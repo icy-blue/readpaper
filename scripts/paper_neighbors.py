@@ -21,9 +21,9 @@ DISPLAY_LABELS = {
     "pdf": "PDF 链接",
     "doi": "DOI",
     "arxiv": "arXiv",
-    "project": "Project",
-    "code": "Code",
-    "data": "Data",
+    "project": "项目页",
+    "code": "代码",
+    "data": "数据",
     "abstract_raw": "英文摘要",
     "abstract_zh": "中文摘要",
     "reading_digest": "阅读摘要",
@@ -108,6 +108,17 @@ CURATION_LIMITATION_PREFIXES = (
     "当前结论",
 )
 
+DISPLAY_VALUE_LABELS = {
+    "point cloud": "点云",
+    "text": "文本",
+    "image": "图像",
+    "video": "视频",
+    "bounding box": "边界框",
+    "normals": "法向量",
+    "representation": "表示建模",
+    "architecture": "架构设计",
+}
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -156,6 +167,35 @@ def shorten_text(value: str | None, max_chars: int) -> str | None:
 def normalize_label(value: str) -> str:
     text = unicodedata.normalize("NFKC", value or "")
     return re.sub(r"\s+", " ", text).strip()
+
+
+def clean_display_text(value: str | None, max_chars: int | None = None) -> str | None:
+    text = normalize_label(value or "")
+    text = re.sub(r"^#+\s*", "", text)
+    text = re.sub(r"^\d+(?:\.\d+)*[.)]?\s+", "", text)
+    if not text:
+        return None
+    if max_chars is None or len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1].rstrip("，,；;：: ") + "…"
+
+
+def display_value(value: str | None) -> str | None:
+    text = clean_display_text(value)
+    if not text:
+        return None
+    return DISPLAY_VALUE_LABELS.get(text.lower(), text)
+
+
+def clean_display_list(values: Any, *, max_chars: int, limit: int | None = None) -> list[str]:
+    cleaned: list[str] = []
+    for item in ensure_strings(values):
+        text = clean_display_text(display_value(item), max_chars=max_chars)
+        if text and text not in cleaned:
+            cleaned.append(text)
+            if limit is not None and len(cleaned) >= limit:
+                break
+    return cleaned
 
 
 def is_curation_limitation(value: str) -> bool:
@@ -653,58 +693,106 @@ def normalized_record(
         "abstract_raw": str(record.get("abstract_raw") or "") or None,
         "abstract_zh": str(record.get("abstract_zh") or "") or None,
         "summary": {
-            "one_liner": str(summary.get("one_liner") or ""),
-            "abstract_summary": str(summary.get("abstract_summary") or ""),
-            "research_value": research_value,
+            "one_liner": clean_display_text(str(summary.get("one_liner") or ""), max_chars=110) or "",
+            "abstract_summary": clean_display_text(str(summary.get("abstract_summary") or ""), max_chars=150),
+            "research_value": {
+                "summary": clean_display_text(str(research_value.get("summary") or ""), max_chars=72),
+                "points": clean_display_list(research_value.get("points"), max_chars=64, limit=3),
+            },
             "worth_long_term_graph": bool(summary.get("worth_long_term_graph")),
         },
-        "reading_digest": reading_digest,
-        "storyline": storyline,
-        "research_problem": research_problem,
-        "core_contributions": ensure_strings(record.get("core_contributions")),
+        "reading_digest": {
+            "value_statement": clean_display_text(str(reading_digest.get("value_statement") or ""), max_chars=84),
+            "best_for": clean_display_text(str(reading_digest.get("best_for") or ""), max_chars=72),
+            "why_read": clean_display_list(reading_digest.get("why_read"), max_chars=64, limit=3),
+            "recommended_route": str(reading_digest.get("recommended_route") or "overview"),
+            "positioning": {
+                "task": clean_display_list((reading_digest.get("positioning") or {}).get("task"), max_chars=28, limit=4)
+                if isinstance(reading_digest.get("positioning"), dict)
+                else [],
+                "modality": clean_display_list((reading_digest.get("positioning") or {}).get("modality"), max_chars=24, limit=4)
+                if isinstance(reading_digest.get("positioning"), dict)
+                else [],
+                "method": clean_display_list((reading_digest.get("positioning") or {}).get("method"), max_chars=28, limit=4)
+                if isinstance(reading_digest.get("positioning"), dict)
+                else [],
+                "novelty": clean_display_list((reading_digest.get("positioning") or {}).get("novelty"), max_chars=24, limit=4)
+                if isinstance(reading_digest.get("positioning"), dict)
+                else [],
+            },
+            "narrative": {
+                "problem": clean_display_text(str((reading_digest.get("narrative") or {}).get("problem") or ""), max_chars=90)
+                if isinstance(reading_digest.get("narrative"), dict)
+                else None,
+                "method": clean_display_text(str((reading_digest.get("narrative") or {}).get("method") or ""), max_chars=90)
+                if isinstance(reading_digest.get("narrative"), dict)
+                else None,
+                "result": clean_display_text(str((reading_digest.get("narrative") or {}).get("result") or ""), max_chars=90)
+                if isinstance(reading_digest.get("narrative"), dict)
+                else None,
+            },
+            "result_headline": clean_display_text(str(reading_digest.get("result_headline") or ""), max_chars=96),
+        },
+        "storyline": {
+            "problem": clean_display_text(str(storyline.get("problem") or ""), max_chars=84),
+            "method": clean_display_text(str(storyline.get("method") or ""), max_chars=84),
+            "outcome": clean_display_text(str(storyline.get("outcome") or ""), max_chars=84),
+        },
+        "research_problem": {
+            "summary": clean_display_text(str(research_problem.get("summary") or ""), max_chars=100),
+            "gaps": clean_display_list(research_problem.get("gaps"), max_chars=84, limit=4),
+            "goal": clean_display_text(str(research_problem.get("goal") or ""), max_chars=100),
+        },
+        "core_contributions": clean_display_list(record.get("core_contributions"), max_chars=90, limit=4),
         "key_claims": [
             {
-                "claim": str(item.get("claim") or ""),
-                "type": str(item.get("type") or "method"),
+                "claim": clean_display_text(str(item.get("claim") or ""), max_chars=120) or "",
+                "type": clean_display_text(str(item.get("type") or "method"), max_chars=24) or "method",
                 "support": ensure_strings(item.get("support")),
-                "confidence": str(item.get("confidence") or ""),
+                "confidence": clean_display_text(str(item.get("confidence") or ""), max_chars=16) or "",
             }
             for item in record.get("key_claims", [])
             if isinstance(item, dict)
         ],
         "method_core": {
-            "approach_summary": str(method_core.get("approach_summary") or "") or None,
-            "pipeline_steps": ensure_strings(method_core.get("pipeline_steps")),
-            "innovations": ensure_strings(method_core.get("innovations")),
-            "ingredients": ensure_strings(method_core.get("ingredients")),
-            "representation": ensure_strings(method_core.get("representation")),
-            "supervision": ensure_strings(method_core.get("supervision")),
-            "differences": ensure_strings(method_core.get("differences")),
+            "approach_summary": clean_display_text(str(method_core.get("approach_summary") or ""), max_chars=110),
+            "pipeline_steps": clean_display_list(method_core.get("pipeline_steps"), max_chars=105, limit=4),
+            "innovations": clean_display_list(method_core.get("innovations"), max_chars=90, limit=4),
+            "ingredients": clean_display_list(method_core.get("ingredients"), max_chars=32, limit=6),
+            "representation": clean_display_list(method_core.get("representation"), max_chars=32, limit=6),
+            "supervision": clean_display_list(method_core.get("supervision"), max_chars=48, limit=4),
+            "differences": clean_display_list(method_core.get("differences"), max_chars=90, limit=4),
         },
         "inputs_outputs": {
-            "inputs": ensure_strings(inputs_outputs.get("inputs")),
-            "outputs": ensure_strings(inputs_outputs.get("outputs")),
-            "modalities": ensure_strings(inputs_outputs.get("modalities")),
+            "inputs": clean_display_list(inputs_outputs.get("inputs"), max_chars=28, limit=6),
+            "outputs": clean_display_list(inputs_outputs.get("outputs"), max_chars=28, limit=6),
+            "modalities": clean_display_list(inputs_outputs.get("modalities"), max_chars=24, limit=6),
         },
         "benchmarks_or_eval": {
-            "datasets": ensure_strings(eval_block.get("datasets")),
-            "metrics": ensure_strings(eval_block.get("metrics")),
-            "baselines": ensure_strings(eval_block.get("baselines")),
-            "findings": ensure_strings(eval_block.get("findings")),
-            "best_results": ensure_strings(eval_block.get("best_results")),
-            "experiment_setup_summary": str(eval_block.get("experiment_setup_summary") or "") or None,
+            "datasets": clean_display_list(eval_block.get("datasets"), max_chars=30, limit=8),
+            "metrics": clean_display_list(eval_block.get("metrics"), max_chars=20, limit=8),
+            "baselines": clean_display_list(eval_block.get("baselines"), max_chars=28, limit=8),
+            "findings": clean_display_list(eval_block.get("findings"), max_chars=90, limit=4),
+            "best_results": clean_display_list(eval_block.get("best_results"), max_chars=90, limit=4),
+            "experiment_setup_summary": clean_display_text(str(eval_block.get("experiment_setup_summary") or ""), max_chars=140),
         },
-        "author_conclusion": str(record.get("author_conclusion") or "") or None,
+        "author_conclusion": clean_display_text(str(record.get("author_conclusion") or ""), max_chars=180),
         "editor_note": editor_note,
-        "editorial_review": editorial_review,
-        "limitations": paper_limitations(record.get("limitations")),
-        "novelty_type": ensure_strings(record.get("novelty_type")),
+        "editorial_review": {
+            "verdict": clean_display_text(str(editorial_review.get("verdict") or ""), max_chars=16),
+            "strengths": clean_display_list(editorial_review.get("strengths"), max_chars=80, limit=4),
+            "cautions": clean_display_list(editorial_review.get("cautions"), max_chars=80, limit=4),
+            "research_position": clean_display_text(str(editorial_review.get("research_position") or ""), max_chars=84),
+            "next_read_hint": clean_display_text(str(editorial_review.get("next_read_hint") or ""), max_chars=60),
+        },
+        "limitations": clean_display_list(paper_limitations(record.get("limitations")), max_chars=90, limit=4),
+        "novelty_type": clean_display_list(record.get("novelty_type"), max_chars=24, limit=4),
         "research_tags": {
             "themes": tag_group(record, "themes"),
             "tasks": tag_group(record, "tasks"),
             "methods": tag_group(record, "methods"),
-            "modalities": tag_group(record, "modalities"),
-            "representations": tag_group(record, "representations"),
+            "modalities": clean_display_list(tag_group(record, "modalities"), max_chars=24, limit=6),
+            "representations": clean_display_list(tag_group(record, "representations"), max_chars=28, limit=6),
         },
         "retrieval_profile": {
             "problem_spaces": ensure_strings(retrieval_profile.get("problem_spaces")),
@@ -716,14 +804,17 @@ def normalized_record(
             "comparison_axes": ensure_strings(retrieval_profile.get("comparison_axes")),
         },
         "comparison_context": {
-            "explicit_baselines": ensure_strings(comparison_context_payload.get("explicit_baselines")),
-            "contrast_methods": ensure_strings(comparison_context_payload.get("contrast_methods")),
+            "explicit_baselines": clean_display_list(comparison_context_payload.get("explicit_baselines"), max_chars=28, limit=8),
+            "contrast_methods": clean_display_list(comparison_context_payload.get("contrast_methods"), max_chars=28, limit=8),
             "comparison_aspects": [
-                item
+                {
+                    "aspect": clean_display_text(str(item.get("aspect") or ""), max_chars=28) or "",
+                    "difference": clean_display_text(str(item.get("difference") or ""), max_chars=96) or "",
+                }
                 for item in comparison_context_payload.get("comparison_aspects", [])
                 if isinstance(item, dict)
             ],
-            "recommended_next_read": str(comparison_context_payload.get("recommended_next_read") or "") or None,
+            "recommended_next_read": clean_display_text(str(comparison_context_payload.get("recommended_next_read") or ""), max_chars=36),
         },
         "paper_neighbors": {
             "task": paper_neighbors.get("task", []),

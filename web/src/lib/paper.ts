@@ -11,6 +11,56 @@ import type {
 
 type JsonRecord = Record<string, unknown>;
 
+const DISPLAY_VALUE_LABELS: Record<string, string> = {
+  "point cloud": "点云",
+  text: "文本",
+  image: "图像",
+  video: "视频",
+  "bounding box": "边界框",
+  normals: "法向量",
+  representation: "表示建模",
+  architecture: "架构设计",
+  method: "方法",
+  result: "结果",
+  difference: "差异",
+};
+
+const SIGNAL_LABELS: Record<string, string> = {
+  task_axes: "任务",
+  problem_spaces: "问题空间",
+  input_axes: "输入",
+  output_axes: "输出",
+  modality_axes: "模态",
+  approach_axes: "方法",
+  comparison_axes: "对比线索",
+  current_approach_axes: "当前路线",
+  candidate_approach_axes: "候选路线",
+};
+
+const FIGURE_ROLE_LABELS: Record<string, string> = {
+  method_overview: "方法总览",
+  qualitative_result: "定性结果",
+  quantitative_result: "定量结果",
+  ablation: "消融实验",
+  failure_case: "失败案例",
+};
+
+const COMPARISON_ASPECT_LABELS: Record<string, string> = {
+  method: "方法差异",
+  result: "结果差异",
+  difference: "差异说明",
+};
+
+const CLAIM_TYPE_LABELS: Record<string, string> = {
+  all: "全部",
+  method: "方法",
+  experiment: "实验",
+  capability: "能力",
+  limitation: "局限",
+};
+
+const DISPLAY_TEXT_PREFIX_RE = /^(#+\s*|\d+(?:\.\d+)*[.)]?\s+)/;
+
 const REBUILD_COMMANDS = [
   "python3 scripts/normalize_papers.py --raw-dir outputs/raw --papers-dir outputs/papers",
   "python3 scripts/backfill_paper_neighbors.py --papers-dir outputs/papers",
@@ -540,14 +590,60 @@ export function recommendedRouteLabel(value: PaperRecord["reading_digest"]["reco
   return "先看概述";
 }
 
-export function verdictTone(value: EditorialReview["verdict"]): "gold" | "blue" | "default" {
+export function verdictTagClass(value: EditorialReview["verdict"]): string {
   if (value === "值得精读") {
-    return "gold";
+    return "chip-tag chip-tag-verdict-strong";
   }
   if (value === "值得浏览") {
-    return "blue";
+    return "chip-tag chip-tag-verdict-browse";
   }
-  return "default";
+  return "chip-tag chip-tag-verdict-muted";
+}
+
+export function routeTagClass(value: PaperRecord["reading_digest"]["recommended_route"]): string {
+  if (value === "method") {
+    return "chip-tag chip-tag-route-method";
+  }
+  if (value === "evaluation") {
+    return "chip-tag chip-tag-route-evaluation";
+  }
+  if (value === "comparison") {
+    return "chip-tag chip-tag-route-comparison";
+  }
+  return "chip-tag chip-tag-route-overview";
+}
+
+export function scoreLevelTagClass(value: NeighborItem["score_level"]): string {
+  if (value === "high") {
+    return "chip-tag chip-tag-score-high";
+  }
+  if (value === "medium") {
+    return "chip-tag chip-tag-score-medium";
+  }
+  return "chip-tag chip-tag-score-low";
+}
+
+export function importanceTagClass(value: FigureTableIndexItem["importance"]): string {
+  if (value === "high") {
+    return "chip-tag chip-tag-score-high";
+  }
+  if (value === "medium") {
+    return "chip-tag chip-tag-score-medium";
+  }
+  return "chip-tag chip-tag-score-low";
+}
+
+export function chipToneClass(value?: string | null): string {
+  if (value === "gold" || value === "warning" || value === "magenta") {
+    return "chip-tag chip-tag-tone-warm";
+  }
+  if (value === "green" || value === "success") {
+    return "chip-tag chip-tag-tone-green";
+  }
+  if (value === "processing" || value === "purple") {
+    return "chip-tag chip-tag-tone-cyan";
+  }
+  return "chip-tag chip-tag-tone-blue";
 }
 
 export function matchesTags(paperTags: string[], selected: string[]): boolean {
@@ -581,10 +677,10 @@ export function firstExternalLinks(links: LinkSet): Array<{ key: keyof LinkSet; 
   const labels: Record<keyof LinkSet, string> = {
     pdf: "PDF",
     arxiv: "arXiv",
-    project: "Project",
-    code: "Code",
+    project: "项目页",
+    code: "代码",
     doi: "DOI",
-    data: "Data",
+    data: "数据",
   };
   return (["pdf", "arxiv", "project", "code", "doi", "data"] as Array<keyof LinkSet>)
     .map((key) => ({ key, label: labels[key], href: normalizeExternalLink(key, links[key]) }))
@@ -636,7 +732,9 @@ export function scoreLevelLabel(level: string | null | undefined): string {
 
 export function sharedSignalPreview(sharedSignals: NeighborItem["shared_signals"]): string[] {
   return Object.entries(sharedSignals)
-    .flatMap(([key, values]) => values.slice(0, 2).map((value) => `${key}: ${value}`))
+    .flatMap(([key, values]) =>
+      values.slice(0, 2).map((value) => `${displaySignalLabel(key)}: ${displayValueLabel(value)}`),
+    )
     .slice(0, 3);
 }
 
@@ -646,14 +744,50 @@ export function compactList(values: string[], limit = 4): string[] {
 
 export function flattenRetrievalProfile(profile: RetrievalProfile): Array<{ label: string; values: string[] }> {
   return [
-    { label: "Problem spaces", values: profile.problem_spaces },
-    { label: "Task axes", values: profile.task_axes },
-    { label: "Approach axes", values: profile.approach_axes },
-    { label: "Input axes", values: profile.input_axes },
-    { label: "Output axes", values: profile.output_axes },
-    { label: "Modality axes", values: profile.modality_axes },
-    { label: "Comparison axes", values: profile.comparison_axes },
+    { label: "问题空间", values: profile.problem_spaces.map(displayValueLabel) },
+    { label: "任务轴", values: profile.task_axes.map(displayValueLabel) },
+    { label: "方法轴", values: profile.approach_axes.map(displayValueLabel) },
+    { label: "输入轴", values: profile.input_axes.map(displayValueLabel) },
+    { label: "输出轴", values: profile.output_axes.map(displayValueLabel) },
+    { label: "模态轴", values: profile.modality_axes.map(displayValueLabel) },
+    { label: "对比线索", values: profile.comparison_axes.map(displayValueLabel) },
   ];
+}
+
+export function cleanDisplayText(value: string | null | undefined, maxChars?: number): string | null {
+  const content = (value ?? "")
+    .replace(DISPLAY_TEXT_PREFIX_RE, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!content) {
+    return null;
+  }
+  if (!maxChars || content.length <= maxChars) {
+    return content;
+  }
+  return `${content.slice(0, maxChars - 1).trimEnd()}…`;
+}
+
+export function displayValueLabel(value: string | null | undefined): string {
+  const content = cleanDisplayText(value) ?? "";
+  const lowered = content.toLowerCase();
+  return DISPLAY_VALUE_LABELS[lowered] ?? content;
+}
+
+export function displaySignalLabel(value: string): string {
+  return SIGNAL_LABELS[value] ?? value;
+}
+
+export function displayFigureRole(value: string): string {
+  return FIGURE_ROLE_LABELS[value] ?? value;
+}
+
+export function displayComparisonAspect(value: string): string {
+  return COMPARISON_ASPECT_LABELS[value] ?? value;
+}
+
+export function displayClaimType(value: string): string {
+  return CLAIM_TYPE_LABELS[value] ?? value;
 }
 
 export function filterFigureTableItems(items: FigureTableIndexItem[], query: string): FigureTableIndexItem[] {

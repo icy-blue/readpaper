@@ -18,15 +18,19 @@ import { FileSearchOutlined, FilterOutlined, FireOutlined, ReadOutlined } from "
 import { startTransition, useDeferredValue, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  cleanDisplayText,
+  displayValueLabel,
   firstExternalLinks,
+  routeTagClass,
   formatYear,
   markdownHref,
   matchesTags,
   paperRoute,
   recommendedRouteLabel,
   searchableText,
-  verdictTone,
+  verdictTagClass,
 } from "../lib/paper";
+import { TooltipTag, TooltipText } from "../components/OverflowTooltip";
 import type { PaperRecord, SitePayload } from "../types";
 
 const { Title, Paragraph, Text } = Typography;
@@ -59,12 +63,12 @@ function DiscoveryPanel({
   return (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
       <Card bordered={false} className="surface-card discovery-card control-panel-card">
-        <Text className="section-kicker">Research Console</Text>
+        <Text className="section-kicker">论文检索台</Text>
         <Title level={4} className="panel-title">
-          先选方向，再进单篇阅读流
+          先筛选，再进入单篇阅读
         </Title>
         <Paragraph type="secondary" className="panel-support-copy">
-          首页负责发现与判断，详情页负责深读与对比。
+          首页负责发现与判断，详情页负责深入理解与对比。
         </Paragraph>
         <Input
           allowClear
@@ -82,7 +86,7 @@ function DiscoveryPanel({
             size="large"
             placeholder="按主题筛选"
             value={selectedThemes}
-            options={payload.filters.themes.map((item) => ({ label: `${item.label} (${item.count})`, value: item.label }))}
+            options={payload.filters.themes.map((item) => ({ label: `${displayValueLabel(item.label)} (${item.count})`, value: item.label }))}
             onChange={(value) => startTransition(() => setSelectedThemes(value))}
           />
           <Select
@@ -91,7 +95,7 @@ function DiscoveryPanel({
             size="large"
             placeholder="按任务筛选"
             value={selectedTasks}
-            options={payload.filters.tasks.map((item) => ({ label: `${item.label} (${item.count})`, value: item.label }))}
+            options={payload.filters.tasks.map((item) => ({ label: `${displayValueLabel(item.label)} (${item.count})`, value: item.label }))}
             onChange={(value) => startTransition(() => setSelectedTasks(value))}
           />
           <Select
@@ -100,7 +104,7 @@ function DiscoveryPanel({
             size="large"
             placeholder="按方法筛选"
             value={selectedMethods}
-            options={payload.filters.methods.map((item) => ({ label: `${item.label} (${item.count})`, value: item.label }))}
+            options={payload.filters.methods.map((item) => ({ label: `${displayValueLabel(item.label)} (${item.count})`, value: item.label }))}
             onChange={(value) => startTransition(() => setSelectedMethods(value))}
           />
           <Select
@@ -120,9 +124,7 @@ function DiscoveryPanel({
         <Text className="section-kicker">热门切口</Text>
         <Flex wrap="wrap" gap={8} style={{ marginTop: 12 }}>
           {payload.filters.themes.slice(0, 10).map((item) => (
-            <Tag key={item.label} className="soft-tag">
-              {item.label}
-            </Tag>
+            <TooltipTag key={item.label} label={displayValueLabel(item.label)} maxChars={20} className="chip-tag chip-tag-tone-blue" />
           ))}
         </Flex>
       </Card>
@@ -142,16 +144,19 @@ function positioningTags(paper: PaperRecord): string[] {
 function QuickEntryCard({ paper }: { paper: PaperRecord }) {
   return (
     <Card bordered={false} className="surface-card quick-entry-card">
-      <Text className="section-kicker">快速进入</Text>
+      <Text className="section-kicker">推荐阅读</Text>
       <Link to={paperRoute(paper.route_path, paper.paper_id)} className="paper-link small">
         {paper.title}
       </Link>
-      <Paragraph className="quick-entry-copy">
-        {paper.reading_digest.value_statement || paper.summary.one_liner || "暂无阅读判断。"}
-      </Paragraph>
+      <TooltipText
+        text={paper.reading_digest.value_statement || paper.summary.one_liner || "暂无阅读判断。"}
+        as="paragraph"
+        rows={3}
+        className="quick-entry-copy"
+      />
       <Flex wrap="wrap" gap={8}>
-        {paper.editorial_review.verdict ? <Tag color={verdictTone(paper.editorial_review.verdict)}>{paper.editorial_review.verdict}</Tag> : null}
-        <Tag className="soft-tag">{recommendedRouteLabel(paper.reading_digest.recommended_route)}</Tag>
+        {paper.editorial_review.verdict ? <Tag className={verdictTagClass(paper.editorial_review.verdict)}>{paper.editorial_review.verdict}</Tag> : null}
+        <Tag className={routeTagClass(paper.reading_digest.recommended_route)}>{recommendedRouteLabel(paper.reading_digest.recommended_route)}</Tag>
       </Flex>
     </Card>
   );
@@ -166,9 +171,9 @@ function PaperListCard({ paper }: { paper: PaperRecord }) {
       <Flex justify="space-between" align="start" gap={16} wrap="wrap">
         <div className="paper-card-main">
           <Flex wrap="wrap" gap={8} className="paper-decision-tags">
-            {paper.editorial_review.verdict ? <Tag color={verdictTone(paper.editorial_review.verdict)}>{paper.editorial_review.verdict}</Tag> : null}
-            <Tag color="blue">{recommendedRouteLabel(paper.reading_digest.recommended_route)}</Tag>
-            {paper.summary.worth_long_term_graph ? <Tag color="success">值得长期图谱</Tag> : null}
+            {paper.editorial_review.verdict ? <Tag className={verdictTagClass(paper.editorial_review.verdict)}>{paper.editorial_review.verdict}</Tag> : null}
+            <Tag className={routeTagClass(paper.reading_digest.recommended_route)}>{recommendedRouteLabel(paper.reading_digest.recommended_route)}</Tag>
+            {paper.summary.worth_long_term_graph ? <Tag className="chip-tag chip-tag-worth">值得长期图谱</Tag> : null}
           </Flex>
           <Link to={paperRoute(paper.route_path, paper.paper_id)} className="paper-link">
             {paper.title}
@@ -182,15 +187,23 @@ function PaperListCard({ paper }: { paper: PaperRecord }) {
         </Button>
       </Flex>
 
-      <Paragraph className="paper-summary-line">
-        {paper.reading_digest.value_statement || paper.summary.one_liner || "暂无一句话结论。"}
-      </Paragraph>
+      <TooltipText
+        text={cleanDisplayText(paper.reading_digest.value_statement || paper.summary.one_liner, 110) || "暂无一句话结论。"}
+        as="paragraph"
+        rows={3}
+        className="paper-summary-line"
+      />
 
       {paper.reading_digest.best_for ? (
-        <Paragraph className="paper-support-line">适合谁读：{paper.reading_digest.best_for}</Paragraph>
+        <TooltipText
+          text={`适合谁读：${cleanDisplayText(paper.reading_digest.best_for, 72) || paper.reading_digest.best_for}`}
+          as="paragraph"
+          rows={2}
+          className="paper-support-line"
+        />
       ) : null}
 
-      <Row gutter={[12, 12]} className="paper-reason-grid">
+      <Row gutter={[12, 12]} className="paper-reason-grid card-grid-row">
         {[
           {
             title: "为什么读",
@@ -198,7 +211,7 @@ function PaperListCard({ paper }: { paper: PaperRecord }) {
           },
           {
             title: "结果先看",
-            values: [paper.reading_digest.result_headline || paper.benchmarks_or_eval.best_results[0] || "暂无前置结果判断。"],
+            values: [cleanDisplayText(paper.reading_digest.result_headline || paper.benchmarks_or_eval.best_results[0], 82) || "暂无前置结果判断。"],
           },
         ].map((group) => (
           <Col xs={24} md={12} key={group.title}>
@@ -206,9 +219,7 @@ function PaperListCard({ paper }: { paper: PaperRecord }) {
               <Text strong>{group.title}</Text>
               <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
                 {group.values.map((value) => (
-                  <Paragraph key={value} style={{ marginBottom: 0 }}>
-                    {value}
-                  </Paragraph>
+                  <TooltipText key={value} text={cleanDisplayText(value, 80)} as="paragraph" rows={3} />
                 ))}
               </Space>
             </Card>
@@ -218,9 +229,7 @@ function PaperListCard({ paper }: { paper: PaperRecord }) {
 
       <Flex wrap="wrap" gap={8}>
         {positioningTags(paper).map((tag) => (
-          <Tag key={`${paper.paper_id}-${tag}`} className="soft-tag">
-            {tag}
-          </Tag>
+          <TooltipTag key={`${paper.paper_id}-${tag}`} label={displayValueLabel(tag)} maxChars={22} className="chip-tag chip-tag-tone-blue" />
         ))}
       </Flex>
 
@@ -303,16 +312,14 @@ export function HomePage({ payload }: { payload: SitePayload }) {
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24} xl={14}>
             <Text className="section-kicker">Translate Paper Forest</Text>
-            <Title className="display-title">把论文页做成研究控制台，而不是资料堆栈。</Title>
+            <Title className="display-title">把论文站做成研究工作台，而不是信息堆栈。</Title>
             <Paragraph className="hero-description">
-              先在首页完成筛选与阅读判断，再进入单篇页按“决策层、理解层、资料层”推进。每篇论文都优先回答值不值得读、该从哪里切入、下一篇该看谁。
+              先在首页完成筛选与阅读判断，再进入单篇页依次看研究问题、方法设计、实验结果与对比线索。每篇论文都优先回答值不值得读、该从哪里切入、下一篇该看谁。
             </Paragraph>
             {payload.recent_titles.length ? (
               <Flex wrap="wrap" gap={8} className="recent-tag-row">
                 {payload.recent_titles.slice(0, 6).map((title) => (
-                  <Tag key={title} icon={<FireOutlined />} className="soft-tag">
-                    {title}
-                  </Tag>
+                  <TooltipTag key={title} label={cleanDisplayText(title, 24)} maxChars={24} icon={<FireOutlined />} className="chip-tag chip-tag-highlight" />
                 ))}
               </Flex>
             ) : null}
@@ -383,12 +390,12 @@ export function HomePage({ payload }: { payload: SitePayload }) {
           <Card bordered={false} className="surface-card results-surface">
             <Flex justify="space-between" align="end" wrap="wrap" gap={12}>
               <div>
-                <Text className="section-kicker">判断结果</Text>
-                <Title level={3} className="panel-title">
-                  {filteredPapers.length ? `找到 ${filteredPapers.length} 篇可进入阅读流的论文` : "没有命中论文"}
-                </Title>
-              </div>
-              <Text type="secondary">结果卡展示阅读判断、推荐路线和定位标签，不再平铺摘要字段。</Text>
+              <Text className="section-kicker">判断结果</Text>
+              <Title level={3} className="panel-title">
+                {filteredPapers.length ? `找到 ${filteredPapers.length} 篇可进入阅读流的论文` : "没有命中论文"}
+              </Title>
+            </div>
+              <Text type="secondary">结果卡只保留读前决策信息，不再平铺长摘要。</Text>
             </Flex>
 
             <Space direction="vertical" size={16} style={{ width: "100%", marginTop: 22 }}>

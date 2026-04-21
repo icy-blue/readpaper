@@ -286,7 +286,7 @@ def render_paper_page(record: dict[str, Any]) -> str:
             if isinstance(value, str) and value.strip()
         ]
         if storyline_parts:
-            lines.append("- Storyline: " + " | ".join(storyline_parts))
+            lines.append("- 三段故事: " + " | ".join(storyline_parts))
     lines.append("")
 
     research_problem = record.get("research_problem", {}) if isinstance(record.get("research_problem"), dict) else {}
@@ -296,11 +296,11 @@ def render_paper_page(record: dict[str, Any]) -> str:
     if research_problem_summary or research_problem_gaps or research_problem_goal:
         lines.extend(["## 研究问题", ""])
         if research_problem_summary:
-            lines.append(f"- summary: {research_problem_summary}")
+            lines.append(f"- 问题摘要: {research_problem_summary}")
         for item in research_problem_gaps:
-            lines.append(f"- gap: {item}")
+            lines.append(f"- 研究缺口: {item}")
         if research_problem_goal:
-            lines.append(f"- goal: {research_problem_goal}")
+            lines.append(f"- 研究目标: {research_problem_goal}")
         lines.append("")
 
     if contributions:
@@ -315,9 +315,9 @@ def render_paper_page(record: dict[str, Any]) -> str:
         lines.append(f"- {display_label('approach_summary')}: {approach_summary}")
     pipeline_steps = ensure_strings(method_core.get("pipeline_steps"))
     for item in pipeline_steps:
-        lines.append(f"- pipeline: {item}")
+        lines.append(f"- 方法流程: {item}")
     for item in ensure_strings(method_core.get("innovations")):
-        lines.append(f"- innovation: {item}")
+        lines.append(f"- 主要创新: {item}")
     for key in ("ingredients", "representation", "supervision", "differences"):
         values = ensure_strings(method_core.get(key))
         if values:
@@ -348,21 +348,21 @@ def render_paper_page(record: dict[str, Any]) -> str:
     editor_note_points = ensure_strings(editor_note.get("points")) if isinstance(editor_note, dict) else []
     lines.extend(["", "## 编辑判断", ""])
     if verdict:
-        lines.append(f"- verdict: {verdict}")
+        lines.append(f"- 结论: {verdict}")
     for item in ensure_strings(editorial_review.get("strengths")):
-        lines.append(f"- strength: {item}")
+        lines.append(f"- 值得看: {item}")
     for item in ensure_strings(editorial_review.get("cautions")):
-        lines.append(f"- caution: {item}")
+        lines.append(f"- 需注意: {item}")
     research_position = str(editorial_review.get("research_position") or "").strip()
     next_read_hint = str(editorial_review.get("next_read_hint") or "").strip()
     if research_position:
-        lines.append(f"- position: {research_position}")
+        lines.append(f"- 阅读定位: {research_position}")
     if next_read_hint:
-        lines.append(f"- next: {next_read_hint}")
+        lines.append(f"- 下一篇建议: {next_read_hint}")
     if editor_note_summary:
-        lines.append(f"- editor_note: {editor_note_summary}")
+        lines.append(f"- 编者按: {editor_note_summary}")
     for item in editor_note_points:
-        lines.append(f"- editor_point: {item}")
+        lines.append(f"- 阅读备注: {item}")
     lines.append("")
 
     lines.extend(render_comparison_context(record))
@@ -414,7 +414,7 @@ def render_paper_page(record: dict[str, Any]) -> str:
     lines.append("")
 
     if topics:
-        lines.extend(["## Topics", ""])
+        lines.extend(["## 主题节点", ""])
         for item in topics:
             name = str(item.get("name") or item.get("slug") or "")
             role = str(item.get("role") or "").strip()
