@@ -91,6 +91,7 @@ def load_record(path: Path) -> dict[str, Any]:
         year_text = "unknown"
 
     source_ids = ensure_list_strings(data.get("source_conversation_ids"))
+    links = data.get("links") if isinstance(data.get("links"), dict) else {}
     record = {
         "paper_id": paper_id.strip(),
         "title": normalize_text(title),
@@ -99,7 +100,7 @@ def load_record(path: Path) -> dict[str, Any]:
         "dedupe_key": primary_key(title, year_text, venue),
         "fallback_key": fallback_key(title, year_text),
         "source_conversation_ids": source_ids,
-        "canonical_url": str(data.get("pdf_url") or ""),
+        "canonical_url": str(links.get("pdf") or ""),
         "record_path": str(path),
         "processed_at": str(data.get("processed_at") or "") or utc_now(),
     }

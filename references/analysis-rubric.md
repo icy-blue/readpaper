@@ -4,68 +4,52 @@ Extract knowledge for future retrieval, comparison, and idea generation.
 
 ## Priority order
 
-1. What problem the paper solves
-2. What the paper claims is new
-3. What evidence in the translated payload supports those claims
-4. What makes this paper similar to or different from neighboring papers
+1. The core research problem
+2. The paper's concrete contributions
+3. The strongest claims and their support
+4. The method route and comparison hooks
 5. Whether the paper deserves a durable place in the long-term graph
 
-## Claim extraction rules
+## Extraction guidance
 
-- Prefer concrete claims over generic praise.
-- Write 2 to 5 claims.
-- Each claim should be falsifiable or comparable.
-- When possible, attach evidence from:
-  - translated section ids
-  - figure captions
-  - table captions
-  - summary text already present in the payload
-
-## Method analysis rules
-
-- Separate `approach` from `innovation`.
-- `approach` explains the pipeline.
-- `innovation` explains what changed relative to familiar baselines or nearby work.
-- `differences` should emphasize the most decision-relevant differences, not every detail.
+- `abstract_zh`: prefer the translated abstract unit from the conversation.
+- `abstract_raw`: prefer Semantic Scholar abstract; otherwise keep `null`.
+- `research_problem`: write the shortest grounded formulation of the problem.
+- `core_contributions`: keep 2 to 4 concrete items.
+- `key_claims`: keep 2 to 5 falsifiable or comparable claims.
+- `author_conclusion`: prefer conclusion-section wording over editor paraphrase.
+- `editor_note`: reserve for your own grounded reading note; leave `null` when unavailable.
+- `experiment_setup_summary`: summarize datasets / settings / evaluation setup, not the whole result section.
 
 ## Similarity and difference rules
 
-When writing single-paper neighbor context, prioritize three reading dimensions:
+Before matching papers, compress each paper into a retrieval-facing profile:
 
-- task neighbors: same or very close `research_tags.tasks`
-- method neighbors: same method family or representation family
-- comparison neighbors: explicit baselines first, then methods called out in `differences` or `innovation`
+- `problem_spaces`
+- `task_axes`
+- `approach_axes`
+- `input_axes`
+- `output_axes`
+- `modality_axes`
+- `comparison_axes`
 
-Use `comparison_context` to store the machine-readable comparison cues:
+Use `comparison_context` for machine-readable comparison cues and `paper_neighbors` for the actual retrieved neighbor list.
 
-- `explicit_baselines`
-- `contrast_methods`
-- `contrast_notes`
+Each neighbor should include:
 
-Use `paper_neighbors` to store the actual per-paper results:
+- `match_source`
+- `reason`
+- `shared_signals`
+- `relation_hint`
 
-- `task`
-- `method`
-- `comparison`
+## Partial translation handling
 
-Each neighbor should explain:
+- Prefer visible evidence from translated sections, figures, and tables.
+- If translation is incomplete, record the uncertainty in `translate_status.coverage_notes`.
+- Use `limitations` only for paper-side limitations, not extraction caveats.
 
-- why it matched
-- which signals were shared
-- whether the match came from task overlap, method overlap, baseline match, contrast-method match, or fallback contrast
+## Source priority
 
-## Partial-translation handling
-
-If the payload does not cover the full paper:
-
-- still extract useful structure
-- prefer visible evidence
-- mention uncertainty through `limitations`
-- mark `translate_status.is_partial` as `true`
-
-## Tone rules
-
-- Write for your future self as a research engineer.
-- Favor short, information-dense phrasing.
-- Avoid marketing language.
-- Avoid repeating the abstract unless it truly captures the novelty.
+- Prefer `translate.icydev.cn` for translated content, section state, and PDF link.
+- Prefer Semantic Scholar for `authors`, `abstract_raw`, `citation_count`, and metadata enrichment.
+- Never override `conversation.pdf_url` with an external PDF when a conversation PDF is already present.

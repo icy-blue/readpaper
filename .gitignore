@@ -21,6 +21,10 @@ venv/
 .env.*
 *.log
 
+# Frontend
+node_modules/
+web/dist/
+
 # Local pipeline artifacts
 outputs/fetch/
 outputs/papers/*.json

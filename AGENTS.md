@@ -46,6 +46,14 @@ python3 scripts/fetch_translate_papers.py \
 - `references/paper-schema.md`
 - `references/analysis-rubric.md`
 
+Preferred command:
+
+```bash
+python3 scripts/normalize_papers.py \
+  --raw-dir outputs/raw \
+  --papers-dir outputs/papers
+```
+
 3. Rebuild the registry:
 
 ```bash

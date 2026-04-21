@@ -13,12 +13,24 @@ from typing import Any
 
 DISPLAY_LABELS = {
     "paper_id": "论文 ID",
+    "authors": "作者",
     "venue": "会议 / 期刊",
     "year": "年份",
     "citation_count": "引用数",
     "translate_created_at": "收录时间",
-    "pdf_url": "PDF 链接",
-    "problem": "研究问题",
+    "links": "链接",
+    "pdf": "PDF 链接",
+    "doi": "DOI",
+    "arxiv": "arXiv",
+    "project": "Project",
+    "code": "Code",
+    "data": "Data",
+    "abstract_raw": "英文摘要",
+    "abstract_zh": "中文摘要",
+    "research_problem": "研究问题",
+    "core_contributions": "核心贡献",
+    "author_conclusion": "作者结论",
+    "editor_note": "编者按",
     "approach": "核心思路",
     "innovation": "主要创新",
     "ingredients": "关键组成",
@@ -32,16 +44,27 @@ DISPLAY_LABELS = {
     "metrics": "评测指标",
     "baselines": "对比方法",
     "findings": "主要发现",
+    "experiment_setup_summary": "实验设置摘要",
     "themes": "主题",
     "tasks": "任务",
     "methods": "方法",
     "representations": "表征",
+    "problem_spaces": "问题空间",
+    "task_axes": "任务画像",
+    "approach_axes": "技术路线",
+    "input_axes": "输入画像",
+    "output_axes": "输出画像",
+    "modality_axes": "模态画像",
+    "comparison_axes": "对比线索",
     "explicit_baselines": "显式对比方法",
     "contrast_methods": "对比方法线索",
     "contrast_notes": "对比说明",
     "matched_terms": "命中线索",
     "current_methods": "当前方法",
     "candidate_methods": "对方方法",
+    "current_approach_axes": "当前路线",
+    "candidate_approach_axes": "对方路线",
+    "relation_hint": "关系提示",
     "score": "相关度",
 }
 
@@ -52,6 +75,14 @@ MATCH_SOURCE_LABELS = {
     "contrast_method_match": "线索对比",
     "fallback_contrast": "回退对比",
     "neighbor": "近邻",
+}
+
+RELATION_HINT_LABELS = {
+    "task_overlap": "同任务代表方法",
+    "method_overlap": "同路线近邻",
+    "baseline_match": "显式对比对象",
+    "contrast_method_match": "路线对比对象",
+    "fallback_contrast": "同任务差异路线",
 }
 
 SUPPORT_PREFIX_LABELS = {
@@ -65,6 +96,12 @@ CONFIDENCE_LABELS = {
     "medium": "中",
     "low": "低",
 }
+
+CURATION_LIMITATION_PREFIXES = (
+    "当前记录",
+    "当前摘要",
+    "当前结论",
+)
 
 
 def utc_now() -> str:
@@ -107,6 +144,24 @@ def normalize_label(value: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def is_curation_limitation(value: str) -> bool:
+    text = normalize_label(value)
+    return any(text.startswith(prefix) for prefix in CURATION_LIMITATION_PREFIXES)
+
+
+def paper_limitations(value: Any) -> list[str]:
+    return [item for item in ensure_strings(value) if not is_curation_limitation(item)]
+
+
+def coverage_notes(record: dict[str, Any]) -> list[str]:
+    translate_status = record.get("translate_status") if isinstance(record.get("translate_status"), dict) else {}
+    notes = ensure_strings(translate_status.get("coverage_notes"))
+    for item in ensure_strings(record.get("limitations")):
+        if is_curation_limitation(item) and item not in notes:
+            notes.append(item)
+    return notes
+
+
 def normalize_match_text(value: str) -> str:
     text = normalize_label(value).lower()
     text = re.sub(r"[^0-9a-z\u4e00-\u9fff]+", " ", text)
@@ -120,6 +175,11 @@ def display_label(key: str, default: str = "") -> str:
 def match_source_label(value: str) -> str:
     text = normalize_label(value)
     return MATCH_SOURCE_LABELS.get(text, text or "近邻")
+
+
+def relation_hint(value: str) -> str | None:
+    text = normalize_label(value)
+    return RELATION_HINT_LABELS.get(text)
 
 
 def format_support_label(value: str) -> str:
@@ -162,7 +222,7 @@ def paper_sort_key(item: dict[str, Any]) -> tuple[int, str]:
 def paper_paths(paper_id: str) -> dict[str, str]:
     return {
         "paper_path": f"papers/{paper_id}.md",
-        "html_path": f"papers/{paper_id}.html",
+        "route_path": f"#/paper/{paper_id}",
     }
 
 
@@ -209,6 +269,17 @@ def sort_lookup(values: list[str]) -> list[str]:
     return sorted(dedupe_sorted(values), key=normalize_label)
 
 
+def merge_string_lists(*groups: Any, max_items: int | None = None) -> list[str]:
+    merged: list[str] = []
+    for group in groups:
+        for item in ensure_strings(group):
+            if item not in merged:
+                merged.append(item)
+                if max_items is not None and len(merged) >= max_items:
+                    return merged
+    return merged
+
+
 def build_signal_vocabulary(records: list[dict[str, Any]]) -> list[str]:
     vocab: list[str] = []
     for record in records:
@@ -253,9 +324,61 @@ def derive_comparison_context(record: dict[str, Any], vocabulary: list[str]) -> 
     }
 
 
+def derive_problem_spaces(record: dict[str, Any]) -> list[str]:
+    themes = tag_group(record, "themes")
+    tasks = tag_group(record, "tasks")
+    inputs_outputs = record.get("inputs_outputs") if isinstance(record.get("inputs_outputs"), dict) else {}
+    outputs = ensure_strings(inputs_outputs.get("outputs"))
+    return merge_string_lists(themes, tasks, outputs, max_items=3)
+
+
+def build_retrieval_profile(
+    record: dict[str, Any],
+    comparison_context: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    method_core = record.get("method_core") if isinstance(record.get("method_core"), dict) else {}
+    inputs_outputs = record.get("inputs_outputs") if isinstance(record.get("inputs_outputs"), dict) else {}
+    existing = record.get("retrieval_profile") if isinstance(record.get("retrieval_profile"), dict) else {}
+    derived = {
+        "problem_spaces": derive_problem_spaces(record),
+        "task_axes": tag_group(record, "tasks"),
+        "approach_axes": merge_string_lists(
+            tag_group(record, "methods"),
+            ensure_strings(method_core.get("ingredients")),
+            ensure_strings(method_core.get("representation")),
+            tag_group(record, "representations"),
+        ),
+        "input_axes": ensure_strings(inputs_outputs.get("inputs")),
+        "output_axes": ensure_strings(inputs_outputs.get("outputs")),
+        "modality_axes": merge_string_lists(inputs_outputs.get("modalities"), tag_group(record, "modalities")),
+        "comparison_axes": merge_string_lists(
+            ensure_strings(comparison_context.get("explicit_baselines")),
+            ensure_strings(comparison_context.get("contrast_methods")),
+        ),
+    }
+    return {
+        "problem_spaces": merge_string_lists(existing.get("problem_spaces"), derived["problem_spaces"], max_items=3),
+        "task_axes": merge_string_lists(existing.get("task_axes"), derived["task_axes"]),
+        "approach_axes": merge_string_lists(existing.get("approach_axes"), derived["approach_axes"]),
+        "input_axes": merge_string_lists(existing.get("input_axes"), derived["input_axes"]),
+        "output_axes": merge_string_lists(existing.get("output_axes"), derived["output_axes"]),
+        "modality_axes": merge_string_lists(existing.get("modality_axes"), derived["modality_axes"]),
+        "comparison_axes": merge_string_lists(existing.get("comparison_axes"), derived["comparison_axes"]),
+    }
+
+
+def build_route_core(record: dict[str, Any]) -> list[str]:
+    method_core = record.get("method_core") if isinstance(record.get("method_core"), dict) else {}
+    return merge_string_lists(
+        tag_group(record, "methods"),
+        ensure_strings(method_core.get("ingredients")),
+    )
+
+
 def normalized_record(
     record: dict[str, Any],
     comparison_context: dict[str, list[str]],
+    retrieval_profile: dict[str, list[str]],
     paper_neighbors: dict[str, list[dict[str, Any]]],
     *,
     include_site_paths: bool,
@@ -265,24 +388,41 @@ def normalized_record(
     eval_block = record.get("benchmarks_or_eval") if isinstance(record.get("benchmarks_or_eval"), dict) else {}
     translate_status = record.get("translate_status") if isinstance(record.get("translate_status"), dict) else {}
     figure_table_index = record.get("figure_table_index") if isinstance(record.get("figure_table_index"), dict) else {}
+    links = record.get("links") if isinstance(record.get("links"), dict) else {}
     summary = summary_block(record)
+    translate_status_payload = dict(translate_status)
+    note_values = coverage_notes(record)
+    if note_values:
+        translate_status_payload["coverage_notes"] = note_values
 
     payload = {
         "paper_id": str(record.get("paper_id") or ""),
         "source_conversation_ids": ensure_strings(record.get("source_conversation_ids")),
         "title": str(record.get("title") or record.get("paper_id") or ""),
+        "authors": ensure_strings(record.get("authors")),
         "year": record.get("year"),
         "venue": str(record.get("venue") or "Unknown"),
-        "citation_count": record.get("citation_count") or 0,
-        "pdf_url": str(record.get("pdf_url") or ""),
+        "citation_count": record.get("citation_count"),
+        "links": {
+            "pdf": str(links.get("pdf") or "") or None,
+            "doi": str(links.get("doi") or "") or None,
+            "arxiv": str(links.get("arxiv") or "") or None,
+            "project": str(links.get("project") or "") or None,
+            "code": str(links.get("code") or "") or None,
+            "data": str(links.get("data") or "") or None,
+        },
         "translate_created_at": str(record.get("translate_created_at") or ""),
-        "translate_status": translate_status,
+        "translate_status": translate_status_payload,
+        "abstract_raw": str(record.get("abstract_raw") or "") or None,
+        "abstract_zh": str(record.get("abstract_zh") or "") or None,
         "summary": {
             "one_liner": str(summary.get("one_liner") or ""),
             "abstract_summary": str(summary.get("abstract_summary") or ""),
-            "research_value": str(summary.get("research_value") or ""),
+            "research_value": str(summary.get("research_value") or "") or None,
             "worth_long_term_graph": bool(summary.get("worth_long_term_graph")),
         },
+        "research_problem": str(record.get("research_problem") or "") or None,
+        "core_contributions": ensure_strings(record.get("core_contributions")),
         "key_claims": [
             {
                 "claim": str(item.get("claim") or ""),
@@ -293,9 +433,8 @@ def normalized_record(
             if isinstance(item, dict)
         ],
         "method_core": {
-            "problem": str(method_core.get("problem") or ""),
-            "approach": str(method_core.get("approach") or ""),
-            "innovation": str(method_core.get("innovation") or ""),
+            "approach": str(method_core.get("approach") or "") or None,
+            "innovation": str(method_core.get("innovation") or "") or None,
             "ingredients": ensure_strings(method_core.get("ingredients")),
             "representation": ensure_strings(method_core.get("representation")),
             "supervision": ensure_strings(method_core.get("supervision")),
@@ -311,8 +450,11 @@ def normalized_record(
             "metrics": ensure_strings(eval_block.get("metrics")),
             "baselines": ensure_strings(eval_block.get("baselines")),
             "findings": ensure_strings(eval_block.get("findings")),
+            "experiment_setup_summary": str(eval_block.get("experiment_setup_summary") or "") or None,
         },
-        "limitations": ensure_strings(record.get("limitations")),
+        "author_conclusion": str(record.get("author_conclusion") or "") or None,
+        "editor_note": str(record.get("editor_note") or "") or None,
+        "limitations": paper_limitations(record.get("limitations")),
         "novelty_type": ensure_strings(record.get("novelty_type")),
         "research_tags": {
             "themes": tag_group(record, "themes"),
@@ -320,6 +462,15 @@ def normalized_record(
             "methods": tag_group(record, "methods"),
             "modalities": tag_group(record, "modalities"),
             "representations": tag_group(record, "representations"),
+        },
+        "retrieval_profile": {
+            "problem_spaces": ensure_strings(retrieval_profile.get("problem_spaces")),
+            "task_axes": ensure_strings(retrieval_profile.get("task_axes")),
+            "approach_axes": ensure_strings(retrieval_profile.get("approach_axes")),
+            "input_axes": ensure_strings(retrieval_profile.get("input_axes")),
+            "output_axes": ensure_strings(retrieval_profile.get("output_axes")),
+            "modality_axes": ensure_strings(retrieval_profile.get("modality_axes")),
+            "comparison_axes": ensure_strings(retrieval_profile.get("comparison_axes")),
         },
         "comparison_context": {
             "explicit_baselines": ensure_strings(comparison_context.get("explicit_baselines")),
@@ -331,6 +482,8 @@ def normalized_record(
             "method": paper_neighbors.get("method", []),
             "comparison": paper_neighbors.get("comparison", []),
         },
+        "topics": [item for item in record.get("topics", []) if isinstance(item, dict)],
+        "paper_relations": [item for item in record.get("paper_relations", []) if isinstance(item, dict)],
         "figure_table_index": figure_table_index,
     }
 
@@ -347,46 +500,118 @@ def reason_from_parts(parts: list[str], fallback: str) -> str:
     return "，".join(parts) if parts else fallback
 
 
-def task_neighbor_reason(shared_tasks: list[str], shared_themes: list[str], shared_modalities: list[str]) -> str:
+def profile_values(profile: dict[str, list[str]], key: str) -> list[str]:
+    return ensure_strings(profile.get(key))
+
+
+def shared_profile_values(left: dict[str, list[str]], right: dict[str, list[str]], key: str) -> list[str]:
+    return shared_values(profile_values(left, key), profile_values(right, key))
+
+
+def has_problem_alignment(left: dict[str, list[str]], right: dict[str, list[str]]) -> bool:
+    return bool(shared_profile_values(left, right, "task_axes") or shared_profile_values(left, right, "problem_spaces"))
+
+
+def has_io_alignment(left: dict[str, list[str]], right: dict[str, list[str]]) -> bool:
+    return bool(
+        shared_profile_values(left, right, "input_axes")
+        or shared_profile_values(left, right, "output_axes")
+        or shared_profile_values(left, right, "modality_axes")
+    )
+
+
+def comparison_gate(left: dict[str, list[str]], right: dict[str, list[str]]) -> bool:
+    return has_problem_alignment(left, right) and has_io_alignment(left, right)
+
+
+def task_neighbor_reason(
+    shared_tasks: list[str],
+    shared_problem_spaces: list[str],
+    shared_inputs: list[str],
+    shared_outputs: list[str],
+    shared_modalities: list[str],
+) -> str:
     parts: list[str] = []
     if shared_tasks:
         parts.append("同属 " + " / ".join(shared_tasks))
-    if shared_themes:
-        parts.append("主题接近：" + " / ".join(shared_themes))
+    if shared_problem_spaces:
+        parts.append("问题空间接近：" + " / ".join(shared_problem_spaces))
+    if shared_inputs:
+        parts.append("输入接近：" + " / ".join(shared_inputs))
+    if shared_outputs:
+        parts.append("输出接近：" + " / ".join(shared_outputs))
     if shared_modalities:
-        parts.append("输入模态接近：" + " / ".join(shared_modalities))
+        parts.append("模态接近：" + " / ".join(shared_modalities))
     return reason_from_parts(parts, "任务定义接近。")
 
 
 def method_neighbor_reason(
-    shared_methods: list[str],
-    shared_representations: list[str],
-    shared_novelty: list[str],
+    shared_tasks: list[str],
+    shared_problem_spaces: list[str],
+    shared_approaches: list[str],
+    shared_outputs: list[str],
 ) -> str:
     parts: list[str] = []
-    if shared_methods:
-        parts.append("共享方法族：" + " / ".join(shared_methods))
-    if shared_representations:
-        parts.append("共享表征：" + " / ".join(shared_representations))
-    if shared_novelty:
-        parts.append("创新点相近：" + " / ".join(shared_novelty))
+    if shared_tasks:
+        parts.append("同任务：" + " / ".join(shared_tasks))
+    if shared_problem_spaces:
+        parts.append("同问题空间：" + " / ".join(shared_problem_spaces))
+    if shared_approaches:
+        parts.append("共享技术路线：" + " / ".join(shared_approaches))
+    if shared_outputs:
+        parts.append("输出对象接近：" + " / ".join(shared_outputs))
     return reason_from_parts(parts, "技术路线接近。")
 
 
 def comparison_reason(
     matched_terms: list[str],
-    shared_tasks: list[str],
     source_label: str,
-    current_methods: list[str],
-    candidate_methods: list[str],
+    shared_tasks: list[str],
+    shared_problem_spaces: list[str],
+    shared_inputs: list[str],
+    shared_outputs: list[str],
+    shared_modalities: list[str],
+    current_approaches: list[str],
+    candidate_approaches: list[str],
 ) -> str:
     parts: list[str] = []
     if matched_terms:
         parts.append(f"{source_label}命中：" + " / ".join(matched_terms))
     if shared_tasks:
         parts.append("同任务：" + " / ".join(shared_tasks))
-    if current_methods and candidate_methods and set(current_methods) != set(candidate_methods):
-        parts.append("方法侧重点不同")
+    if shared_problem_spaces:
+        parts.append("同问题空间：" + " / ".join(shared_problem_spaces))
+    if shared_inputs:
+        parts.append("输入接近：" + " / ".join(shared_inputs))
+    if shared_outputs:
+        parts.append("输出接近：" + " / ".join(shared_outputs))
+    if shared_modalities:
+        parts.append("模态接近：" + " / ".join(shared_modalities))
+    if current_approaches and candidate_approaches and not set(current_approaches) & set(candidate_approaches):
+        parts.append("技术路线侧重点不同")
+    return reason_from_parts(parts, "适合作为对比阅读对象。")
+
+
+def fallback_comparison_reason(
+    source_label: str,
+    shared_tasks: list[str],
+    shared_problem_spaces: list[str],
+    shared_inputs: list[str],
+    shared_outputs: list[str],
+    shared_modalities: list[str],
+) -> str:
+    parts: list[str] = []
+    if shared_tasks:
+        parts.append("同任务：" + " / ".join(shared_tasks))
+    if shared_problem_spaces:
+        parts.append("同问题空间：" + " / ".join(shared_problem_spaces))
+    if shared_inputs:
+        parts.append("输入接近：" + " / ".join(shared_inputs))
+    if shared_outputs:
+        parts.append("输出接近：" + " / ".join(shared_outputs))
+    if shared_modalities:
+        parts.append("模态接近：" + " / ".join(shared_modalities))
+    parts.append(f"{source_label}下技术路线明显不同")
     return reason_from_parts(parts, "适合作为对比阅读对象。")
 
 
@@ -434,30 +659,20 @@ def build_candidate_index(records: list[dict[str, Any]]) -> dict[str, dict[str, 
     return index
 
 
-def paper_signal_lookup(record: dict[str, Any], comparison_context: dict[str, list[str]]) -> list[str]:
-    return sort_lookup(
-        [
-            str(record.get("title") or ""),
-            *tag_group(record, "methods"),
-            *tag_group(record, "representations"),
-            *ensure_strings(comparison_context.get("explicit_baselines")),
-        ]
-    )
-
-
-def match_terms_against_paper(
-    terms: list[str],
-    candidate: dict[str, Any],
-    candidate_context: dict[str, list[str]],
-) -> list[str]:
+def match_terms_against_profile(terms: list[str], candidate_profile: dict[str, list[str]]) -> list[str]:
     matched: list[str] = []
-    title_norm = normalize_match_text(str(candidate.get("title") or ""))
-    signal_norms = [normalize_match_text(value) for value in paper_signal_lookup(candidate, candidate_context)]
+    signal_norms = [
+        normalize_match_text(value)
+        for value in merge_string_lists(
+            candidate_profile.get("comparison_axes"),
+            candidate_profile.get("approach_axes"),
+        )
+    ]
     for term in terms:
         normalized_term = normalize_match_text(term)
         if not normalized_term:
             continue
-        if normalized_term in title_norm or any(
+        if any(
             normalized_term == signal or normalized_term in signal or signal in normalized_term
             for signal in signal_norms
             if signal
@@ -467,33 +682,53 @@ def match_terms_against_paper(
     return matched
 
 
-def build_task_neighbors(record: dict[str, Any], candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    items: list[tuple[tuple[int, int, int, str], dict[str, Any]]] = []
-    left_tasks = tag_group(record, "tasks")
-    left_themes = tag_group(record, "themes")
-    left_modalities = tag_group(record, "modalities")
+def build_task_neighbors(
+    record: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    profile_lookup: dict[str, dict[str, list[str]]],
+) -> list[dict[str, Any]]:
+    items: list[tuple[tuple[int, int, int, int, int, str], dict[str, Any]]] = []
+    left_profile = profile_lookup.get(str(record.get("paper_id") or ""), {})
     for candidate in candidates:
-        shared_tasks = shared_values(left_tasks, tag_group(candidate, "tasks"))
+        candidate_profile = profile_lookup.get(str(candidate.get("paper_id") or ""), {})
+        shared_tasks = shared_profile_values(left_profile, candidate_profile, "task_axes")
         if not shared_tasks:
             continue
-        shared_themes = shared_values(left_themes, tag_group(candidate, "themes"))
-        shared_modalities = shared_values(left_modalities, tag_group(candidate, "modalities"))
+        shared_problem_spaces = shared_profile_values(left_profile, candidate_profile, "problem_spaces")
+        shared_inputs = shared_profile_values(left_profile, candidate_profile, "input_axes")
+        shared_outputs = shared_profile_values(left_profile, candidate_profile, "output_axes")
+        shared_modalities = shared_profile_values(left_profile, candidate_profile, "modality_axes")
         item = {
             "paper_id": str(candidate.get("paper_id") or ""),
             "title": str(candidate.get("title") or candidate.get("paper_id") or ""),
-            "score": len(shared_tasks) * 100 + len(shared_themes) * 10 + len(shared_modalities),
+            "score": len(shared_tasks) * 100
+            + len(shared_problem_spaces) * 30
+            + len(shared_inputs) * 10
+            + len(shared_outputs) * 10
+            + len(shared_modalities) * 5,
             "match_source": "task_overlap",
             "shared_signals": {
-                "tasks": shared_tasks,
-                "themes": shared_themes,
-                "modalities": shared_modalities,
+                "task_axes": shared_tasks,
+                "problem_spaces": shared_problem_spaces,
+                "input_axes": shared_inputs,
+                "output_axes": shared_outputs,
+                "modality_axes": shared_modalities,
             },
-            "reason": task_neighbor_reason(shared_tasks, shared_themes, shared_modalities),
+            "reason": task_neighbor_reason(
+                shared_tasks,
+                shared_problem_spaces,
+                shared_inputs,
+                shared_outputs,
+                shared_modalities,
+            ),
+            "relation_hint": relation_hint("task_overlap"),
             **paper_paths(str(candidate.get("paper_id") or "")),
         }
         sort_key = (
             -len(shared_tasks),
-            -len(shared_themes),
+            -len(shared_problem_spaces),
+            -len(shared_inputs),
+            -len(shared_outputs),
             -len(shared_modalities),
             candidate_sort_title(candidate),
         )
@@ -502,34 +737,51 @@ def build_task_neighbors(record: dict[str, Any], candidates: list[dict[str, Any]
     return [item for _, item in items[:3]]
 
 
-def build_method_neighbors(record: dict[str, Any], candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    items: list[tuple[tuple[int, int, int, str], dict[str, Any]]] = []
-    left_methods = tag_group(record, "methods")
-    left_representations = tag_group(record, "representations")
-    left_novelty = novelty_tags(record)
+def build_method_neighbors(
+    record: dict[str, Any],
+    candidates: list[dict[str, Any]],
+    profile_lookup: dict[str, dict[str, list[str]]],
+) -> list[dict[str, Any]]:
+    items: list[tuple[tuple[int, int, int, int, str], dict[str, Any]]] = []
+    left_profile = profile_lookup.get(str(record.get("paper_id") or ""), {})
     for candidate in candidates:
-        shared_methods = shared_values(left_methods, tag_group(candidate, "methods"))
-        shared_representations = shared_values(left_representations, tag_group(candidate, "representations"))
-        if not shared_methods and not shared_representations:
+        candidate_profile = profile_lookup.get(str(candidate.get("paper_id") or ""), {})
+        if not has_problem_alignment(left_profile, candidate_profile):
             continue
-        shared_novelty = shared_values(left_novelty, novelty_tags(candidate))
+        shared_tasks = shared_profile_values(left_profile, candidate_profile, "task_axes")
+        shared_problem_spaces = shared_profile_values(left_profile, candidate_profile, "problem_spaces")
+        shared_approaches = shared_profile_values(left_profile, candidate_profile, "approach_axes")
+        shared_outputs = shared_profile_values(left_profile, candidate_profile, "output_axes")
+        if not shared_approaches:
+            continue
         item = {
             "paper_id": str(candidate.get("paper_id") or ""),
             "title": str(candidate.get("title") or candidate.get("paper_id") or ""),
-            "score": len(shared_methods) * 100 + len(shared_representations) * 10 + len(shared_novelty),
+            "score": len(shared_tasks) * 100
+            + len(shared_problem_spaces) * 40
+            + len(shared_approaches) * 30
+            + len(shared_outputs) * 10,
             "match_source": "method_overlap",
             "shared_signals": {
-                "methods": shared_methods,
-                "representations": shared_representations,
-                "novelty_type": shared_novelty,
+                "task_axes": shared_tasks,
+                "problem_spaces": shared_problem_spaces,
+                "approach_axes": shared_approaches,
+                "output_axes": shared_outputs,
             },
-            "reason": method_neighbor_reason(shared_methods, shared_representations, shared_novelty),
+            "reason": method_neighbor_reason(
+                shared_tasks,
+                shared_problem_spaces,
+                shared_approaches,
+                shared_outputs,
+            ),
+            "relation_hint": relation_hint("method_overlap"),
             **paper_paths(str(candidate.get("paper_id") or "")),
         }
         sort_key = (
-            -len(shared_methods),
-            -len(shared_representations),
-            -len(shared_novelty),
+            -len(shared_tasks),
+            -len(shared_problem_spaces),
+            -len(shared_approaches),
+            -len(shared_outputs),
             candidate_sort_title(candidate),
         )
         items.append((sort_key, item))
@@ -541,13 +793,12 @@ def build_comparison_neighbors(
     record: dict[str, Any],
     candidates: list[dict[str, Any]],
     comparison_context: dict[str, list[str]],
-    context_lookup: dict[str, dict[str, list[str]]],
+    profile_lookup: dict[str, dict[str, list[str]]],
+    route_lookup: dict[str, list[str]],
 ) -> list[dict[str, Any]]:
     selected: list[dict[str, Any]] = []
     selected_ids: set[str] = set()
-    left_tasks = tag_group(record, "tasks")
-    left_methods = tag_group(record, "methods")
-    left_modalities = tag_group(record, "modalities")
+    left_profile = profile_lookup.get(str(record.get("paper_id") or ""), {})
 
     def append_candidates(
         terms: list[str],
@@ -561,38 +812,55 @@ def build_comparison_neighbors(
             candidate_id = str(candidate.get("paper_id") or "")
             if not candidate_id or candidate_id in selected_ids:
                 continue
-            candidate_context = context_lookup.get(candidate_id, {})
-            matched_terms = match_terms_against_paper(terms, candidate, candidate_context)
+            candidate_profile = profile_lookup.get(candidate_id, {})
+            if not comparison_gate(left_profile, candidate_profile):
+                continue
+            matched_terms = match_terms_against_profile(terms, candidate_profile)
             if require_match and not matched_terms:
                 continue
-            shared_tasks = shared_values(left_tasks, tag_group(candidate, "tasks"))
-            shared_methods = shared_values(left_methods, tag_group(candidate, "methods"))
-            shared_modalities = shared_values(left_modalities, tag_group(candidate, "modalities"))
+            shared_tasks = shared_profile_values(left_profile, candidate_profile, "task_axes")
+            shared_problem_spaces = shared_profile_values(left_profile, candidate_profile, "problem_spaces")
+            shared_inputs = shared_profile_values(left_profile, candidate_profile, "input_axes")
+            shared_outputs = shared_profile_values(left_profile, candidate_profile, "output_axes")
+            shared_modalities = shared_profile_values(left_profile, candidate_profile, "modality_axes")
             if require_match or matched_terms:
                 item = {
                     "paper_id": candidate_id,
                     "title": str(candidate.get("title") or candidate_id),
-                    "score": len(matched_terms) * 100 + len(shared_tasks) * 10 + len(shared_methods),
+                    "score": len(matched_terms) * 100
+                    + len(shared_tasks) * 40
+                    + len(shared_problem_spaces) * 30
+                    + len(shared_inputs) * 10
+                    + len(shared_outputs) * 10
+                    + len(shared_modalities) * 5,
                     "match_source": source_name,
                     "shared_signals": {
-                        "matched_terms": matched_terms,
-                        "tasks": shared_tasks,
-                        "methods": shared_methods,
-                        "modalities": shared_modalities,
+                        "comparison_axes": matched_terms,
+                        "task_axes": shared_tasks,
+                        "problem_spaces": shared_problem_spaces,
+                        "input_axes": shared_inputs,
+                        "output_axes": shared_outputs,
+                        "modality_axes": shared_modalities,
                     },
                     "reason": comparison_reason(
                         matched_terms,
-                        shared_tasks,
                         source_label,
-                        left_methods,
-                        tag_group(candidate, "methods"),
+                        shared_tasks,
+                        shared_problem_spaces,
+                        shared_inputs,
+                        shared_outputs,
+                        shared_modalities,
+                        route_lookup.get(str(record.get("paper_id") or ""), []),
+                        route_lookup.get(candidate_id, []),
                     ),
+                    "relation_hint": relation_hint(source_name),
                     **paper_paths(candidate_id),
                 }
                 sort_key = (
                     -len(matched_terms),
                     -len(shared_tasks),
-                    -len(shared_methods),
+                    -len(shared_problem_spaces),
+                    -(len(shared_inputs) + len(shared_outputs) + len(shared_modalities)),
                     candidate_sort_title(candidate),
                 )
                 ranked.append((sort_key, item))
@@ -623,39 +891,55 @@ def build_comparison_neighbors(
             candidate_id = str(candidate.get("paper_id") or "")
             if not candidate_id or candidate_id in selected_ids:
                 continue
-            shared_tasks = shared_values(left_tasks, tag_group(candidate, "tasks"))
-            shared_themes = shared_values(tag_group(record, "themes"), tag_group(candidate, "themes"))
-            shared_modalities = shared_values(left_modalities, tag_group(candidate, "modalities"))
-            candidate_methods = tag_group(candidate, "methods")
-            if not shared_tasks:
+            candidate_profile = profile_lookup.get(candidate_id, {})
+            if not comparison_gate(left_profile, candidate_profile):
                 continue
-            if set(left_methods) & set(candidate_methods):
+            shared_tasks = shared_profile_values(left_profile, candidate_profile, "task_axes")
+            shared_problem_spaces = shared_profile_values(left_profile, candidate_profile, "problem_spaces")
+            shared_inputs = shared_profile_values(left_profile, candidate_profile, "input_axes")
+            shared_outputs = shared_profile_values(left_profile, candidate_profile, "output_axes")
+            shared_modalities = shared_profile_values(left_profile, candidate_profile, "modality_axes")
+            current_approaches = route_lookup.get(str(record.get("paper_id") or ""), [])
+            candidate_approaches = route_lookup.get(candidate_id, [])
+            if not shared_tasks and not shared_problem_spaces:
+                continue
+            if not current_approaches or not candidate_approaches:
+                continue
+            if set(current_approaches) & set(candidate_approaches):
                 continue
             item = {
                 "paper_id": candidate_id,
                 "title": str(candidate.get("title") or candidate_id),
-                "score": len(shared_tasks) * 100 + len(shared_themes) * 10 + len(shared_modalities),
+                "score": len(shared_tasks) * 100
+                + len(shared_problem_spaces) * 40
+                + len(shared_inputs) * 10
+                + len(shared_outputs) * 10
+                + len(shared_modalities) * 5,
                 "match_source": "fallback_contrast",
                 "shared_signals": {
-                    "tasks": shared_tasks,
-                    "themes": shared_themes,
-                    "modalities": shared_modalities,
-                    "current_methods": left_methods,
-                    "candidate_methods": candidate_methods,
+                    "task_axes": shared_tasks,
+                    "problem_spaces": shared_problem_spaces,
+                    "input_axes": shared_inputs,
+                    "output_axes": shared_outputs,
+                    "modality_axes": shared_modalities,
+                    "current_approach_axes": current_approaches,
+                    "candidate_approach_axes": candidate_approaches,
                 },
-                "reason": comparison_reason(
-                    [],
+                "reason": fallback_comparison_reason(
+                    "同任务 / 同问题空间",
                     shared_tasks,
-                    "fallback",
-                    left_methods,
-                    candidate_methods,
+                    shared_problem_spaces,
+                    shared_inputs,
+                    shared_outputs,
+                    shared_modalities,
                 ),
+                "relation_hint": relation_hint("fallback_contrast"),
                 **paper_paths(candidate_id),
             }
             sort_key = (
                 -len(shared_tasks),
-                -len(shared_themes),
-                -len(shared_modalities),
+                -len(shared_problem_spaces),
+                -(len(shared_inputs) + len(shared_outputs) + len(shared_modalities)),
                 candidate_sort_title(candidate),
             )
             ranked_fallback.append((sort_key, item))
@@ -676,6 +960,19 @@ def backfill_records(records: list[dict[str, Any]], *, include_site_paths: bool)
         for record in records
         if str(record.get("paper_id") or "")
     }
+    profile_lookup = {
+        str(record.get("paper_id") or ""): build_retrieval_profile(
+            record,
+            comparison_lookup.get(str(record.get("paper_id") or ""), {}),
+        )
+        for record in records
+        if str(record.get("paper_id") or "")
+    }
+    route_lookup = {
+        str(record.get("paper_id") or ""): build_route_core(record)
+        for record in records
+        if str(record.get("paper_id") or "")
+    }
     neighbor_lookup: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for record in records:
         paper_id = str(record.get("paper_id") or "")
@@ -686,11 +983,16 @@ def backfill_records(records: list[dict[str, Any]], *, include_site_paths: bool)
             for candidate in records
             if str(candidate.get("paper_id") or "") and str(candidate.get("paper_id") or "") != paper_id
         ]
-        comparison_context = comparison_lookup.get(paper_id, {})
         neighbor_lookup[paper_id] = {
-            "task": build_task_neighbors(record, candidates),
-            "method": build_method_neighbors(record, candidates),
-            "comparison": build_comparison_neighbors(record, candidates, comparison_context, comparison_lookup),
+            "task": build_task_neighbors(record, candidates, profile_lookup),
+            "method": build_method_neighbors(record, candidates, profile_lookup),
+            "comparison": build_comparison_neighbors(
+                record,
+                candidates,
+                comparison_lookup.get(paper_id, {}),
+                profile_lookup,
+                route_lookup,
+            ),
         }
 
     normalized: list[dict[str, Any]] = []
@@ -702,6 +1004,7 @@ def backfill_records(records: list[dict[str, Any]], *, include_site_paths: bool)
             normalized_record(
                 record,
                 comparison_lookup.get(paper_id, {}),
+                profile_lookup.get(paper_id, {}),
                 neighbor_lookup.get(paper_id, {"task": [], "method": [], "comparison": []}),
                 include_site_paths=include_site_paths,
             )
@@ -711,10 +1014,32 @@ def backfill_records(records: list[dict[str, Any]], *, include_site_paths: bool)
 
 
 def build_site_payload(records: list[dict[str, Any]]) -> dict[str, Any]:
+    filters = build_tag_filters(records)
+    generated_at = utc_now()
     return {
-        "generated_at": utc_now(),
+        "generated_at": generated_at,
         "paper_count": len(records),
+        "site_meta": {
+            "title": "Translate Paper Forest",
+            "generated_at": generated_at,
+            "paper_count": len(records),
+        },
+        "navigation": {
+            "home_route": "#/",
+            "detail_route_template": "#/paper/{paper_id}",
+            "neighbor_tabs": [
+                {"key": "task", "label": "任务近邻"},
+                {"key": "method", "label": "方法近邻"},
+                {"key": "comparison", "label": "对比近邻"},
+            ],
+            "filter_groups": [
+                {"key": "themes", "label": "主题"},
+                {"key": "tasks", "label": "任务"},
+                {"key": "methods", "label": "方法"},
+            ],
+        },
         "papers": records,
-        "tag_filters": build_tag_filters(records),
+        "filters": filters,
+        "tag_filters": filters,
         "recent_titles": [str(item.get("title") or "") for item in records[:8]],
     }

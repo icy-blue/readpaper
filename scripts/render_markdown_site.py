@@ -21,8 +21,26 @@ from paper_neighbors import (
 )
 
 
+LEGACY_SITE_FILES = (
+    "forest.json",
+    "theme-map.md",
+    "method-map.md",
+    "timeline.md",
+    "relationship-graph.md",
+)
+
+
 def render_support_line(values: list[str]) -> str:
     return ", ".join(format_support_labels(values)) if values else "暂无"
+
+
+def render_links_block(links: dict[str, Any]) -> list[str]:
+    lines: list[str] = []
+    for key in ("pdf", "doi", "arxiv", "project", "code", "data"):
+        value = str(links.get(key) or "").strip()
+        if value:
+            lines.append(f"- {display_label(key)}: {value}")
+    return lines
 
 
 def render_linked_papers(paper_ids: list[str], paper_lookup: dict[str, dict[str, Any]]) -> str:
@@ -30,7 +48,7 @@ def render_linked_papers(paper_ids: list[str], paper_lookup: dict[str, dict[str,
     for paper_id in paper_ids:
         paper = paper_lookup.get(str(paper_id), {})
         title = str(paper.get("title") or paper_id)
-        links.append(f'[{title}](papers/{paper_id}.md)')
+        links.append(f'[{title}](index.html#/paper/{paper_id})')
     return " / ".join(links) if links else "暂无"
 
 
@@ -91,6 +109,9 @@ def render_neighbor_section(title: str, items: list[dict[str, Any]]) -> list[str
         lines.append(
             f"- {label} | {display_label('score')} {item.get('score') or 0} | {match_source_label(str(item.get('match_source') or 'neighbor'))} | {item.get('reason') or ''}"
         )
+        relation_hint = str(item.get("relation_hint") or "").strip()
+        if relation_hint:
+            lines.append(f"  {display_label('relation_hint')}: {relation_hint}")
         shared_signals = item.get("shared_signals") if isinstance(item.get("shared_signals"), dict) else {}
         detail_parts = []
         for key, values in shared_signals.items():
@@ -104,16 +125,16 @@ def render_neighbor_section(title: str, items: list[dict[str, Any]]) -> list[str
 
 
 def render_index(payload: dict[str, Any], paper_lookup: dict[str, dict[str, Any]]) -> str:
-    tag_filters = payload.get("tag_filters", {}) if isinstance(payload.get("tag_filters"), dict) else {}
+    tag_filters = payload.get("filters", {}) if isinstance(payload.get("filters"), dict) else {}
     papers = payload.get("papers", []) if isinstance(payload.get("papers"), list) else []
     lines = [
         "# Translate Paper Forest",
         "",
-        "- 主入口: [HTML 首页](index.html)",
+        "- 主入口: [网页首页](index.html#/)",
         f"- 生成时间: {payload.get('generated_at') or ''}",
         f"- 论文总数: {payload.get('paper_count') or 0}",
-        "- 当前主流程: 先看单篇论文，再沿任务 / 方法 / 对比方法三个维度展开近邻阅读。",
-        "- 旧的全局森林视图已降级为兼容占位页，不再作为主导航。",
+        "- 当前主流程: 先检索论文，再进入单篇阅读页沿任务 / 方法 / 对比方法三个维度展开近邻阅读。",
+        "- 前端站点已切换为单页应用，不再生成每篇论文独立 HTML。",
         "",
         "## 最近论文",
         "",
@@ -122,11 +143,11 @@ def render_index(payload: dict[str, Any], paper_lookup: dict[str, dict[str, Any]
         for paper in papers[:10]:
             paper_id = str(paper.get("paper_id") or "")
             lines.append(
-                f"- [{paper.get('title') or paper_id}](papers/{paper_id}.md) | {paper.get('venue') or ''} {paper.get('year') or ''}"
+                f"- [{paper.get('title') or paper_id}](index.html#/paper/{paper_id}) | {paper.get('venue') or ''} {paper.get('year') or ''}"
             )
     else:
         lines.append("- 暂无已处理论文。")
-    lines.extend(["", "## 导航", "", "- [单篇阅读 HTML](index.html)", ""])
+    lines.extend(["", "## 导航", "", "- [站点首页](index.html#/)", ""])
     lines.extend(render_filter_group("按主题筛选", ensure_strings_dicts(tag_filters.get("themes")), paper_lookup))
     lines.extend(render_filter_group("按任务筛选", ensure_strings_dicts(tag_filters.get("tasks")), paper_lookup))
     lines.extend(render_filter_group("按方法筛选", ensure_strings_dicts(tag_filters.get("methods")), paper_lookup))
@@ -139,6 +160,13 @@ def ensure_strings_dicts(value: Any) -> list[dict[str, Any]]:
     return [item for item in value if isinstance(item, dict)]
 
 
+def remove_legacy_site_files(site_dir: Path) -> None:
+    for name in LEGACY_SITE_FILES:
+        path = site_dir / name
+        if path.exists():
+            path.unlink()
+
+
 def render_paper_page(record: dict[str, Any]) -> str:
     title = str(record.get("title") or record.get("paper_id") or "Untitled")
     summary = record.get("summary", {}) if isinstance(record.get("summary"), dict) else {}
@@ -148,29 +176,62 @@ def render_paper_page(record: dict[str, Any]) -> str:
     inputs_outputs = record.get("inputs_outputs", {}) if isinstance(record.get("inputs_outputs"), dict) else {}
     claims = record.get("key_claims") if isinstance(record.get("key_claims"), list) else []
     neighbors = record.get("paper_neighbors") if isinstance(record.get("paper_neighbors"), dict) else {}
+    links = record.get("links", {}) if isinstance(record.get("links"), dict) else {}
+    authors = ensure_strings(record.get("authors"))
+    contributions = ensure_strings(record.get("core_contributions"))
+    topics = ensure_strings_dicts(record.get("topics"))
+    relations = ensure_strings_dicts(record.get("paper_relations"))
 
     lines = [
         f"# {title}",
         "",
-        f"- HTML 阅读版: [{Path(str(record.get('html_path') or '')).name}]({Path(str(record.get('html_path') or '')).name})",
+        f"- 网页阅读版: [index.html{record.get('route_path') or '#/'}](../index.html{record.get('route_path') or '#/'})",
         f"- {display_label('paper_id')}: {record.get('paper_id') or ''}",
+        f"- {display_label('authors')}: " + (" / ".join(authors) if authors else "暂无"),
         f"- {display_label('venue')}: {record.get('venue') or ''}",
         f"- {display_label('year')}: {record.get('year') or ''}",
-        f"- {display_label('citation_count')}: {record.get('citation_count') or 0}",
-        f"- {display_label('pdf_url')}: {record.get('pdf_url') or ''}",
+        f"- {display_label('citation_count')}: {record.get('citation_count') if record.get('citation_count') is not None else '暂无'}",
+        "",
+        "## 链接",
+        "",
+    ]
+    link_lines = render_links_block(links)
+    if link_lines:
+        lines.extend(link_lines)
+    else:
+        lines.append("- 暂无可用链接。")
+
+    lines.extend([
         "",
         "## 一句话结论",
         "",
         str(summary.get("one_liner") or "暂无"),
         "",
-    ]
+    ])
+
+    abstract_raw = str(record.get("abstract_raw") or "").strip()
+    abstract_zh = str(record.get("abstract_zh") or "").strip()
+    if abstract_raw:
+        lines.extend(["## 英文摘要", "", abstract_raw, ""])
+    if abstract_zh:
+        lines.extend(["## 中文摘要", "", abstract_zh, ""])
 
     abstract_summary = str(summary.get("abstract_summary") or "")
-    research_value = str(summary.get("research_value") or "")
+    research_value = str(summary.get("research_value") or "").strip()
     if abstract_summary:
         lines.extend(["## 摘要概览", "", abstract_summary, ""])
     if research_value:
         lines.extend(["## 长期价值", "", research_value, ""])
+
+    research_problem = str(record.get("research_problem") or "").strip()
+    if research_problem:
+        lines.extend(["## 研究问题", "", research_problem, ""])
+
+    if contributions:
+        lines.extend(["## 核心贡献", ""])
+        for item in contributions:
+            lines.append(f"- {item}")
+        lines.append("")
 
     lines.extend(["## 核心论断", ""])
     if claims:
@@ -188,7 +249,7 @@ def render_paper_page(record: dict[str, Any]) -> str:
         lines.append("- 暂无核心论断。")
 
     lines.extend(["", "## 方法核心", ""])
-    for key in ("problem", "approach", "innovation"):
+    for key in ("approach", "innovation"):
         value = str(method_core.get(key) or "").strip()
         if value:
             lines.append(f"- {display_label(key)}: {value}")
@@ -209,6 +270,17 @@ def render_paper_page(record: dict[str, Any]) -> str:
         values = ensure_strings(eval_block.get(key))
         if values:
             lines.append(f"- {display_label(key)}: " + " / ".join(values))
+    experiment_setup_summary = str(eval_block.get("experiment_setup_summary") or "").strip()
+    if experiment_setup_summary:
+        lines.append(f"- {display_label('experiment_setup_summary')}: {experiment_setup_summary}")
+
+    author_conclusion = str(record.get("author_conclusion") or "").strip()
+    if author_conclusion:
+        lines.extend(["", "## 作者结论", "", author_conclusion])
+
+    editor_note = str(record.get("editor_note") or "").strip()
+    if editor_note:
+        lines.extend(["", "## 编者按", "", editor_note])
 
     limitations = ensure_strings(record.get("limitations"))
     lines.extend(["", "## 局限", ""])
@@ -216,7 +288,7 @@ def render_paper_page(record: dict[str, Any]) -> str:
         for item in limitations:
             lines.append(f"- {item}")
     else:
-        lines.append("- 暂无")
+        lines.append("- 暂无论文局限记录。")
 
     novelty = ensure_strings(record.get("novelty_type"))
     if novelty:
@@ -229,6 +301,29 @@ def render_paper_page(record: dict[str, Any]) -> str:
         if values:
             lines.append(f"- {display_label(key)}: " + " / ".join(values))
     lines.append("")
+
+    if topics:
+        lines.extend(["## Topics", ""])
+        for item in topics:
+            name = str(item.get("name") or item.get("slug") or "")
+            role = str(item.get("role") or "").strip()
+            lines.append(f"- {name}" + (f" | {role}" if role else ""))
+        lines.append("")
+
+    if relations:
+        lines.extend(["## 论文关系", ""])
+        for item in relations:
+            target = str(item.get("target_paper_id") or "")
+            relation_type = str(item.get("relation_type") or "")
+            description = str(item.get("description") or "")
+            confidence = item.get("confidence")
+            line = f"- {target} | {relation_type}"
+            if description:
+                line += f" | {description}"
+            if confidence is not None:
+                line += f" | confidence={confidence}"
+            lines.append(line)
+        lines.append("")
 
     lines.extend(render_comparison_context(record))
     lines.extend(render_neighbor_section("相似论文：任务维度", ensure_strings_dicts(neighbors.get("task"))))
@@ -249,23 +344,6 @@ def render_paper_page(record: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_compat_page(title: str, html_name: str) -> str:
-    return "\n".join(
-        [
-            f"# {title}",
-            "",
-            f"- HTML 阅读版: [{html_name}]({html_name})",
-            "- 该页面已降级为兼容占位页。",
-            "- 当前推荐路径: 从首页进入单篇论文，再沿任务 / 方法 / 对比方法三个维度查看近邻。",
-            "",
-            "## 说明",
-            "",
-            "全局森林视图不再是主入口。本轮输出重点是单篇论文页与每篇论文的多维近邻。",
-            "",
-        ]
-    )
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Render Markdown site from paper-neighbor-first records.")
     parser.add_argument("--papers-dir", required=True, help="Directory containing normalized paper JSON files.")
@@ -276,6 +354,7 @@ def main() -> int:
     site_dir = Path(args.site_dir)
     paper_site_dir = site_dir / "papers"
     paper_site_dir.mkdir(parents=True, exist_ok=True)
+    remove_legacy_site_files(site_dir)
 
     records = backfill_records(papers, include_site_paths=True)
     payload = build_site_payload(records)
@@ -287,10 +366,6 @@ def main() -> int:
 
     write_json(site_dir / "paper-neighbors.json", payload)
     write_text(site_dir / "index.md", render_index(payload, paper_lookup))
-    write_text(site_dir / "theme-map.md", render_compat_page("主题视图", "theme-map.html"))
-    write_text(site_dir / "method-map.md", render_compat_page("方法视图", "method-map.html"))
-    write_text(site_dir / "timeline.md", render_compat_page("时间视图", "timeline.html"))
-    write_text(site_dir / "relationship-graph.md", render_compat_page("关系视图", "relationship-graph.html"))
 
     for record in records:
         paper_id = str(record.get("paper_id") or "")

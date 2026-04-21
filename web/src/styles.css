@@ -1,0 +1,172 @@
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(197, 143, 62, 0.16), transparent 28%),
+    radial-gradient(circle at right 20%, rgba(36, 82, 75, 0.14), transparent 22%),
+    linear-gradient(180deg, #f8f4eb 0%, #f2ebdf 100%);
+}
+
+a {
+  color: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: transparent;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(248, 244, 235, 0.82);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(36, 82, 75, 0.1);
+  padding-inline: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.app-content {
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+}
+
+.brand-lockup {
+  display: grid;
+  gap: 2px;
+}
+
+.brand-label,
+.hero-eyebrow,
+.panel-kicker {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8a5a2b;
+}
+
+.hero-card,
+.panel-card,
+.reading-card,
+.outline-card,
+.paper-card,
+.neighbor-card,
+.sub-card,
+.stat-card {
+  box-shadow: 0 24px 64px rgba(29, 47, 43, 0.08);
+}
+
+.hero-card {
+  background: linear-gradient(135deg, rgba(255, 250, 241, 0.94), rgba(244, 230, 206, 0.88));
+}
+
+.hero-title,
+.detail-title {
+  margin-top: 10px !important;
+  margin-bottom: 12px !important;
+  font-family: Baskerville, "Times New Roman", "Songti SC", serif;
+}
+
+.hero-title {
+  max-width: 14ch;
+  font-size: clamp(36px, 5vw, 58px) !important;
+  line-height: 1.04 !important;
+}
+
+.detail-title {
+  font-size: clamp(30px, 4vw, 44px) !important;
+}
+
+.hero-copy {
+  max-width: 70ch;
+  font-size: 16px;
+  color: rgba(29, 47, 43, 0.75);
+}
+
+.paper-card {
+  background: rgba(255, 252, 247, 0.92);
+}
+
+.paper-link {
+  font-size: 22px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.soft-tag {
+  background: rgba(36, 82, 75, 0.08) !important;
+  border-color: rgba(36, 82, 75, 0.12) !important;
+  color: #204d46 !important;
+}
+
+.neighbor-card,
+.sub-card {
+  background: rgba(250, 248, 243, 0.96);
+}
+
+.finding-card {
+  background: rgba(255, 252, 247, 0.98);
+}
+
+.finding-text {
+  margin-bottom: 0 !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.8;
+}
+
+.reading-card .ant-card-body {
+  display: grid;
+  gap: 14px;
+}
+
+.outline-card {
+  background: rgba(255, 251, 245, 0.92);
+}
+
+.sticky-column {
+  position: sticky;
+  top: 96px;
+}
+
+.lead-text {
+  font-size: 20px;
+  line-height: 1.8;
+}
+
+.loading-state {
+  min-height: 40vh;
+  display: grid;
+  place-items: center;
+}
+
+@media (max-width: 991px) {
+  .app-content {
+    padding: 20px 14px 36px;
+  }
+
+  .app-header {
+    padding-inline: 14px;
+  }
+
+  .hero-title {
+    max-width: none;
+  }
+}

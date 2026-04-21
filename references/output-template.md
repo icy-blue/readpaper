@@ -10,15 +10,7 @@ Write these files under `outputs/site/`:
 - `paper-neighbors.json`
 - `index.html`
 - `papers/<paper-id>.md`
-- `papers/<paper-id>.html`
-- `theme-map.md`
-- `method-map.md`
-- `timeline.md`
-- `relationship-graph.md`
-- `theme-map.html`
-- `method-map.html`
-- `timeline.html`
-- `relationship-graph.html`
+- `assets/*`
 
 ## `index.md`
 
@@ -27,44 +19,64 @@ Include:
 - title
 - generation time
 - total paper count
-- HTML-first navigation
+- SPA-first navigation
 - current reading strategy note
 - recent papers
 - theme/task/method quick filter sections
-
-## Compatibility pages
-
-`theme-map.md`, `method-map.md`, `timeline.md`, and `relationship-graph.md` should remain as short compatibility pages that point readers back to single-paper pages.
 
 ## Per-paper Markdown
 
 Each `papers/<paper-id>.md` should include:
 
 - title and metadata
-- link back to HTML detail page
+- links block
 - one-line conclusion
+- English / Chinese abstract when available
+- research problem
+- core contributions
 - key claims with support
 - method core
-- inputs/outputs when available
+- inputs / outputs when available
 - evaluation snapshot
+- author conclusion / editor note when available
 - limitations
 - research tags
+- topics / paper relations when available
 - comparison context
-- task neighbors
-- method neighbors
-- comparison neighbors
-- figure/table index
+- task / method / comparison neighbors
+- figure / table index
+
+Do not add a dedicated `retrieval_profile` section to the reading pages.
+
+## `paper-neighbors.json`
+
+Each paper payload should retain:
+
+- `links`
+- `research_problem`
+- `core_contributions`
+- `retrieval_profile`
+- `comparison_context`
+- `paper_neighbors`
+- `topics`
+- `paper_relations`
+
+At the top level, include:
+
+- `site_meta`
+- `navigation`
+- `filters`
 
 ## HTML site
 
-Generate the HTML pages from structured data with Python, not by hand.
+Generate a React single-page site from structured data and publish the build artifacts with Python.
 
 The site should include:
 
 - summary cards
-- local navigation
-- recent paper list
-- filter sections by theme, task, and method
-- links between HTML and Markdown counterparts
-- per-paper HTML detail pages with reading-focused layout
-- compatibility placeholder pages for old global views
+- SPA local navigation
+- search and filter controls
+- links between SPA detail routes and Markdown counterparts
+- single-paper detail routes with reading-focused layout
+- author / link metadata
+- abstract, problem, contribution, evaluation, relation, and neighbor sections

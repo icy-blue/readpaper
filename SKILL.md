@@ -23,6 +23,7 @@ Read these references before writing or updating paper records:
 Use these scripts directly instead of inventing ad hoc workflows:
 
 - [scripts/fetch_translate_papers.py](scripts/fetch_translate_papers.py)
+- [scripts/normalize_papers.py](scripts/normalize_papers.py)
 - [scripts/build_registry.py](scripts/build_registry.py)
 - [scripts/backfill_paper_neighbors.py](scripts/backfill_paper_neighbors.py)
 - [scripts/render_markdown_site.py](scripts/render_markdown_site.py)
@@ -63,22 +64,25 @@ If `new_paper_count` is `0`, do not fabricate work. Rebuild the site from existi
 
 For each new paper, read the corresponding raw JSON file in `outputs/raw/`.
 
-### 3. Write one normalized paper record per new paper
+### 3. Normalize raw payloads into paper records
 
-For every new raw payload:
+Run:
 
-1. Follow [references/paper-schema.md](references/paper-schema.md) exactly.
-2. Follow [references/analysis-rubric.md](references/analysis-rubric.md) to extract concise, research-useful knowledge.
-3. Prefer evidence already present in the payload: translated sections, glossary, summary, figures, tables, and metadata.
-4. Save exactly one JSON record to `outputs/papers/<paper-id>.json`.
+```bash
+python scripts/normalize_papers.py \
+  --raw-dir outputs/raw \
+  --papers-dir outputs/papers
+```
 
-Important extraction rules:
+This is the only supported paper-record generation entrypoint.
 
-- Write for personal research retrieval, not public-facing promotion.
-- Extract `key_claims` as 2 to 5 concrete claims.
-- Attach evidence support using translated section ids or figure/table labels whenever possible.
-- Mark partially translated papers as partial instead of pretending the paper is fully covered.
-- Do not invent benchmarks, losses, or claims that are not grounded in the payload.
+Important rules:
+
+- Follow [references/paper-schema.md](references/paper-schema.md) exactly.
+- Prefer `translate.icydev.cn` for translated content, section state, and `links.pdf`.
+- Use Semantic Scholar as the preferred enrichment source for `authors`, `abstract_raw`, and `citation_count`.
+- Do not override `conversation.pdf_url` with an external PDF.
+- Leave `topics`, `paper_relations`, and `editor_note` empty unless there is grounded signal.
 
 ### 4. Update the dedupe registry
 
