@@ -1,0 +1,4 @@
+interface:
+  display_name: "Translate Paper Forest"
+  short_description: "Build a local research forest from translate papers"
+  default_prompt: "Use $translate-paper-forest to ingest translate.icydev.cn papers and rebuild the local knowledge forest."

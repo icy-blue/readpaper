@@ -1,0 +1,29 @@
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.env
+.env.*
+*.log
+
+# Local pipeline artifacts
+outputs/fetch/
+outputs/papers/*.json
+outputs/raw/
+outputs/site/
+state/paper_registry.json
