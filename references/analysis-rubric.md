@@ -19,17 +19,32 @@ Extract knowledge for future retrieval, comparison, and idea generation.
 - `storyline.problem`: must describe the research gap or task difficulty, not method or result.
 - `storyline.method`: must describe the core method action or mechanism, not evaluation.
 - `storyline.outcome`: must describe the result or observed gain, not problem framing.
+- `summary.one_liner`: write one finished judgment sentence; do not splice `problem + method` fragments with semicolons and do not emit `...`.
 - `reading_digest.value_statement`: write a reading-value judgment, not a content recap.
 - `reading_digest.best_for`: write a reader profile sentence, not a task/method tag dump.
 - `reading_digest.why_read`: write 2 to 3 reading reasons; do not emit `任务:` / `方法:` label strings.
+- `research_problem.goal`: write the intended research objective in plain language, not background evidence or literature motivation.
 - `method_core.innovations`: keep short innovation sentences only; do not copy long method paragraphs or section headings.
+- `method_core.approach_summary`: summarize the paper-specific mechanism first; avoid reducing the paper to a generic baseline pipeline.
+- `method_core.pipeline_steps`: rewrite into 2 to 4 short action steps instead of copying paragraph fragments.
 - `core_contributions`: keep 2 to 4 concrete items.
+- `core_contributions`: do not use a plain SOTA sentence as one contribution unless the paper itself frames the system contribution that way.
 - `key_claims`: keep 2 to 5 falsifiable or comparable claims.
 - `key_claims[].type`: classify each claim as `method`, `experiment`, `capability`, or `limitation` when possible.
+- `benchmarks_or_eval.datasets` / `metrics` / `baselines`: prefer explicit names from experiments and tables; leave missing rather than guessing.
+- `novelty_type`: stay conservative and grounded; omit stock labels unrelated to the paper.
 - `author_conclusion`: prefer conclusion-section wording over editor paraphrase.
 - `editor_note`: reserve for your own grounded reading note; keep it as `summary + points`, or leave it empty when unavailable.
 - `experiment_setup_summary`: summarize datasets / settings / evaluation setup, not the whole result section.
 - `figure_table_index`: add `role` and `importance` so the front end can prioritize what to read first.
+
+## Failure Patterns To Avoid
+
+- Do not let baseline descriptions overwrite the paper's own method summary.
+- Do not copy subsection headers like `数据与监督（外部）` into summary bullets.
+- Do not leave front-end strings clipped with `...`; rewrite shorter instead.
+- Do not invent extra metrics, novelty tags, or representations from prior papers.
+- Do not leave `retrieval_profile` empty when the paper clearly exposes tasks, methods, inputs, and outputs.
 
 ## Similarity and difference rules
 

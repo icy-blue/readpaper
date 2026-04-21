@@ -132,7 +132,24 @@ Treat these as hard limits, not suggestions.
 - `why_read[]`, `strengths[]`, `cautions[]`, and `limitations[]` must keep one point per item.
 - `core_contributions[]`, `innovations[]`, and `findings[]` must be concrete.
 - `positioning.*`, `ingredients`, `representation`, `datasets`, and `metrics` must be tag-like phrases, not sentences.
+- Rewrite to satisfy length limits; do not hard-truncate or emit `...`.
+- Do not paste section titles, subsection labels, figure labels, or phrases like `第 3.2 节` into reader-facing summary fields.
 - Do not emit filler such as “很有启发”, “值得关注”, or “有重要意义” unless followed by a concrete reason in the same short line.
+
+## Field Grounding Rules
+
+- Build `problem`, `method`, `evaluation`, and `conclusion` evidence buckets first, then write fields from the right bucket.
+- `storyline.problem`, `reading_digest.narrative.problem`, and `research_problem.gaps[]` must come from problem/gap evidence, not result or method prose.
+- `storyline.method`, `reading_digest.narrative.method`, and `method_core.*` must come from method sections or method figures first, not from intro-only baseline recaps.
+- `storyline.outcome`, `reading_digest.narrative.result`, `benchmarks_or_eval.findings`, and `best_results` must come from experiment or conclusion evidence.
+- `research_problem.goal` must describe the paper's target objective, not a motivation citation, human-perception observation, or background fact.
+- `core_contributions[]` must list what the paper adds; do not use pure result sentences unless the contribution is explicitly framed as a benchmark-setting system contribution.
+- `method_core.approach_summary` must name the paper-specific mechanism. If a reused baseline path is mentioned, keep it secondary to the unique mechanism.
+- `method_core.pipeline_steps[]` must be short action steps. Do not paste paragraph fragments or half-sentences.
+- `method_core.innovations[]` must be concrete innovations, not section headings or outline labels.
+- `benchmarks_or_eval.datasets[]`, `metrics[]`, and `baselines[]` must be explicit names found in experiment text, table captions, or figures. Never backfill stock metric lists.
+- `novelty_type[]` must stay conservative and grounded. Prefer labels like `representation`, `architecture`, `training objective`, `data curation`, or `evaluation setting` when supported; otherwise leave it empty.
+- `retrieval_profile.*` should be filled from grounded task/method/input/output/modality signals when those signals already appear elsewhere in the artifact.
 
 ## Evidence Rules
 
