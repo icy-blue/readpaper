@@ -167,7 +167,6 @@ a {
 .paper-summary-line,
 .quick-card-content,
 .claim-text,
-.status-value,
 .author-line {
   white-space: pre-wrap;
   word-break: break-word;
@@ -263,8 +262,7 @@ a {
 .discovery-card .ant-card-body,
 .results-surface .ant-card-body,
 .sidebar-card .ant-card-body,
-.reading-section .ant-card-body,
-.coverage-card .ant-card-body {
+.reading-section .ant-card-body {
   padding: 24px;
 }
 
@@ -331,37 +329,6 @@ a {
 
 .paper-card-actions {
   margin-top: 2px;
-}
-
-.coverage-card {
-  background: rgba(255, 250, 243, 0.94);
-}
-
-.coverage-strip .ant-card-body {
-  display: grid;
-  gap: 8px;
-  padding: 18px 24px;
-}
-
-.coverage-strip {
-  background: rgba(255, 251, 245, 0.96);
-}
-
-.coverage-strip.is-partial {
-  background: linear-gradient(180deg, rgba(255, 246, 229, 0.98), rgba(255, 239, 208, 0.98));
-  border-color: rgba(180, 117, 36, 0.2);
-}
-
-.coverage-card.is-partial {
-  background: linear-gradient(180deg, rgba(255, 246, 229, 0.98), rgba(255, 239, 208, 0.98));
-  border-color: rgba(180, 117, 36, 0.2);
-}
-
-.status-value {
-  margin-top: 6px !important;
-  margin-bottom: 0 !important;
-  font-size: 17px;
-  font-weight: 600;
 }
 
 .storyline-strip {
@@ -580,9 +547,7 @@ a {
   .discovery-card .ant-card-body,
   .results-surface .ant-card-body,
   .sidebar-card .ant-card-body,
-  .reading-section .ant-card-body,
-  .coverage-card .ant-card-body,
-  .coverage-strip .ant-card-body {
+  .reading-section .ant-card-body {
     padding: 20px;
   }
 

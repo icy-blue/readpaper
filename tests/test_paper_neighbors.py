@@ -41,15 +41,6 @@ def make_record(
             "code": None,
             "data": None,
         },
-        "translate_created_at": "2026-04-21T00:00:00+08:00",
-        "translate_status": {
-            "state": "BODY_DONE",
-            "completed_unit_count": 1,
-            "total_unit_count": 1,
-            "is_partial": False,
-            "active_scope": "body",
-            "coverage_notes": [],
-        },
         "abstract_raw": "test abstract raw",
         "abstract_zh": "测试摘要",
         "summary": {

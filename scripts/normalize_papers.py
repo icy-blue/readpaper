@@ -400,39 +400,6 @@ def extract_sections(conversation: dict[str, Any]) -> dict[str, list[str]]:
     return buckets
 
 
-def latest_translation_status(conversation: dict[str, Any]) -> dict[str, Any]:
-    latest: dict[str, Any] = {}
-    for message in visible_bot_messages(conversation):
-        translation_status = message.get("translation_status")
-        if isinstance(translation_status, dict):
-            latest = translation_status
-    return latest
-
-
-def translate_status_payload(conversation: dict[str, Any]) -> dict[str, Any]:
-    latest = latest_translation_status(conversation)
-    state = normalize_text(str(latest.get("state") or "UNKNOWN"))
-    completed_count = latest.get("completed_unit_count")
-    total_count = latest.get("total_unit_count")
-    completed = completed_count if isinstance(completed_count, int) else 0
-    total = total_count if isinstance(total_count, int) else completed
-    is_all_done = bool(latest.get("is_all_done"))
-    active_scope = normalize_text(str(latest.get("active_scope") or "body")) or "body"
-    coverage_notes: list[str] = []
-    if not is_all_done:
-        coverage_notes.append("当前记录主要依据已完成翻译单元，未完成部分暂未纳入。")
-    if state == "BODY_DONE" and active_scope == "body":
-        coverage_notes.append("正文已完成，但附录或补充材料可能仍未完全覆盖。")
-    return {
-        "state": state or "UNKNOWN",
-        "completed_unit_count": completed,
-        "total_unit_count": total,
-        "is_partial": not is_all_done,
-        "active_scope": active_scope,
-        "coverage_notes": coverage_notes,
-    }
-
-
 def extract_urls(conversation: dict[str, Any]) -> list[str]:
     urls: list[str] = []
     for message in visible_bot_messages(conversation):
@@ -1077,8 +1044,6 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
         "venue": venue_text or "Unknown",
         "citation_count": citation_count,
         "links": links,
-        "translate_created_at": normalize_text(str(conversation.get("created_at") or raw_payload.get("fetched_at") or "")),
-        "translate_status": translate_status_payload(conversation),
         "abstract_raw": semantic_paper.abstract_raw if semantic_paper else None,
         "abstract_zh": abstract_zh,
         "summary": {

@@ -18,7 +18,6 @@ import {
 import {
   ArrowLeftOutlined,
   BookOutlined,
-  ClockCircleOutlined,
   CopyOutlined,
   FileSearchOutlined,
   LinkOutlined,
@@ -31,7 +30,6 @@ import {
   filterFigureTableItems,
   firstExternalLinks,
   flattenRetrievalProfile,
-  formatDate,
   formatYear,
   markdownHref,
   paperRoute,
@@ -284,50 +282,6 @@ function HeroHeader({ paper }: { paper: PaperRecord }) {
           </Flex>
         </div>
       </Space>
-    </Card>
-  );
-}
-
-function CoverageStatusBar({ paper }: { paper: PaperRecord }) {
-  const status = paper.translate_status;
-  const completion =
-    status.completed_unit_count !== null && status.total_unit_count !== null
-      ? `${status.completed_unit_count}/${status.total_unit_count}`
-      : "未知";
-
-  return (
-    <Card bordered={false} className={`surface-card coverage-strip ${status.is_partial ? "is-partial" : ""}`}>
-      <Flex justify="space-between" align="center" gap={16} wrap="wrap">
-        <Flex wrap="wrap" gap={16}>
-          <Text>阅读状态：{status.state || "未知"}</Text>
-          <Text>覆盖：{completion}</Text>
-          <Text>{status.is_partial ? "部分完成" : "完整记录"}</Text>
-          <Text>最近整理：{formatDate(paper.translate_created_at)}</Text>
-        </Flex>
-        <Tag icon={<ClockCircleOutlined />} color={status.is_partial ? "warning" : "success"}>
-          {status.is_partial ? "部分完成" : "已完成"}
-        </Tag>
-      </Flex>
-      {status.coverage_notes.length ? (
-        <Collapse
-          ghost
-          items={[
-            {
-              key: "coverage-notes",
-              label: "展开覆盖说明",
-              children: (
-                <Space direction="vertical" size={8} style={{ width: "100%" }}>
-                  {status.coverage_notes.map((note) => (
-                    <Paragraph key={note} style={{ marginBottom: 0 }}>
-                      {note}
-                    </Paragraph>
-                  ))}
-                </Space>
-              ),
-            },
-          ]}
-        />
-      ) : null}
     </Card>
   );
 }
@@ -1175,7 +1129,6 @@ export function PaperDetailPage({ payload, debugMode }: { payload: SitePayload; 
   return (
     <div className="page-stack">
       <HeroHeader paper={paper} />
-      <CoverageStatusBar paper={paper} />
       <StorylineStrip paper={paper} />
       <QuickScanCards paper={paper} />
 

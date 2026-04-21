@@ -93,19 +93,6 @@ function validateLinkSet(issues: string[], path: string, value: unknown): void {
   });
 }
 
-function validateTranslateStatus(issues: string[], path: string, value: unknown): void {
-  const record = expectRecord(issues, path, value);
-  if (!record) {
-    return;
-  }
-  expectOptionalString(issues, `${path}.state`, record.state);
-  expectOptionalNumber(issues, `${path}.completed_unit_count`, record.completed_unit_count);
-  expectOptionalNumber(issues, `${path}.total_unit_count`, record.total_unit_count);
-  expectBoolean(issues, `${path}.is_partial`, record.is_partial);
-  expectOptionalString(issues, `${path}.active_scope`, record.active_scope);
-  expectStringArray(issues, `${path}.coverage_notes`, record.coverage_notes);
-}
-
 function validateSummaryBlock(issues: string[], path: string, value: unknown): void {
   const record = expectRecord(issues, path, value);
   if (!record) {
@@ -314,7 +301,6 @@ function validatePaperRecord(issues: string[], path: string, value: unknown): vo
   expectNumberOrStringOrNull(issues, `${path}.year`, record.year);
   expectString(issues, `${path}.venue`, record.venue);
   expectOptionalNumber(issues, `${path}.citation_count`, record.citation_count);
-  expectString(issues, `${path}.translate_created_at`, record.translate_created_at);
   expectString(issues, `${path}.paper_path`, record.paper_path);
   expectString(issues, `${path}.route_path`, record.route_path);
   expectOptionalString(issues, `${path}.abstract_raw`, record.abstract_raw);
@@ -322,7 +308,6 @@ function validatePaperRecord(issues: string[], path: string, value: unknown): vo
   expectOptionalString(issues, `${path}.author_conclusion`, record.author_conclusion);
 
   validateLinkSet(issues, `${path}.links`, record.links);
-  validateTranslateStatus(issues, `${path}.translate_status`, record.translate_status);
   validateSummaryBlock(issues, `${path}.summary`, record.summary);
   validateStoryline(issues, `${path}.storyline`, record.storyline);
   validateResearchProblem(issues, `${path}.research_problem`, record.research_problem);
@@ -488,23 +473,6 @@ export function matchesTags(paperTags: string[], selected: string[]): boolean {
     return true;
   }
   return selected.every((tag) => paperTags.includes(tag));
-}
-
-export function formatDate(value: string | null | undefined): string {
-  if (!value) {
-    return "未知时间";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 }
 
 export function formatYear(value: number | string | null | undefined): string {

@@ -21,15 +21,6 @@ Write one JSON file per canonical paper at `outputs/papers/<paper-id>.json`.
     "code": null,
     "data": null
   },
-  "translate_created_at": "2026-04-15T14:41:27.094309+08:00",
-  "translate_status": {
-    "state": "BODY_DONE",
-    "completed_unit_count": 7,
-    "total_unit_count": 11,
-    "is_partial": true,
-    "active_scope": "appendix",
-    "coverage_notes": ["当前记录主要依据摘要，正文细节仍需完整核对。"]
-  },
   "abstract_raw": "Original abstract text...",
   "abstract_zh": "中文摘要……",
   "summary": {

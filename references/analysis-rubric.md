@@ -50,7 +50,7 @@ Each neighbor should include:
 ## Partial translation handling
 
 - Prefer visible evidence from translated sections, figures, and tables.
-- If translation is incomplete, record the uncertainty in `translate_status.coverage_notes`.
+- If translation is incomplete, keep the record partial rather than inventing missing details.
 - Use `limitations` only for paper-side limitations, not extraction caveats.
 
 ## Source priority

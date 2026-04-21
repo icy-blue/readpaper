@@ -17,7 +17,6 @@ DISPLAY_LABELS = {
     "venue": "会议 / 期刊",
     "year": "年份",
     "citation_count": "引用数",
-    "translate_created_at": "收录时间",
     "links": "链接",
     "pdf": "PDF 链接",
     "doi": "DOI",
@@ -164,15 +163,6 @@ def is_curation_limitation(value: str) -> bool:
 
 def paper_limitations(value: Any) -> list[str]:
     return [item for item in ensure_strings(value) if not is_curation_limitation(item)]
-
-
-def coverage_notes(record: dict[str, Any]) -> list[str]:
-    translate_status = record.get("translate_status") if isinstance(record.get("translate_status"), dict) else {}
-    notes = ensure_strings(translate_status.get("coverage_notes"))
-    for item in ensure_strings(record.get("limitations")):
-        if is_curation_limitation(item) and item not in notes:
-            notes.append(item)
-    return notes
 
 
 def normalize_match_text(value: str) -> str:
@@ -542,7 +532,6 @@ def normalized_record(
     method_core = method_core_block(record)
     inputs_outputs = record.get("inputs_outputs") if isinstance(record.get("inputs_outputs"), dict) else {}
     eval_block = record.get("benchmarks_or_eval") if isinstance(record.get("benchmarks_or_eval"), dict) else {}
-    translate_status = record.get("translate_status") if isinstance(record.get("translate_status"), dict) else {}
     figure_table_index = figure_table_index_block(record)
     links = record.get("links") if isinstance(record.get("links"), dict) else {}
     summary = summary_block(record)
@@ -556,10 +545,6 @@ def normalized_record(
             "comparison_context": comparison_context,
         }
     )
-    translate_status_payload = dict(translate_status)
-    note_values = coverage_notes(record)
-    if note_values:
-        translate_status_payload["coverage_notes"] = note_values
 
     payload = {
         "paper_id": str(record.get("paper_id") or ""),
@@ -577,8 +562,6 @@ def normalized_record(
             "code": str(links.get("code") or "") or None,
             "data": str(links.get("data") or "") or None,
         },
-        "translate_created_at": str(record.get("translate_created_at") or ""),
-        "translate_status": translate_status_payload,
         "abstract_raw": str(record.get("abstract_raw") or "") or None,
         "abstract_zh": str(record.get("abstract_zh") or "") or None,
         "summary": {

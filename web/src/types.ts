@@ -39,15 +39,6 @@ export interface LinkSet {
   data: string | null;
 }
 
-export interface TranslateStatus {
-  state: string | null;
-  completed_unit_count: number | null;
-  total_unit_count: number | null;
-  is_partial: boolean;
-  active_scope: string | null;
-  coverage_notes: string[];
-}
-
 export interface SummaryBlock {
   one_liner: string;
   abstract_summary: string | null;
@@ -171,8 +162,6 @@ export interface PaperRecord {
   venue: string;
   citation_count: number | null;
   links: LinkSet;
-  translate_created_at: string;
-  translate_status: TranslateStatus;
   paper_path: string;
   route_path: string;
   abstract_raw: string | null;
