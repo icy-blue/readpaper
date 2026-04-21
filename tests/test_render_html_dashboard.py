@@ -28,7 +28,7 @@ class RenderHtmlDashboardTests(unittest.TestCase):
             (site_dir / "papers" / "legacy.html").write_text("legacy", encoding="utf-8")
             (site_dir / "papers" / "keep.md").write_text("# keep", encoding="utf-8")
             (site_dir / "papers" / "keep.json").write_text('{"paper_id":"keep"}', encoding="utf-8")
-            (site_dir / "paper-neighbors.json").write_text('{"paper_count":1}', encoding="utf-8")
+            (site_dir / "site-index.json").write_text('{"paper_count":1}', encoding="utf-8")
 
             index_path = publish_site(dist_dir=dist_dir, site_dir=site_dir)
 
@@ -37,7 +37,7 @@ class RenderHtmlDashboardTests(unittest.TestCase):
             self.assertFalse((site_dir / "papers" / "legacy.html").exists())
             self.assertTrue((site_dir / "papers" / "keep.md").exists())
             self.assertTrue((site_dir / "papers" / "keep.json").exists())
-            self.assertTrue((site_dir / "paper-neighbors.json").exists())
+            self.assertTrue((site_dir / "site-index.json").exists())
 
             rendered = (site_dir / "index.html").read_text(encoding="utf-8")
             self.assertIn("Translate Paper Forest", rendered)

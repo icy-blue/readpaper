@@ -1,165 +1,139 @@
-# Paper Schema
+# Paper Schema v2
 
-Write one JSON file per canonical paper at `outputs/papers/<paper-id>.json`.
+Write one canonical paper record per file at `outputs/papers/<paper-id>.json`.
 
-## Required shape
+This schema is the long-lived source of truth for paper content. It stores:
+
+- paper facts
+- grounded analysis
+- canonical taxonomy
+- typed relations
+
+It does **not** store UI-only fallback text, search indexes, neighbor lists, or other site-derived artifacts.
+
+## Required Shape
 
 ```json
 {
-  "paper_id": "structured-3d-latents-cvpr-2024-a1b2c3d4",
-  "source_conversation_ids": ["399facf1f854"],
-  "title": "Structured 3D Latents for Scalable and Versatile 3D Generation",
-  "authors": ["Author A", "Author B"],
-  "year": 2024,
-  "venue": "CVPR",
-  "citation_count": 564,
-  "links": {
-    "pdf": "https://...",
-    "doi": null,
-    "arxiv": null,
-    "project": null,
-    "code": null,
-    "data": null
+  "id": "cosmo3d-open-world-promptable-3d-semantic-part-segmentat-8764ad09",
+  "source": {
+    "conversation_ids": ["1bec2cbb63a7"],
+    "paper_path": "papers/cosmo3d-open-world-promptable-3d-semantic-part-segmentat-8764ad09.md",
+    "route_path": "#/paper/cosmo3d-open-world-promptable-3d-semantic-part-segmentat-8764ad09"
   },
-  "abstract_raw": "Original abstract text...",
-  "abstract_zh": "中文摘要……",
-  "summary": {
-    "one_liner": "一句话结论",
-    "abstract_summary": "面向自己复盘的短摘要",
-    "research_value": {
-      "summary": "为什么值得继续读",
-      "points": ["可作为长期知识图谱节点", "适合作为某条技术路线的对比入口"]
+  "bibliography": {
+    "title": "CoSMo3D: Open-World Promptable 3D Semantic Part Segmentation through LLM-Guided Canonical Spatial Modeling",
+    "authors": ["Li Jin", "Weikai Chen"],
+    "year": 2026,
+    "venue": "arXiv.org",
+    "citation_count": 0,
+    "identifiers": {
+      "doi": "10.48550/arXiv.2603.01205",
+      "arxiv": "2603.01205"
     },
-    "worth_long_term_graph": true
+    "links": {
+      "pdf": "https://...",
+      "project": null,
+      "code": "https://github.com/JinLi998/CoSMo3D/tree/main",
+      "data": null
+    }
   },
-  "reading_digest": {
-    "value_statement": "首屏一句话价值判断",
-    "best_for": "适合谁读",
-    "why_read": ["继续读的理由 1", "继续读的理由 2"],
-    "recommended_route": "method",
-    "positioning": {
-      "task": ["Open-Vocabulary Segmentation"],
-      "modality": ["text", "3D"],
-      "method": ["Large Language Model"],
-      "novelty": ["representation"]
-    },
-    "narrative": {
-      "problem": "现有方法在开放世界部件理解上缺少稳定空间建模",
-      "method": "通过 LLM-guided canonical spatial modeling 建模规范空间",
-      "result": "提升开放世界 promptable segmentation 的稳定性"
-    },
-    "result_headline": "在开放词汇分割设定下结果更稳。"
+  "abstracts": {
+    "raw": "Original abstract text...",
+    "zh": "中文摘要……"
   },
-  "storyline": {
-    "problem": "现有开放词汇 3D part segmentation 缺少规范空间建模",
-    "method": "通过 LLM-guided canonical spatial modeling 建模规范空间",
-    "outcome": "提升开放世界 promptable segmentation 的稳定性"
+  "story": {
+    "paper_one_liner": "把规范空间直接引入开放世界 3D part segmentation 的代表工作。",
+    "problem": "现有开放世界 3D part segmentation 缺少稳定的规范空间建模。",
+    "method": "通过 canonical spatial modeling 与双分支训练目标学习可迁移的规范空间。",
+    "result": "在多组 promptable segmentation 设定下结果更稳且更强。"
   },
   "research_problem": {
-    "summary": "这篇论文要解决的核心研究问题",
-    "gaps": ["已有方法仍在输入坐标系里做语义推断", "跨姿态和跨类别的一致性不足"],
-    "goal": "建立面向开放世界 3D 语义部件理解的规范空间建模"
+    "summary": "开放世界 promptable 3D segmentation 在任意姿态和跨类别场景下仍不稳定。",
+    "gaps": ["现有方法主要依赖几何-文本匹配。", "缺少跨姿态与跨类别共享的规范空间语义。"],
+    "goal": "为开放世界 3D part understanding 建立可学习的 canonical-space reasoning。"
   },
-  "core_contributions": ["贡献 1", "贡献 2"],
-  "key_claims": [
+  "core_contributions": [
+    "提出面向开放世界 promptable 3D segmentation 的 canonical spatial modeling 框架。",
+    "构建 LLM-guided 的跨类别 canonicalized dataset。",
+    "通过 canonical map anchoring 与 box calibration 强化规范空间一致性。"
+  ],
+  "method": {
+    "summary": "以双分支框架把几何-语言对齐和 canonical-space regularization 结合起来。",
+    "pipeline_steps": [
+      "编码点云与文本提示并建立跨模态对齐。",
+      "引入训练期 canonical embedding branch 预测 canonical map 与 semantic boxes。",
+      "用 canonical-space losses 压缩姿态变化并稳定部件语义。"
+    ],
+    "innovations": [
+      "把开放世界 3D part segmentation 重写为 canonical-space reasoning 问题。",
+      "引入跨类别 canonicalized supervision 与双分支 regularization。"
+    ],
+    "ingredients": ["Large Language Model", "Point Transformer", "SigLIP"],
+    "inputs": ["Point Cloud", "Text Prompt"],
+    "outputs": ["Segmentation Mask"],
+    "representations": ["Point Cloud", "Canonical Map", "Bounding Box", "Normals"]
+  },
+  "evaluation": {
+    "headline": "在多组 promptable segmentation 设定下都优于 Find3D 等基线。",
+    "datasets": ["3Dcompat-Coarse", "3Dcompat-Fine", "ShapeNet-Part", "PartNet-E"],
+    "metrics": ["mIoU"],
+    "baselines": ["Find3D", "PartSLIP++", "PointCLIPV2"],
+    "key_findings": [
+      "在 canonical 与 rotated 两类姿态设定下都保持稳定提升。",
+      "相对 2D rendering baselines 推理更快且分割更稳。"
+    ],
+    "setup_summary": "在多组 prompt 和姿态设置下，对 3Dcompat、ShapeNet-Part 与 PartNet-E 做统一比较。"
+  },
+  "claims": [
     {
-      "claim": "具体 claim",
-      "type": "experiment",
-      "support": ["section:4. Experiments", "figure:Figure 2"],
+      "text": "canonical-space modeling 能显著提升开放世界 promptable 3D segmentation 的稳定性与精度。",
+      "type": "method",
+      "support": ["section:3. Method", "figure:Figure 2"],
       "confidence": "high"
     }
   ],
-  "method_core": {
-    "approach_summary": "核心做法",
-    "pipeline_steps": ["步骤 1", "步骤 2"],
-    "innovations": ["方法创新 1", "方法创新 2"],
-    "ingredients": ["ingredient a", "ingredient b"],
-    "representation": ["representation a"],
-    "supervision": ["监督或约束"],
-    "differences": ["相对相近论文最重要差异"]
+  "conclusion": {
+    "author": "作者认为 canonical space 是开放世界 3D understanding 的关键缺失变量。",
+    "limitations": []
   },
-  "inputs_outputs": {
-    "inputs": ["text prompt", "image prompt"],
-    "outputs": ["mesh", "3D Gaussian"],
-    "modalities": ["text", "image", "3D"]
-  },
-  "benchmarks_or_eval": {
-    "datasets": ["dataset a"],
-    "metrics": ["metric a"],
-    "baselines": ["baseline a"],
-    "findings": ["最重要实验结论"],
-    "best_results": ["最值得高亮的一条结果"],
-    "experiment_setup_summary": "实验设置摘要"
-  },
-  "author_conclusion": "作者在论文中最终想传达的结论",
-  "editor_note": {
-    "summary": "你的编者按/阅读备注",
-    "points": ["为什么值得看", "接下来最适合拿谁做对比"]
-  },
-  "editorial_review": {
+  "editorial": {
     "verdict": "值得精读",
-    "strengths": ["方法线清楚", "结果信号强"],
-    "cautions": ["局限仍集中在特定设定"],
-    "research_position": "可作为该方向的阅读入口或对比样本",
-    "next_read_hint": "可继续对比 Find3D。"
+    "summary": "适合作为 canonical-space 3D understanding 路线的代表样本。",
+    "why_read": ["方法动机和机制都很明确。", "和 Find3D 的对比线清楚。"],
+    "strengths": ["canonical-space 变量引入得自然。", "实验设置覆盖姿态与 prompt 变化。"],
+    "cautions": ["主要仍聚焦于 segmentation 任务。"],
+    "reading_route": "method",
+    "research_position": "可作为开放世界 3D part reasoning 的关键对照样本。",
+    "graph_worthy": true,
+    "next_read": ["Find3D"]
   },
-  "limitations": ["局限 1", "局限 2"],
-  "novelty_type": ["representation", "decoder flexibility"],
-  "research_tags": {
-    "themes": ["3D Generation"],
-    "tasks": ["Text-to-3D", "Image-to-3D"],
-    "methods": ["Rectified Flow Transformer"],
-    "modalities": ["text", "image", "3D"],
-    "representations": ["SLAT", "Radiance Fields", "3D Gaussians", "Mesh"]
+  "taxonomy": {
+    "themes": ["3D Understanding"],
+    "tasks": ["Semantic Segmentation", "Open-Vocabulary Segmentation"],
+    "methods": ["Large Language Model", "Point Transformer", "Canonical Spatial Modeling"],
+    "modalities": ["3D", "Text"],
+    "representations": ["Point Cloud", "Canonical Map", "Bounding Box", "Normals"],
+    "novelty_types": ["Representation Modeling", "Architecture Design", "Data Curation"]
   },
-  "topics": [],
-  "retrieval_profile": {
-    "problem_spaces": ["3D Generation", "Image-to-3D", "mesh"],
-    "task_axes": ["Text-to-3D", "Image-to-3D"],
-    "approach_axes": ["Rectified Flow Transformer", "Structured Latents", "Mesh"],
-    "input_axes": ["text prompt", "image prompt"],
-    "output_axes": ["mesh", "3D Gaussian"],
-    "modality_axes": ["text", "image", "3D"],
-    "comparison_axes": ["baseline a", "method phrase a"]
-  },
-  "comparison_context": {
-    "explicit_baselines": ["baseline a"],
-    "contrast_methods": ["method phrase a"],
-    "comparison_aspects": [
+  "comparison": {
+    "aspects": [
       {
-        "aspect": "canonical space modeling",
-        "difference": "把规范空间直接引入开放世界 3D part segmentation"
+        "aspect": "method",
+        "difference": "相对只做 geometry-text matching 的路线，显式引入 canonical-space regularization。"
+      },
+      {
+        "aspect": "result",
+        "difference": "在任意姿态与跨类别设定下保持更稳的 part localization。"
       }
     ],
-    "recommended_next_read": "Find3D"
+    "next_read": ["Find3D"]
   },
-  "paper_neighbors": {
-    "task": [
-      {
-        "paper_id": "neighbor-paper",
-        "title": "Neighbor Paper",
-        "score": 11,
-        "score_level": "high",
-        "match_source": "task_overlap",
-        "paper_path": "papers/neighbor-paper.md",
-        "route_path": "#/paper/neighbor-paper",
-        "shared_signals": {
-          "task_axes": ["Text-to-3D"]
-        },
-        "reason": "同属 Text-to-3D，且输出与模态接近。",
-        "reason_short": "同任务且输出对象接近。",
-        "relation_hint": "same-task"
-      }
-    ],
-    "method": [],
-    "comparison": []
-  },
-  "paper_relations": [],
-  "figure_table_index": {
+  "assets": {
     "figures": [
       {
         "label": "Figure 1",
-        "caption": "图注",
+        "caption": "Method overview.",
         "role": "method_overview",
         "importance": "high"
       }
@@ -167,55 +141,50 @@ Write one JSON file per canonical paper at `outputs/papers/<paper-id>.json`.
     "tables": [
       {
         "label": "Table 1",
-        "caption": "表注",
+        "caption": "Quantitative comparison on promptable segmentation benchmarks.",
         "role": "quantitative_result",
-        "importance": "medium"
+        "importance": "high"
       }
     ]
-  }
+  },
+  "relations": [
+    {
+      "type": "compares_to",
+      "target_paper_id": "find3d-open-world-3d-part-segmentation-xxxx",
+      "label": "Find3D",
+      "description": "最直接的几何-文本匹配对照路线。",
+      "confidence": 0.9
+    }
+  ]
 }
 ```
 
-## Field rules
+## Field Rules
 
-- `links.pdf`: always prefer `conversation.pdf_url`; only fall back to Semantic Scholar `openAccessPdf.url` when the conversation payload is missing a PDF link.
-- `authors`, `abstract_raw`, `citation_count`: Semantic Scholar is the preferred enrichment source when available.
-- `links.doi` / `links.arxiv`: try Semantic Scholar `externalIds`; otherwise keep `null`.
-- `summary.one_liner`: keep it under 120 Chinese characters when possible.
-- `reading_digest.value_statement`: keep it under 80 Chinese characters when possible.
-  It must be a reading-value judgment, not a paper-content recap.
-- `reading_digest.best_for`: keep it under 70 Chinese characters when possible.
-  It must describe the target reader, not concatenate task/method labels mechanically.
-- `reading_digest.why_read[]`: keep each item under 72 Chinese characters when possible.
-  Each item must be a reading reason sentence; do not emit `任务:` / `方法:`-style tag text.
-- `reading_digest.result_headline`: keep it under 88 Chinese characters when possible.
-  It must come from a result sentence; leave it empty instead of backfilling with problem text.
-- `reading_digest.recommended_route`: use `method`, `evaluation`, `comparison`, or `overview`.
-- `reading_digest.positioning`: keep only front-end useful定位标签; do not dump every tag.
-- `storyline.problem` / `storyline.method` / `storyline.outcome`: keep each item short enough for a two-line first-screen strip.
-  `problem` is only for the research gap, `method` only for the method action, and `outcome` only for the result.
-- `research_problem.summary`: keep it under 100 Chinese characters when possible.
-  It must describe the problem definition, not conclusion-style result text.
-- `method_core.approach_summary`: keep it under 100 Chinese characters when possible.
-- `method_core.innovations[]`: keep each item as a short innovation sentence; do not copy section titles, numbered fragments, or long paragraphs.
-- `benchmarks_or_eval.findings`: prefer short bullet-like results; each item should stay under 80 Chinese characters when possible.
-- `editor_note.summary`: keep it under 120 Chinese characters when possible.
-- `editorial_review.verdict`: use `值得精读`, `值得浏览`, `只记结论`, or `null`.
-- `editorial_review.strengths[]` / `editorial_review.cautions[]`: keep each item under 72 Chinese characters when possible.
-- `editorial_review.research_position`: keep it under 80 Chinese characters when possible.
-- `paper_neighbors.*[].reason_short`: keep it under 50 Chinese characters when possible.
-- `benchmarks_or_eval.experiment_setup_summary`: keep it concise and focused on setup, not results.
-- `key_claims[].type`: use `method`, `experiment`, `capability`, or `limitation` when grounded; otherwise keep a stable custom string or omit the claim.
-- `figure_table_index.*[].role`: use lightweight reading-oriented categories such as `method_overview`, `qualitative_result`, `quantitative_result`, `ablation`, or `failure_case`.
-- `figure_table_index.*[].importance`: use `high`, `medium`, or `low`.
-- `editor_note`, `topics`, `paper_relations`: optional, research-facing fields; leave empty when no grounded signal exists.
-- Missing scalar/link values should be `null`; missing arrays should be `[]`.
+- `id`: canonical paper id, unique within the repo.
+- `source.conversation_ids`: all contributing source conversations for the canonical paper.
+- `source.paper_path` / `source.route_path`: stable local routing info used by site generators.
+- `bibliography.identifiers`: only persistent scholarly IDs such as DOI / arXiv.
+- `bibliography.links`: only reader-facing URLs such as PDF / project / code / data.
+- `abstracts.raw`: original-language abstract, usually from Semantic Scholar when available.
+- `abstracts.zh`: translated abstract from the translate conversation.
+- `story`: short reading-facing summary of the paper itself.
+- `research_problem`: grounded formulation of the problem, gaps, and goal.
+- `method.inputs` / `method.outputs`: canonical task I/O facts; do not repeat elsewhere.
+- `evaluation.baselines`: explicit comparison methods named in the paper.
+- `claims`: falsifiable or comparable claims with grounded support references.
+- `editorial`: editor-facing reading judgment for humans.
+- `taxonomy`: canonical English labels only. Translate only in view/render layers.
+- `comparison.aspects`: short comparison hooks for reading and relation building.
+- `assets`: figure/table reading index with stable role and importance labels.
+- `relations`: typed graph edges only; do not store generic neighbors or retrieval artifacts here.
 
-## Do not do
+## Do Not Store In Canonical Records
 
-- Do not write legacy `pdf_url`.
-- Do not write legacy `method_core.problem`.
-- Do not keep `research_problem`, `summary.research_value`, or `editor_note` as plain strings.
-- Do not populate `reading_digest` or `editorial_review` with generic filler that is not grounded in existing tags, findings, or notes.
-- Do not infer `authors`, `doi`, `arxiv`, or `abstract_raw` without a grounded source.
-- Do not fabricate `topics` or `paper_relations` just to fill the schema.
+- UI fallbacks or display-specific duplicated text
+- search text, embeddings, retrieval axes, or ranking features
+- homepage cards, filters, featured-paper lists, or reading-route chips
+- derived neighbor lists
+- empty future placeholders such as `topics`, `paper_neighbors`, or `retrieval_profile`
+
+Those belong in `outputs/site/` or other derived artifacts.

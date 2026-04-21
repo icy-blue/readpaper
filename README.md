@@ -2,10 +2,11 @@
 
 本仓库用于把 `translate.icydev.cn` 上的论文内容整理成一个本地研究知识森林，并生成可浏览的 Markdown / HTML 阅读站点。
 
-前端站点现在采用“首页索引 + 单篇按需加载”的结构：
+前端站点现在采用“canonical papers + derived site payloads”的结构：
 
-- `outputs/site/paper-neighbors.json` 只承载首页发现、筛选、搜索和近邻入口所需的轻量索引
-- `outputs/site/papers/<paper-id>.json` 承载单篇详情页所需的完整阅读数据
+- `outputs/papers/<paper-id>.json` 保存长期维护的 canonical paper record
+- `outputs/site/site-index.json` 只承载首页发现、筛选和 featured/card 所需的派生索引
+- `outputs/site/papers/<paper-id>.json` 承载单篇详情页所需的 `canonical + neighbors` view model
 - 站点默认应通过本地 server 或静态托管访问，不再保证 `file://` 双击 `index.html` 后详情页可正常加载
 
 ## 目录约定
@@ -14,7 +15,7 @@
 - `outputs/meta/`: agent-native 抽取后的中间 meta artifact
 - `outputs/raw/`: 从 translate 服务抓取的原始 payload
 - `outputs/site/`: 生成后的站点资源
-- `scripts/`: 归一化、邻居回填、站点渲染等脚本
+- `scripts/`: 归一化、site-derived 构建、站点渲染等脚本
 - `references/`: schema 与输出约定
 
 ## 重跑网站
@@ -23,7 +24,7 @@
 
 主 skill 现在会按单篇论文调用 repo 内置 `extract-paper-meta` skill 生成这些 artifact。
 
-当你更新了论文记录、论文邻居，或者前端代码后，按下面顺序重跑站点：
+当你更新了论文记录、site-derived 逻辑，或者前端代码后，按下面顺序重跑站点：
 
 ```bash
 python3 scripts/normalize_papers.py \
@@ -31,8 +32,9 @@ python3 scripts/normalize_papers.py \
   --meta-dir outputs/meta \
   --papers-dir outputs/papers
 
-python3 scripts/backfill_paper_neighbors.py \
-  --papers-dir outputs/papers
+python3 scripts/build_site_derivatives.py \
+  --papers-dir outputs/papers \
+  --site-dir outputs/site
 
 python3 scripts/render_markdown_site.py \
   --papers-dir outputs/papers \
@@ -41,17 +43,16 @@ python3 scripts/render_markdown_site.py \
 npm run build:web
 
 python3 scripts/render_html_dashboard.py \
-  --neighbors-json outputs/site/paper-neighbors.json \
+  --site-index-json outputs/site/site-index.json \
   --output outputs/site/index.html
 ```
 
 各步骤作用：
 
 - `extract-paper-meta`: 从 `outputs/raw/` 抽取单篇 meta artifact，写入 `outputs/meta/`
-- `normalize_papers.py`: 从 `outputs/raw/` 和 `outputs/meta/` 重新组装 `outputs/papers/` 的标准化论文记录
-- `backfill_paper_neighbors.py`: 重新计算每篇论文的任务 / 方法 / 对比近邻
-- `render_markdown_site.py`: 生成站点需要的 Markdown 页面和 `paper-neighbors.json`
-- `render_markdown_site.py`: 同时生成 `outputs/site/papers/<paper-id>.json` 详情数据
+- `normalize_papers.py`: 从 `outputs/raw/` 和 `outputs/meta/` 重新组装 canonical paper records
+- `build_site_derivatives.py`: 从 canonical paper records 派生首页 payload、详情 payload 和近邻信息
+- `render_markdown_site.py`: 生成站点需要的 Markdown 页面，并同步写入 `site-index.json` 与详情 JSON
 - `npm run build:web`: 重新构建前端静态资源
 - `render_html_dashboard.py`: 把前端构建产物发布到 `outputs/site/`，并保留 JSON 数据文件供前端按需加载
 

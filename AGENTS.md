@@ -11,7 +11,7 @@ This repository builds a local research knowledge forest from papers on `transla
 
 ## Repository Map
 
-- `scripts/`: stdlib-only Python entrypoints for fetch, registry rebuild, neighbor backfill, and site rendering.
+- `scripts/`: stdlib-only Python entrypoints for fetch, canonical assembly, registry rebuild, site-derived build, and site rendering.
 - `references/`: schema and rendering contracts. Read these before changing record structure or output shape.
 - `outputs/meta/`: per-paper agent-native meta artifacts used before final paper assembly.
 - `outputs/papers/`: normalized per-paper JSON records kept for local analysis and site generation.
@@ -67,11 +67,12 @@ python3 scripts/build_registry.py \
   --registry state/paper_registry.json
 ```
 
-4. Backfill paper neighbors:
+4. Build site-derived payloads:
 
 ```bash
-python3 scripts/backfill_paper_neighbors.py \
-  --papers-dir outputs/papers
+python3 scripts/build_site_derivatives.py \
+  --papers-dir outputs/papers \
+  --site-dir outputs/site
 ```
 
 5. Rebuild the Markdown site:
@@ -86,7 +87,7 @@ python3 scripts/render_markdown_site.py \
 
 ```bash
 python3 scripts/render_html_dashboard.py \
-  --neighbors-json outputs/site/paper-neighbors.json \
+  --site-index-json outputs/site/site-index.json \
   --output outputs/site/index.html
 ```
 
@@ -99,5 +100,5 @@ python3 scripts/render_html_dashboard.py \
 ## Verification
 
 - For script changes, run the smallest affected command from the workflow above.
-- For local-only changes in `outputs/papers/`, at minimum rebuild neighbors and the site to catch schema drift before relying on generated outputs.
+- For local-only changes in `outputs/papers/`, at minimum rebuild site derivatives and the site to catch schema drift before relying on generated outputs.
 - Keep JSON pretty-printed with UTF-8 and trailing newlines, matching the existing scripts.

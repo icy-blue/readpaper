@@ -23,55 +23,39 @@ export interface Filters {
   methods: FilterItem[];
 }
 
-export interface ClaimItem {
-  claim: string;
-  type: "method" | "experiment" | "capability" | "limitation" | string;
-  support: string[];
-  confidence: "high" | "medium" | "low" | string;
-}
-
-export interface LinkSet {
-  pdf: string | null;
+export interface ScholarlyIdentifiers {
   doi: string | null;
   arxiv: string | null;
+}
+
+export interface ExternalLinks {
+  pdf: string | null;
   project: string | null;
   code: string | null;
   data: string | null;
 }
 
-export interface SummaryBlock {
-  one_liner: string;
-  abstract_summary: string | null;
-  research_value: {
-    summary: string | null;
-    points: string[];
-  };
-  worth_long_term_graph: boolean;
+export interface Bibliography {
+  title: string;
+  authors: string[];
+  year: number | string | null;
+  venue: string;
+  citation_count: number | null;
+  identifiers: ScholarlyIdentifiers;
+  links: ExternalLinks;
 }
 
-export interface ReadingDigest {
-  value_statement: string | null;
-  best_for: string | null;
-  why_read: string[];
-  recommended_route: "method" | "evaluation" | "comparison" | "overview" | string;
-  positioning: {
-    task: string[];
-    modality: string[];
-    method: string[];
-    novelty: string[];
-  };
-  narrative: {
-    problem: string | null;
-    method: string | null;
-    result: string | null;
-  };
-  result_headline: string | null;
+export interface SourceInfo {
+  conversation_ids: string[];
+  paper_path: string;
+  route_path: string;
 }
 
-export interface Storyline {
+export interface StoryBlock {
+  paper_one_liner: string | null;
   problem: string | null;
   method: string | null;
-  outcome: string | null;
+  result: string | null;
 }
 
 export interface ResearchProblem {
@@ -80,65 +64,117 @@ export interface ResearchProblem {
   goal: string | null;
 }
 
-export interface MethodCore {
-  approach_summary: string | null;
+export interface MethodBlock {
+  summary: string | null;
   pipeline_steps: string[];
   innovations: string[];
   ingredients: string[];
-  representation: string[];
-  supervision: string[];
-  differences: string[];
-}
-
-export interface InputsOutputs {
   inputs: string[];
   outputs: string[];
-  modalities: string[];
+  representations: string[];
 }
 
-export interface Benchmarks {
+export interface EvaluationBlock {
+  headline: string | null;
   datasets: string[];
   metrics: string[];
   baselines: string[];
-  findings: string[];
-  best_results: string[];
-  experiment_setup_summary: string | null;
+  key_findings: string[];
+  setup_summary: string | null;
 }
 
-export interface ResearchTags {
+export interface ClaimItem {
+  text: string;
+  type: "method" | "experiment" | "capability" | "limitation" | string;
+  support: string[];
+  confidence: "high" | "medium" | "low" | string;
+}
+
+export interface ConclusionBlock {
+  author: string | null;
+  limitations: string[];
+}
+
+export interface EditorialBlock {
+  verdict: "值得精读" | "值得浏览" | "只记结论" | string | null;
+  summary: string | null;
+  why_read: string[];
+  strengths: string[];
+  cautions: string[];
+  reading_route: "method" | "evaluation" | "comparison" | "overview" | string;
+  research_position: string | null;
+  graph_worthy: boolean;
+  next_read: string[];
+}
+
+export interface TaxonomyBlock {
   themes: string[];
   tasks: string[];
   methods: string[];
   modalities: string[];
   representations: string[];
+  novelty_types: string[];
 }
 
-export interface RetrievalProfile {
-  problem_spaces: string[];
-  task_axes: string[];
-  approach_axes: string[];
-  input_axes: string[];
-  output_axes: string[];
-  modality_axes: string[];
-  comparison_axes: string[];
+export interface ComparisonAspect {
+  aspect: string;
+  difference: string;
 }
 
-export interface ComparisonContext {
-  explicit_baselines: string[];
-  contrast_methods: string[];
-  comparison_aspects: Array<{
-    aspect: string;
-    difference: string;
-  }>;
-  recommended_next_read: string | null;
+export interface ComparisonBlock {
+  aspects: ComparisonAspect[];
+  next_read: string[];
 }
 
-export interface EditorialReview {
-  verdict: "值得精读" | "值得浏览" | "只记结论" | string | null;
-  strengths: string[];
-  cautions: string[];
-  research_position: string | null;
-  next_read_hint: string | null;
+export interface FigureTableIndexItem {
+  label: string;
+  caption: string;
+  role: string;
+  importance: "high" | "medium" | "low" | string;
+}
+
+export interface AssetsBlock {
+  figures: FigureTableIndexItem[];
+  tables: FigureTableIndexItem[];
+}
+
+export interface RelationItem {
+  type: string;
+  target_paper_id: string;
+  label: string | null;
+  description: string | null;
+  confidence?: number | null;
+}
+
+export interface PaperCanonicalRecord {
+  id: string;
+  source: SourceInfo;
+  bibliography: Bibliography;
+  abstracts: {
+    raw: string | null;
+    zh: string | null;
+  };
+  story: StoryBlock;
+  research_problem: ResearchProblem;
+  core_contributions: string[];
+  method: MethodBlock;
+  evaluation: EvaluationBlock;
+  claims: ClaimItem[];
+  conclusion: ConclusionBlock;
+  editorial: EditorialBlock;
+  taxonomy: TaxonomyBlock;
+  comparison: ComparisonBlock;
+  assets: AssetsBlock;
+  relations: RelationItem[];
+}
+
+export interface PaperCardView {
+  id: string;
+  source: SourceInfo;
+  bibliography: Bibliography;
+  story: StoryBlock;
+  editorial: Pick<EditorialBlock, "verdict" | "summary" | "why_read" | "reading_route" | "graph_worthy">;
+  taxonomy: Pick<TaxonomyBlock, "themes" | "tasks" | "methods" | "modalities" | "novelty_types">;
 }
 
 export interface NeighborItem {
@@ -155,93 +191,15 @@ export interface NeighborItem {
   shared_signals: Record<string, string[]>;
 }
 
-export interface FigureTableIndexItem {
-  label: string;
-  caption: string;
-  role: string;
-  importance: "high" | "medium" | "low" | string;
+export interface NeighborGroups {
+  task: NeighborItem[];
+  method: NeighborItem[];
+  comparison: NeighborItem[];
 }
 
-export interface FigureTableIndex {
-  figures: FigureTableIndexItem[];
-  tables: FigureTableIndexItem[];
-}
-
-export interface TopicItem {
-  slug: string;
-  name: string;
-  role: string;
-}
-
-export interface PaperRelation {
-  target_paper_id: string;
-  relation_type: string;
-  description: string;
-  confidence?: number | null;
-}
-
-export interface PaperSummaryRecord {
-  paper_id: string;
-  title: string;
-  authors: string[];
-  year: number | string | null;
-  venue: string;
-  citation_count: number | null;
-  links: LinkSet;
-  paper_path: string;
-  route_path: string;
-  summary: SummaryBlock;
-  reading_digest: ReadingDigest;
-  editorial_review: EditorialReview;
-  research_tags: ResearchTags;
-  paper_neighbors: {
-    task: NeighborItem[];
-    method: NeighborItem[];
-    comparison: NeighborItem[];
-  };
-}
-
-export interface PaperDetailPayload {
-  paper_id: string;
-  source_conversation_ids: string[];
-  title: string;
-  authors: string[];
-  year: number | string | null;
-  venue: string;
-  citation_count: number | null;
-  links: LinkSet;
-  paper_path: string;
-  route_path: string;
-  abstract_raw: string | null;
-  abstract_zh: string | null;
-  summary: SummaryBlock;
-  reading_digest: ReadingDigest;
-  storyline: Storyline;
-  research_problem: ResearchProblem;
-  core_contributions: string[];
-  key_claims: ClaimItem[];
-  method_core: MethodCore;
-  inputs_outputs: InputsOutputs;
-  benchmarks_or_eval: Benchmarks;
-  author_conclusion: string | null;
-  editor_note: {
-    summary: string | null;
-    points: string[];
-  } | null;
-  editorial_review: EditorialReview;
-  limitations: string[];
-  novelty_type: string[];
-  research_tags: ResearchTags;
-  topics: TopicItem[];
-  retrieval_profile: RetrievalProfile;
-  comparison_context: ComparisonContext;
-  paper_neighbors: {
-    task: NeighborItem[];
-    method: NeighborItem[];
-    comparison: NeighborItem[];
-  };
-  paper_relations: PaperRelation[];
-  figure_table_index: FigureTableIndex;
+export interface PaperDetailViewModel {
+  canonical: PaperCanonicalRecord;
+  neighbors: NeighborGroups;
 }
 
 export interface SiteIndexPayload {
@@ -250,9 +208,9 @@ export interface SiteIndexPayload {
   site_meta: SiteMeta;
   navigation: NavigationConfig;
   filters: Filters;
-  papers: PaperSummaryRecord[];
+  featured: PaperCardView[];
+  papers: PaperCardView[];
   recent_titles: string[];
 }
 
-export type PaperRecord = PaperDetailPayload;
 export type SitePayload = SiteIndexPayload;

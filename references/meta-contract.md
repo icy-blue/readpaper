@@ -1,13 +1,10 @@
-# Meta Contract
+# Meta Contract v2
 
 Use this contract for `extract-paper-meta`.
 
-## Purpose
+The artifact written to `outputs/meta/<paper-id>.json` is the analysis-layer input for canonical paper assembly.
 
-Extract a single paper's research-facing meta artifact from one raw translate payload.
-
-The artifact is an intermediate product written to `outputs/meta/<paper-id>.json`.
-It is not the final paper record.
+It should align with canonical paper analysis and taxonomy fields, while leaving bibliography, source, abstracts, and link enrichment to `normalize_papers.py`.
 
 ## Input Source
 
@@ -19,148 +16,156 @@ Ground extraction only in:
 - `conversation.tags`
 - `conversation.figures`
 - `conversation.tables`
-- visible bot messages and their `translation_status.current_unit_id`
+- visible translated bot messages and their `translation_status.current_unit_id`
 
-Do not infer claims from absent sections. Prefer missing over invented.
+Prefer missing over guessed. Do not infer unsupported claims from absent sections.
 
 ## Artifact Shape
 
 ```json
 {
   "paper_id": "demo-paper",
-  "extractor_version": "meta-v1",
+  "extractor_version": "meta-v3",
   "source_conversation_id": "conv-1",
   "source_semantic_updated_at": "2026-04-21T00:00:00+08:00",
   "extracted_at": "2026-04-21T00:00:00+08:00",
   "meta": {
-    "summary": {},
-    "reading_digest": {},
-    "storyline": {},
-    "research_problem": {},
+    "story": {
+      "paper_one_liner": null,
+      "problem": null,
+      "method": null,
+      "result": null
+    },
+    "research_problem": {
+      "summary": null,
+      "gaps": [],
+      "goal": null
+    },
     "core_contributions": [],
-    "key_claims": [],
-    "method_core": {},
-    "inputs_outputs": {},
-    "benchmarks_or_eval": {},
-    "author_conclusion": null,
-    "editor_note": null,
-    "editorial_review": {},
-    "limitations": [],
-    "novelty_type": [],
-    "research_tags": {},
-    "topics": [],
-    "retrieval_profile": {},
-    "comparison_context": {},
-    "paper_relations": [],
-    "figure_table_index": {
+    "method": {
+      "summary": null,
+      "pipeline_steps": [],
+      "innovations": [],
+      "ingredients": [],
+      "inputs": [],
+      "outputs": [],
+      "representations": []
+    },
+    "evaluation": {
+      "headline": null,
+      "datasets": [],
+      "metrics": [],
+      "baselines": [],
+      "key_findings": [],
+      "setup_summary": null
+    },
+    "claims": [],
+    "conclusion": {
+      "author": null,
+      "limitations": []
+    },
+    "editorial": {
+      "verdict": null,
+      "summary": null,
+      "why_read": [],
+      "strengths": [],
+      "cautions": [],
+      "reading_route": "overview",
+      "research_position": null,
+      "graph_worthy": false,
+      "next_read": []
+    },
+    "taxonomy": {
+      "themes": [],
+      "tasks": [],
+      "methods": [],
+      "modalities": [],
+      "representations": [],
+      "novelty_types": []
+    },
+    "comparison": {
+      "aspects": [],
+      "next_read": []
+    },
+    "assets": {
       "figures": [],
       "tables": []
-    }
+    },
+    "relations": []
   }
 }
 ```
 
 ## Output Rules
 
-- Keep the final `meta` payload schema-compatible with `references/paper-schema.md`.
 - Use Chinese for human-facing summaries and judgments.
-- Keep paper titles, venue names, method names, dataset names, and URLs in their original form.
-- Missing scalars must be `null`.
+- Keep paper titles, method names, dataset names, venues, and URLs in original form.
+- Use English canonical labels for `taxonomy.*`.
+- Missing scalar fields must be `null`.
 - Missing arrays must be `[]`.
-- Missing objects must still be present with valid empty members.
+- Every object listed above must still be present.
 
 ## Length Limits
 
-Treat these as hard limits, not suggestions.
-
-- `summary.one_liner`: 110
-- `summary.abstract_summary`: 150
-- `summary.research_value.summary`: 72
-- `summary.research_value.points[]`: 64, max 3
-- `reading_digest.value_statement`: 84
-- `reading_digest.best_for`: 72
-- `reading_digest.why_read[]`: 64, max 3
-- `reading_digest.positioning.task[]`: 28, max 4
-- `reading_digest.positioning.method[]`: 28, max 4
-- `reading_digest.positioning.modality[]`: 24, max 4
-- `reading_digest.positioning.novelty[]`: 24, max 4
-- `reading_digest.narrative.problem|method|result`: 90
-- `reading_digest.result_headline`: 96
-- `storyline.problem|method|outcome`: 84
-- `research_problem.summary`: 100
-- `research_problem.goal`: 100
+- `story.paper_one_liner`: 110
+- `story.problem|method|result`: 88
+- `research_problem.summary|goal`: 100
 - `research_problem.gaps[]`: 84, max 4
 - `core_contributions[]`: 90, max 4
-- `key_claims[].claim`: 120, max 5
-- `key_claims[].type`: 24
-- `key_claims[].confidence`: 16
-- `method_core.approach_summary`: 110
-- `method_core.pipeline_steps[]`: 105, max 4
-- `method_core.innovations[]`: 90, max 4
-- `method_core.ingredients[]`: 32, max 6
-- `method_core.representation[]`: 32, max 6
-- `method_core.supervision[]`: 48, max 4
-- `method_core.differences[]`: 90, max 4
-- `inputs_outputs.inputs[]`: 28, max 6
-- `inputs_outputs.outputs[]`: 28, max 6
-- `inputs_outputs.modalities[]`: 24, max 6
-- `benchmarks_or_eval.datasets[]`: 30, max 8
-- `benchmarks_or_eval.metrics[]`: 20, max 8
-- `benchmarks_or_eval.baselines[]`: 28, max 8
-- `benchmarks_or_eval.findings[]`: 90, max 4
-- `benchmarks_or_eval.best_results[]`: 90, max 4
-- `benchmarks_or_eval.experiment_setup_summary`: 140
-- `author_conclusion`: 180
-- `editorial_review.verdict`: 16
-- `editorial_review.strengths[]`: 80, max 4
-- `editorial_review.cautions[]`: 80, max 4
-- `editorial_review.research_position`: 84
-- `editorial_review.next_read_hint`: 60
-- `limitations[]`: 90, max 4
-- `novelty_type[]`: 24, max 4
-- `comparison_context.explicit_baselines[]`: 28, max 8
-- `comparison_context.contrast_methods[]`: 28, max 8
-- `comparison_context.comparison_aspects[].aspect`: 28
-- `comparison_context.comparison_aspects[].difference`: 96
-- `comparison_context.recommended_next_read`: 36
+- `method.summary`: 110
+- `method.pipeline_steps[]`: 105, max 4
+- `method.innovations[]`: 90, max 4
+- `method.ingredients[]`: 40, max 6
+- `method.inputs[]|outputs[]`: 32, max 6
+- `method.representations[]`: 40, max 6
+- `evaluation.headline`: 96
+- `evaluation.datasets[]`: 36, max 8
+- `evaluation.metrics[]`: 20, max 8
+- `evaluation.baselines[]`: 36, max 8
+- `evaluation.key_findings[]`: 90, max 4
+- `evaluation.setup_summary`: 140
+- `claims[].text`: 120, max 5
+- `claims[].type`: 24
+- `claims[].confidence`: 16
+- `conclusion.author`: 180
+- `conclusion.limitations[]`: 90, max 4
+- `editorial.verdict`: 16
+- `editorial.summary`: 84
+- `editorial.why_read[]`: 64, max 3
+- `editorial.strengths[]|cautions[]`: 80, max 4
+- `editorial.research_position`: 84
+- `editorial.reading_route`: one of `method`, `evaluation`, `comparison`, `overview`
+- `editorial.next_read[]`: 36, max 4
+- `taxonomy.*[]`: tag-like labels only
+- `comparison.aspects[].aspect`: 28
+- `comparison.aspects[].difference`: 96
+- `assets.*[].label`: 24
+- `assets.*[].caption`: 220
+- `assets.*[].role`: 32
+- `assets.*[].importance`: `high`, `medium`, or `low`
 
-## Writing Style
+## Grounding Rules
 
-- Write short judgment-heavy lines, not mini abstracts.
-- `value_statement`, `result_headline`, and `research_position` must be judgments, not content recap.
-- `best_for` must describe reader profile and purpose.
-- `why_read[]`, `strengths[]`, `cautions[]`, and `limitations[]` must keep one point per item.
-- `core_contributions[]`, `innovations[]`, and `findings[]` must be concrete.
-- `positioning.*`, `ingredients`, `representation`, `datasets`, and `metrics` must be tag-like phrases, not sentences.
-- Rewrite to satisfy length limits; do not hard-truncate or emit `...`.
-- Do not paste section titles, subsection labels, figure labels, or phrases like `第 3.2 节` into reader-facing summary fields.
-- Do not emit filler such as “很有启发”, “值得关注”, or “有重要意义” unless followed by a concrete reason in the same short line.
-
-## Field Grounding Rules
-
-- Build `problem`, `method`, `evaluation`, and `conclusion` evidence buckets first, then write fields from the right bucket.
-- `storyline.problem`, `reading_digest.narrative.problem`, and `research_problem.gaps[]` must come from problem/gap evidence, not result or method prose.
-- `storyline.method`, `reading_digest.narrative.method`, and `method_core.*` must come from method sections or method figures first, not from intro-only baseline recaps.
-- `storyline.outcome`, `reading_digest.narrative.result`, `benchmarks_or_eval.findings`, and `best_results` must come from experiment or conclusion evidence.
-- `research_problem.goal` must describe the paper's target objective, not a motivation citation, human-perception observation, or background fact.
-- `core_contributions[]` must list what the paper adds; do not use pure result sentences unless the contribution is explicitly framed as a benchmark-setting system contribution.
-- `method_core.approach_summary` must name the paper-specific mechanism. If a reused baseline path is mentioned, keep it secondary to the unique mechanism.
-- `method_core.pipeline_steps[]` must be short action steps. Do not paste paragraph fragments or half-sentences.
-- `method_core.innovations[]` must be concrete innovations, not section headings or outline labels.
-- `benchmarks_or_eval.datasets[]`, `metrics[]`, and `baselines[]` must be explicit names found in experiment text, table captions, or figures. Never backfill stock metric lists.
-- `novelty_type[]` must stay conservative and grounded. Prefer labels like `representation`, `architecture`, `training objective`, `data curation`, or `evaluation setting` when supported; otherwise leave it empty.
-- `retrieval_profile.*` should be filled from grounded task/method/input/output/modality signals when those signals already appear elsewhere in the artifact.
+- Build evidence buckets first: `problem`, `method`, `evaluation`, `conclusion`.
+- `story.problem` must come from gap/problem evidence.
+- `story.method` and `method.*` must come from method sections or method figures first.
+- `story.result`, `evaluation.headline`, and `evaluation.key_findings` must come from experiment or conclusion evidence.
+- `research_problem.goal` must be the paper's objective, not a background citation or motivation anecdote.
+- `core_contributions` must list what the paper adds, not generic SOTA lines.
+- `method.summary` must describe the paper-specific mechanism first, not a reused baseline backbone.
+- `evaluation.datasets`, `metrics`, and `baselines` must be explicit names from experiment text or captions.
+- `taxonomy` should be conservative and canonical. Do not mix Chinese and English labels.
+- `comparison.next_read` and `editorial.next_read` should contain short target names, not sentences.
+- `relations` should only be emitted when there is clear typed evidence such as `compares_to`, `extends`, or `uses_dataset`.
 
 ## Evidence Rules
 
-- `key_claims[].claim` must be falsifiable or comparable.
-- `key_claims[].support` must cite grounded evidence such as `section:4. Experiments`, `figure:Figure 2`, or `table:Table 1`.
-- Use `limitations` only for paper-side limitations, not extraction caveats.
-- `figure_table_index` must be produced by the skill, including `role` and `importance`.
-- Do not rely on keyword heuristics outside the skill to infer figure or table roles.
+- Each `claims[].text` must be falsifiable or comparable.
+- Each `claims[].support` must cite grounded evidence such as `section:4. Experiments`, `figure:Figure 2`, or `table:Table 1`.
+- `assets` must be produced by the skill; downstream scripts must not infer them from keyword heuristics alone.
 
 ## Versioning
 
 - Read `extractor-config.json` before extraction.
 - Copy `extractor_version` from config into the artifact.
-- When the prompt, contract, extraction policy, or field-writing policy changes, bump `extractor_version` in config and regenerate affected meta artifacts.
+- When the contract, prompt, or writing policy changes, bump `extractor_version` and regenerate affected meta artifacts.

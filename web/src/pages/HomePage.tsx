@@ -2,8 +2,6 @@ import {
   Button,
   Card,
   Col,
-  Drawer,
-  Empty,
   Flex,
   Grid,
   Input,
@@ -14,24 +12,24 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { FileSearchOutlined, FilterOutlined, FireOutlined, ReadOutlined } from "@ant-design/icons";
+import { FileSearchOutlined, FireOutlined, ReadOutlined } from "@ant-design/icons";
 import { startTransition, useDeferredValue, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   cleanDisplayText,
   displayValueLabel,
   firstExternalLinks,
-  routeTagClass,
   formatYear,
   markdownHref,
   matchesTags,
   paperRoute,
   recommendedRouteLabel,
+  routeTagClass,
   searchableText,
   verdictTagClass,
 } from "../lib/paper";
 import { TooltipTag, TooltipText } from "../components/OverflowTooltip";
-import type { PaperSummaryRecord, SiteIndexPayload } from "../types";
+import type { PaperCardView, SiteIndexPayload } from "../types";
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -65,16 +63,16 @@ function DiscoveryPanel({
       <Card bordered={false} className="surface-card discovery-card control-panel-card">
         <Text className="section-kicker">论文检索台</Text>
         <Title level={4} className="panel-title">
-          先筛选，再进入单篇阅读
+          先判断值不值得读，再进入单篇深入
         </Title>
         <Paragraph type="secondary" className="panel-support-copy">
-          首页负责发现与判断，详情页负责深入理解与对比。
+          首页只读 derived discovery payload，详情页再按需加载 canonical paper record。
         </Paragraph>
         <Input
           allowClear
           size="large"
           prefix={<FileSearchOutlined />}
-          placeholder="搜索标题、摘要、标签、作者、venue"
+          placeholder="搜索标题、作者、story、editorial、taxonomy"
           value={query}
           onChange={(event) => startTransition(() => setQuery(event.target.value))}
           className="search-input"
@@ -132,95 +130,78 @@ function DiscoveryPanel({
   );
 }
 
-function positioningTags(paper: PaperSummaryRecord): string[] {
-  return [
-    ...paper.reading_digest.positioning.task,
-    ...paper.reading_digest.positioning.method,
-    ...paper.reading_digest.positioning.modality,
-    ...paper.reading_digest.positioning.novelty,
-  ].slice(0, 5);
+function discoveryTags(paper: PaperCardView): string[] {
+  return [...paper.taxonomy.tasks, ...paper.taxonomy.methods, ...paper.taxonomy.themes, ...paper.taxonomy.novelty_types].slice(0, 5);
 }
 
-function QuickEntryCard({ paper }: { paper: PaperSummaryRecord }) {
+function QuickEntryCard({ paper }: { paper: PaperCardView }) {
   return (
     <Card bordered={false} className="surface-card quick-entry-card">
       <Text className="section-kicker">推荐阅读</Text>
-      <Link to={paperRoute(paper.route_path, paper.paper_id)} className="paper-link small">
-        {paper.title}
+      <Link to={paperRoute(paper.source.route_path, paper.id)} className="paper-link small">
+        {paper.bibliography.title}
       </Link>
       <TooltipText
-        text={paper.reading_digest.value_statement || paper.summary.one_liner || "暂无阅读判断。"}
+        text={paper.editorial.summary || paper.story.paper_one_liner || "暂无阅读判断。"}
         as="paragraph"
         rows={3}
         className="quick-entry-copy"
       />
       <Flex wrap="wrap" gap={8}>
-        {paper.editorial_review.verdict ? <Tag className={verdictTagClass(paper.editorial_review.verdict)}>{paper.editorial_review.verdict}</Tag> : null}
-        <Tag className={routeTagClass(paper.reading_digest.recommended_route)}>{recommendedRouteLabel(paper.reading_digest.recommended_route)}</Tag>
+        {paper.editorial.verdict ? <Tag className={verdictTagClass(paper.editorial.verdict)}>{paper.editorial.verdict}</Tag> : null}
+        <Tag className={routeTagClass(paper.editorial.reading_route)}>{recommendedRouteLabel(paper.editorial.reading_route)}</Tag>
       </Flex>
     </Card>
   );
 }
 
-function PaperListCard({ paper }: { paper: PaperSummaryRecord }) {
-  const externalLinks = firstExternalLinks(paper.links).slice(0, 3);
-  const markdownLink = markdownHref(paper.paper_path);
+function PaperListCard({ paper }: { paper: PaperCardView }) {
+  const externalLinks = firstExternalLinks(paper.bibliography).slice(0, 3);
+  const markdownLink = markdownHref(paper.source.paper_path);
+  const reasons = paper.editorial.why_read.length ? paper.editorial.why_read : [paper.editorial.summary || paper.story.paper_one_liner || "暂无阅读摘要。"];
 
   return (
     <Card bordered={false} className="surface-card paper-list-card decision-paper-card">
       <Flex justify="space-between" align="start" gap={16} wrap="wrap">
         <div className="paper-card-main">
           <Flex wrap="wrap" gap={8} className="paper-decision-tags">
-            {paper.editorial_review.verdict ? <Tag className={verdictTagClass(paper.editorial_review.verdict)}>{paper.editorial_review.verdict}</Tag> : null}
-            <Tag className={routeTagClass(paper.reading_digest.recommended_route)}>{recommendedRouteLabel(paper.reading_digest.recommended_route)}</Tag>
-            {paper.summary.worth_long_term_graph ? <Tag className="chip-tag chip-tag-worth">值得长期图谱</Tag> : null}
+            {paper.editorial.verdict ? <Tag className={verdictTagClass(paper.editorial.verdict)}>{paper.editorial.verdict}</Tag> : null}
+            <Tag className={routeTagClass(paper.editorial.reading_route)}>{recommendedRouteLabel(paper.editorial.reading_route)}</Tag>
+            {paper.editorial.graph_worthy ? <Tag className="chip-tag chip-tag-worth">值得长期图谱</Tag> : null}
           </Flex>
-          <Link to={paperRoute(paper.route_path, paper.paper_id)} className="paper-link">
-            {paper.title}
+          <Link to={paperRoute(paper.source.route_path, paper.id)} className="paper-link">
+            {paper.bibliography.title}
           </Link>
           <Paragraph type="secondary" className="paper-meta-line">
-            {paper.venue || "未知 venue"} · {formatYear(paper.year)}
+            {paper.bibliography.venue || "未知 venue"} · {formatYear(paper.bibliography.year)}
           </Paragraph>
         </div>
         <Button type="primary" icon={<ReadOutlined />}>
-          <Link to={paperRoute(paper.route_path, paper.paper_id)}>进入阅读页</Link>
+          <Link to={paperRoute(paper.source.route_path, paper.id)}>进入阅读页</Link>
         </Button>
       </Flex>
 
       <TooltipText
-        text={cleanDisplayText(paper.reading_digest.value_statement || paper.summary.one_liner, 110) || "暂无一句话结论。"}
+        text={cleanDisplayText(paper.story.paper_one_liner || paper.editorial.summary, 110) || "暂无一句话结论。"}
         as="paragraph"
         rows={3}
         className="paper-summary-line"
       />
 
-      {paper.reading_digest.best_for ? (
-        <TooltipText
-          text={`适合谁读：${cleanDisplayText(paper.reading_digest.best_for, 72) || paper.reading_digest.best_for}`}
-          as="paragraph"
-          rows={2}
-          className="paper-support-line"
-        />
-      ) : null}
-
       <Row gutter={[12, 12]} className="paper-reason-grid card-grid-row">
         {[
-          {
-            title: "为什么读",
-            values: paper.reading_digest.why_read.length ? paper.reading_digest.why_read : paper.summary.research_value.points,
-          },
-          {
-            title: "结果先看",
-            values: [cleanDisplayText(paper.reading_digest.result_headline, 82) || "暂无前置结果判断。"],
-          },
+          { title: "为什么读", values: reasons.slice(0, 3) },
+          { title: "问题 / 方法 / 结果", values: [paper.story.problem, paper.story.method, paper.story.result].filter(Boolean) as string[] },
         ].map((group) => (
           <Col xs={24} md={12} key={group.title}>
             <Card bordered={false} className="subtle-card paper-micro-card">
               <Text strong>{group.title}</Text>
               <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
-                {group.values.map((value) => (
-                  <TooltipText key={value} text={cleanDisplayText(value, 80)} as="paragraph" rows={3} />
-                ))}
+                {group.values.length ? (
+                  group.values.map((value) => <TooltipText key={value} text={cleanDisplayText(value, 80)} as="paragraph" rows={3} />)
+                ) : (
+                  <TooltipText text="暂无。" as="paragraph" rows={2} />
+                )}
               </Space>
             </Card>
           </Col>
@@ -228,14 +209,14 @@ function PaperListCard({ paper }: { paper: PaperSummaryRecord }) {
       </Row>
 
       <Flex wrap="wrap" gap={8}>
-        {positioningTags(paper).map((tag) => (
-          <TooltipTag key={`${paper.paper_id}-${tag}`} label={displayValueLabel(tag)} maxChars={22} className="chip-tag chip-tag-tone-blue" />
+        {discoveryTags(paper).map((tag) => (
+          <TooltipTag key={`${paper.id}-${tag}`} label={displayValueLabel(tag)} maxChars={22} className="chip-tag chip-tag-tone-blue" />
         ))}
       </Flex>
 
       <Flex wrap="wrap" gap={10} className="paper-card-actions">
         {externalLinks.map((item) => (
-          <Button key={`${paper.paper_id}-${item.key}`} href={item.href} target="_blank">
+          <Button key={`${paper.id}-${item.key}`} href={item.href} target="_blank">
             {item.label}
           </Button>
         ))}
@@ -251,7 +232,6 @@ function PaperListCard({ paper }: { paper: PaperSummaryRecord }) {
 
 export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   const screens = Grid.useBreakpoint();
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedThemes, setSelectedThemes] = useState<string[]>([]);
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
@@ -264,31 +244,23 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
       const searchOkay = !deferredQuery.trim() || searchableText(paper).includes(deferredQuery.trim().toLowerCase());
       return (
         searchOkay &&
-        matchesTags(paper.research_tags.themes, selectedThemes) &&
-        matchesTags(paper.research_tags.tasks, selectedTasks) &&
-        matchesTags(paper.research_tags.methods, selectedMethods)
+        matchesTags(paper.taxonomy.themes, selectedThemes) &&
+        matchesTags(paper.taxonomy.tasks, selectedTasks) &&
+        matchesTags(paper.taxonomy.methods, selectedMethods)
       );
     });
 
     papers = [...papers].sort((left, right) => {
       if (sortBy === "title-asc") {
-        return left.title.localeCompare(right.title);
+        return left.bibliography.title.localeCompare(right.bibliography.title);
       }
-      const leftYear = Number(left.year ?? 0);
-      const rightYear = Number(right.year ?? 0);
+      const leftYear = Number(left.bibliography.year ?? 0);
+      const rightYear = Number(right.bibliography.year ?? 0);
       return sortBy === "year-asc" ? leftYear - rightYear : rightYear - leftYear;
     });
 
     return papers;
   }, [deferredQuery, payload.papers, selectedMethods, selectedTasks, selectedThemes, sortBy]);
-
-  const featuredPapers = useMemo(
-    () =>
-      payload.papers
-        .filter((paper) => paper.summary.worth_long_term_graph || paper.editorial_review.verdict === "值得精读")
-        .slice(0, 3),
-    [payload.papers],
-  );
 
   const discoveryPanel = (
     <DiscoveryPanel
@@ -312,9 +284,9 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24} xl={14}>
             <Text className="section-kicker">Translate Paper Forest</Text>
-            <Title className="display-title">把论文站做成研究工作台，而不是信息堆栈。</Title>
+            <Title className="display-title">把论文库拆成 canonical knowledge 和 derived reading views。</Title>
             <Paragraph className="hero-description">
-              先在首页完成筛选与阅读判断，再进入单篇页依次看研究问题、方法设计、实验结果与对比线索。每篇论文都优先回答值不值得读、该从哪里切入、下一篇该看谁。
+              首页只负责发现、筛选和读前判断。进入单篇后，再按 story、method、evaluation、editorial 和 comparison 逐层深入。
             </Paragraph>
             {payload.recent_titles.length ? (
               <Flex wrap="wrap" gap={8} className="recent-tag-row">
@@ -353,10 +325,10 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
           </Col>
         </Row>
 
-        {featuredPapers.length ? (
+        {payload.featured.length ? (
           <Row gutter={[16, 16]} className="hero-quick-entry-grid">
-            {featuredPapers.map((paper) => (
-              <Col xs={24} md={8} key={paper.paper_id}>
+            {payload.featured.map((paper) => (
+              <Col xs={24} md={8} key={paper.id}>
                 <QuickEntryCard paper={paper} />
               </Col>
             ))}
@@ -365,47 +337,20 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
       </Card>
 
       <Row gutter={[24, 24]} align="top">
-        <Col xs={24} lg={8} xl={7}>
-          {screens.lg ? (
-            <div className="sticky-column">{discoveryPanel}</div>
-          ) : (
-            <>
-              <Button icon={<FilterOutlined />} size="large" onClick={() => setDrawerOpen(true)}>
-                打开发现面板
-              </Button>
-              <Drawer
-                open={drawerOpen}
-                onClose={() => setDrawerOpen(false)}
-                title="发现工作台"
-                width={360}
-                styles={{ body: { padding: 12 } }}
-              >
-                {discoveryPanel}
-              </Drawer>
-            </>
-          )}
+        <Col xs={24} xl={7}>
+          {screens.xl ? discoveryPanel : <div>{discoveryPanel}</div>}
         </Col>
-
-        <Col xs={24} lg={16} xl={17}>
-          <Card bordered={false} className="surface-card results-surface">
-            <Flex justify="space-between" align="end" wrap="wrap" gap={12}>
-              <div>
-              <Text className="section-kicker">判断结果</Text>
-              <Title level={3} className="panel-title">
-                {filteredPapers.length ? `找到 ${filteredPapers.length} 篇可进入阅读流的论文` : "没有命中论文"}
-              </Title>
-            </div>
-              <Text type="secondary">结果卡只保留读前决策信息，不再平铺长摘要。</Text>
-            </Flex>
-
-            <Space direction="vertical" size={16} style={{ width: "100%", marginTop: 22 }}>
-              {filteredPapers.length ? (
-                filteredPapers.map((paper) => <PaperListCard key={paper.paper_id} paper={paper} />)
-              ) : (
-                <Empty description="可以试试放宽筛选条件，或搜索其他研究任务与方法。" />
-              )}
-            </Space>
-          </Card>
+        <Col xs={24} xl={17}>
+          <Space direction="vertical" size={18} style={{ width: "100%" }}>
+            {filteredPapers.length ? (
+              filteredPapers.map((paper) => <PaperListCard key={paper.id} paper={paper} />)
+            ) : (
+              <Card bordered={false} className="surface-card paper-list-card">
+                <Title level={4}>没有匹配结果</Title>
+                <Paragraph type="secondary">可以调整检索词或筛选条件，或者先看看首页的 featured 论文。</Paragraph>
+              </Card>
+            )}
+          </Space>
         </Col>
       </Row>
     </div>

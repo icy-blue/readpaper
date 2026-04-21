@@ -73,14 +73,16 @@ def load_record(path: Path) -> dict[str, Any]:
     data = read_json(path, {})
     if not isinstance(data, dict):
         raise ValueError(f"{path} must contain a JSON object.")
-    title = data.get("title")
-    year = data.get("year")
-    venue = data.get("venue")
-    paper_id = data.get("paper_id")
+    bibliography = data.get("bibliography") if isinstance(data.get("bibliography"), dict) else {}
+    source = data.get("source") if isinstance(data.get("source"), dict) else {}
+    title = bibliography.get("title")
+    year = bibliography.get("year")
+    venue = bibliography.get("venue")
+    paper_id = data.get("id")
     if not isinstance(title, str) or not title.strip():
         raise ValueError(f"{path} is missing a valid 'title'.")
     if not isinstance(paper_id, str) or not paper_id.strip():
-        raise ValueError(f"{path} is missing a valid 'paper_id'.")
+        raise ValueError(f"{path} is missing a valid 'id'.")
     if not isinstance(venue, str) or not venue.strip():
         venue = "Unknown"
     if isinstance(year, int):
@@ -90,8 +92,8 @@ def load_record(path: Path) -> dict[str, Any]:
     else:
         year_text = "unknown"
 
-    source_ids = ensure_list_strings(data.get("source_conversation_ids"))
-    links = data.get("links") if isinstance(data.get("links"), dict) else {}
+    source_ids = ensure_list_strings(source.get("conversation_ids"))
+    links = bibliography.get("links") if isinstance(bibliography.get("links"), dict) else {}
     record = {
         "paper_id": paper_id.strip(),
         "title": normalize_text(title),

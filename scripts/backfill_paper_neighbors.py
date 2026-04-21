@@ -1,31 +1,38 @@
 #!/usr/bin/env python3
-"""Backfill comparison_context and paper_neighbors into normalized paper JSON files."""
+"""Compatibility wrapper for the old neighbor backfill command."""
 
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-from paper_neighbors import backfill_records, load_papers, write_json
+from build_site_derivatives import main as build_site_derivatives_main
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Backfill paper_neighbors into outputs/papers/*.json.")
-    parser.add_argument("--papers-dir", required=True, help="Directory containing normalized paper JSON files.")
+    parser = argparse.ArgumentParser(description="Compatibility wrapper for build_site_derivatives.py.")
+    parser.add_argument("--papers-dir", required=True, help="Directory containing canonical paper JSON files.")
+    parser.add_argument("--site-dir", help="Directory to write derived site payloads.")
     args = parser.parse_args()
 
     papers_dir = Path(args.papers_dir)
-    records = load_papers(papers_dir)
-    backfilled = backfill_records(records, include_site_paths=False)
+    site_dir = Path(args.site_dir) if args.site_dir else papers_dir.parent / "site"
 
-    for record in backfilled:
-        paper_id = str(record.get("paper_id") or "")
-        if not paper_id:
-            continue
-        write_json(papers_dir / f"{paper_id}.json", record)
+    print("`backfill_paper_neighbors.py` is deprecated. Building site-derived payloads instead.")
+    import sys
 
-    print(f"Backfilled paper neighbors for {len(backfilled)} papers in {papers_dir}")
-    return 0
+    argv = sys.argv
+    try:
+        sys.argv = [
+            "build_site_derivatives.py",
+            "--papers-dir",
+            str(papers_dir),
+            "--site-dir",
+            str(site_dir),
+        ]
+        return build_site_derivatives_main()
+    finally:
+        sys.argv = argv
 
 
 if __name__ == "__main__":

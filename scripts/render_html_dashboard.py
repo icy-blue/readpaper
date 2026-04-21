@@ -9,11 +9,12 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+
 def read_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8-sig") as handle:
         data = json.load(handle)
     if not isinstance(data, dict):
-        raise ValueError("paper-neighbors.json must contain a JSON object.")
+        raise ValueError("site-index.json must contain a JSON object.")
     return data
 
 
@@ -28,9 +29,7 @@ def default_dist_dir() -> Path:
 def ensure_dist(dist_dir: Path) -> None:
     index_path = dist_dir / "index.html"
     if not index_path.exists():
-        raise FileNotFoundError(
-            f"Frontend build output not found at {index_path}. Run `npm run build:web` first."
-        )
+        raise FileNotFoundError(f"Frontend build output not found at {index_path}. Run `npm run build:web` first.")
 
 
 def clear_legacy_html(site_dir: Path) -> None:
@@ -58,30 +57,25 @@ def copy_dist(dist_dir: Path, site_dir: Path) -> None:
             shutil.copy2(item, destination)
 
 
-def publish_site(
-    dist_dir: Path,
-    site_dir: Path,
-) -> Path:
+def publish_site(dist_dir: Path, site_dir: Path) -> Path:
     ensure_dist(dist_dir)
     site_dir.mkdir(parents=True, exist_ok=True)
     clear_legacy_html(site_dir)
     copy_dist(dist_dir, site_dir)
-
-    index_path = site_dir / "index.html"
-    return index_path
+    return site_dir / "index.html"
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Publish the React SPA to outputs/site.")
-    parser.add_argument("--neighbors-json", help="Path to outputs/site/paper-neighbors.json.")
-    parser.add_argument("--forest-json", help="Backward-compatible alias for --neighbors-json.")
+    parser.add_argument("--site-index-json", help="Path to outputs/site/site-index.json.")
+    parser.add_argument("--neighbors-json", help="Backward-compatible alias for legacy workflows.")
     parser.add_argument("--output", required=True, help="Path to write the HTML dashboard entry page.")
     parser.add_argument("--dist-dir", help="Path to the built frontend dist directory.")
     args = parser.parse_args()
 
-    input_path = args.neighbors_json or args.forest_json
+    input_path = args.site_index_json or args.neighbors_json
     if not input_path:
-        raise SystemExit("One of --neighbors-json or --forest-json is required.")
+        raise SystemExit("One of --site-index-json or --neighbors-json is required.")
 
     payload = read_json(Path(input_path))
     output_path = Path(args.output)
