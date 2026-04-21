@@ -180,7 +180,28 @@ export interface PaperRelation {
   confidence?: number | null;
 }
 
-export interface PaperRecord {
+export interface PaperSummaryRecord {
+  paper_id: string;
+  title: string;
+  authors: string[];
+  year: number | string | null;
+  venue: string;
+  citation_count: number | null;
+  links: LinkSet;
+  paper_path: string;
+  route_path: string;
+  summary: SummaryBlock;
+  reading_digest: ReadingDigest;
+  editorial_review: EditorialReview;
+  research_tags: ResearchTags;
+  paper_neighbors: {
+    task: NeighborItem[];
+    method: NeighborItem[];
+    comparison: NeighborItem[];
+  };
+}
+
+export interface PaperDetailPayload {
   paper_id: string;
   source_conversation_ids: string[];
   title: string;
@@ -223,12 +244,15 @@ export interface PaperRecord {
   figure_table_index: FigureTableIndex;
 }
 
-export interface SitePayload {
+export interface SiteIndexPayload {
   generated_at: string;
   paper_count: number;
   site_meta: SiteMeta;
   navigation: NavigationConfig;
   filters: Filters;
-  papers: PaperRecord[];
+  papers: PaperSummaryRecord[];
   recent_titles: string[];
 }
+
+export type PaperRecord = PaperDetailPayload;
+export type SitePayload = SiteIndexPayload;

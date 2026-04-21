@@ -8,7 +8,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from paper_neighbors import backfill_records, build_site_payload  # noqa: E402
+from paper_neighbors import backfill_records, build_site_payload, summarize_records  # noqa: E402
 
 
 def make_record(
@@ -334,14 +334,15 @@ class PaperNeighborsTests(unittest.TestCase):
         )
 
         records = backfill_records([primary], include_site_paths=True)
-        payload = build_site_payload(records)
+        payload = build_site_payload(summarize_records(records))
         self.assertEqual(payload["site_meta"]["title"], "Translate Paper Forest")
         self.assertEqual(payload["navigation"]["home_route"], "#/")
         self.assertEqual(payload["papers"][0]["route_path"], "#/paper/payload-paper")
         self.assertIn("themes", payload["filters"])
-        self.assertIn("storyline", payload["papers"][0])
         self.assertIn("reading_digest", payload["papers"][0])
         self.assertIn("editorial_review", payload["papers"][0])
+        self.assertNotIn("storyline", payload["papers"][0])
+        self.assertNotIn("method_core", payload["papers"][0])
 
 
 if __name__ == "__main__":

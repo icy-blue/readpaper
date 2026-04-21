@@ -4,13 +4,13 @@ import { Route, Routes } from "react-router-dom";
 import { debugEnabled, loadPayload } from "./lib/paper";
 import { HomePage } from "./pages/HomePage";
 import { PaperDetailPage } from "./pages/PaperDetailPage";
-import type { SitePayload } from "./types";
+import type { SiteIndexPayload } from "./types";
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 export default function App() {
-  const [payload, setPayload] = useState<SitePayload | null>(null);
+  const [payload, setPayload] = useState<SiteIndexPayload | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {

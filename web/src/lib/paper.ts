@@ -3,9 +3,12 @@ import type {
   FigureTableIndexItem,
   LinkSet,
   NeighborItem,
+  PaperDetailPayload,
   PaperRecord,
   PaperRelation,
+  PaperSummaryRecord,
   RetrievalProfile,
+  SiteIndexPayload,
   SitePayload,
 } from "../types";
 
@@ -316,7 +319,7 @@ function validateNeighborGroups(issues: string[], path: string, value: unknown):
   if (!record) {
     return;
   }
-  (["task", "method", "comparison"] as Array<keyof PaperRecord["paper_neighbors"]>).forEach((key) => {
+  (["task", "method", "comparison"] as Array<keyof PaperSummaryRecord["paper_neighbors"]>).forEach((key) => {
     const items = expectObjectArray(issues, `${path}.${key}`, record[key]);
     items?.forEach((item, index) => {
       expectString(issues, `${path}.${key}[${index}].paper_id`, item.paper_id);
@@ -381,13 +384,12 @@ function validatePaperRelations(issues: string[], path: string, value: unknown):
   });
 }
 
-function validatePaperRecord(issues: string[], path: string, value: unknown): void {
+function validatePaperSummaryRecord(issues: string[], path: string, value: unknown): void {
   const record = expectRecord(issues, path, value);
   if (!record) {
     return;
   }
   expectString(issues, `${path}.paper_id`, record.paper_id);
-  expectStringArray(issues, `${path}.source_conversation_ids`, record.source_conversation_ids);
   expectString(issues, `${path}.title`, record.title);
   expectStringArray(issues, `${path}.authors`, record.authors);
   expectNumberOrStringOrNull(issues, `${path}.year`, record.year);
@@ -395,13 +397,25 @@ function validatePaperRecord(issues: string[], path: string, value: unknown): vo
   expectOptionalNumber(issues, `${path}.citation_count`, record.citation_count);
   expectString(issues, `${path}.paper_path`, record.paper_path);
   expectString(issues, `${path}.route_path`, record.route_path);
-  expectOptionalString(issues, `${path}.abstract_raw`, record.abstract_raw);
-  expectOptionalString(issues, `${path}.abstract_zh`, record.abstract_zh);
-  expectOptionalString(issues, `${path}.author_conclusion`, record.author_conclusion);
 
   validateLinkSet(issues, `${path}.links`, record.links);
   validateSummaryBlock(issues, `${path}.summary`, record.summary);
   validateReadingDigest(issues, `${path}.reading_digest`, record.reading_digest);
+  validateEditorialReview(issues, `${path}.editorial_review`, record.editorial_review);
+  validateResearchTags(issues, `${path}.research_tags`, record.research_tags);
+  validateNeighborGroups(issues, `${path}.paper_neighbors`, record.paper_neighbors);
+}
+
+function validatePaperDetail(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  validatePaperSummaryRecord(issues, path, value);
+  expectStringArray(issues, `${path}.source_conversation_ids`, record.source_conversation_ids);
+  expectOptionalString(issues, `${path}.abstract_raw`, record.abstract_raw);
+  expectOptionalString(issues, `${path}.abstract_zh`, record.abstract_zh);
+  expectOptionalString(issues, `${path}.author_conclusion`, record.author_conclusion);
   validateStoryline(issues, `${path}.storyline`, record.storyline);
   validateResearchProblem(issues, `${path}.research_problem`, record.research_problem);
   expectStringArray(issues, `${path}.core_contributions`, record.core_contributions);
@@ -410,14 +424,11 @@ function validatePaperRecord(issues: string[], path: string, value: unknown): vo
   validateInputsOutputs(issues, `${path}.inputs_outputs`, record.inputs_outputs);
   validateBenchmarks(issues, `${path}.benchmarks_or_eval`, record.benchmarks_or_eval);
   validateEditorNote(issues, `${path}.editor_note`, record.editor_note);
-  validateEditorialReview(issues, `${path}.editorial_review`, record.editorial_review);
   expectStringArray(issues, `${path}.limitations`, record.limitations);
   expectStringArray(issues, `${path}.novelty_type`, record.novelty_type);
-  validateResearchTags(issues, `${path}.research_tags`, record.research_tags);
   validateTopics(issues, `${path}.topics`, record.topics);
   validateRetrievalProfile(issues, `${path}.retrieval_profile`, record.retrieval_profile);
   validateComparisonContext(issues, `${path}.comparison_context`, record.comparison_context);
-  validateNeighborGroups(issues, `${path}.paper_neighbors`, record.paper_neighbors);
   validatePaperRelations(issues, `${path}.paper_relations`, record.paper_relations);
   validateFigureTableIndex(issues, `${path}.figure_table_index`, record.figure_table_index);
 }
@@ -440,7 +451,7 @@ function validationError(issues: string[]): Error {
   );
 }
 
-export function validatePayload(payload: unknown): SitePayload {
+export function validatePayload(payload: unknown): SiteIndexPayload {
   const issues: string[] = [];
   const record = expectRecord(issues, "payload", payload);
   if (!record) {
@@ -482,33 +493,41 @@ export function validatePayload(payload: unknown): SitePayload {
   }
 
   const papers = expectObjectArray(issues, "payload.papers", record.papers);
-  papers?.forEach((paper, index) => validatePaperRecord(issues, `payload.papers[${index}]`, paper));
+  papers?.forEach((paper, index) => validatePaperSummaryRecord(issues, `payload.papers[${index}]`, paper));
 
   if (issues.length) {
     throw validationError(issues);
   }
-  return payload as SitePayload;
+  return payload as SiteIndexPayload;
 }
 
-export function inlinePayload(): SitePayload | null {
-  const node = document.getElementById("paper-neighbors-data");
-  const text = node?.textContent?.trim();
-  if (!text || text === "__PAPER_NEIGHBORS_DATA__") {
-    return null;
+export function validatePaperDetailPayload(payload: unknown): PaperDetailPayload {
+  const issues: string[] = [];
+  validatePaperDetail(issues, "paper", payload);
+  if (issues.length) {
+    throw validationError(issues);
   }
-  return validatePayload(JSON.parse(text));
+  return payload as PaperDetailPayload;
 }
 
-export async function loadPayload(): Promise<SitePayload> {
-  const embedded = inlinePayload();
-  if (embedded) {
-    return embedded;
-  }
-  const response = await fetch(new URL("paper-neighbors.json", window.location.href.split("#")[0]).toString());
+function siteJsonUrl(path: string): string {
+  return new URL(path, window.location.href.split("#")[0]).toString();
+}
+
+export async function loadPayload(): Promise<SiteIndexPayload> {
+  const response = await fetch(siteJsonUrl("paper-neighbors.json"));
   if (!response.ok) {
     throw new Error(`读取 paper-neighbors.json 失败: ${response.status}`);
   }
   return validatePayload(await response.json());
+}
+
+export async function loadPaperDetail(paperId: string): Promise<PaperDetailPayload> {
+  const response = await fetch(siteJsonUrl(`papers/${paperId}.json`));
+  if (!response.ok) {
+    throw new Error(`读取 papers/${paperId}.json 失败: ${response.status}`);
+  }
+  return validatePaperDetailPayload(await response.json());
 }
 
 export function paperRoute(routePath: string | undefined, paperId: string): string {
@@ -528,15 +547,12 @@ export function markdownHref(path: string | undefined): string | undefined {
   return path.replace(/^\/+/, "");
 }
 
-export function searchableText(paper: PaperRecord): string {
-  const comparisonAspects = paper.comparison_context.comparison_aspects.flatMap((item) => [item.aspect, item.difference]);
+export function searchableText(paper: PaperSummaryRecord): string {
   return [
     paper.title,
     ...paper.authors,
     paper.venue,
     String(paper.year ?? ""),
-    paper.abstract_raw ?? "",
-    paper.abstract_zh ?? "",
     paper.summary.one_liner,
     paper.reading_digest.value_statement ?? "",
     paper.reading_digest.best_for ?? "",
@@ -552,16 +568,6 @@ export function searchableText(paper: PaperRecord): string {
     paper.summary.abstract_summary ?? "",
     paper.summary.research_value.summary ?? "",
     ...paper.summary.research_value.points,
-    paper.storyline.problem ?? "",
-    paper.storyline.method ?? "",
-    paper.storyline.outcome ?? "",
-    paper.research_problem.summary ?? "",
-    ...paper.research_problem.gaps,
-    paper.research_problem.goal ?? "",
-    ...paper.core_contributions,
-    paper.author_conclusion ?? "",
-    paper.editor_note?.summary ?? "",
-    ...(paper.editor_note?.points ?? []),
     paper.editorial_review.verdict ?? "",
     ...paper.editorial_review.strengths,
     ...paper.editorial_review.cautions,
@@ -571,8 +577,7 @@ export function searchableText(paper: PaperRecord): string {
     ...paper.research_tags.tasks,
     ...paper.research_tags.methods,
     ...paper.research_tags.representations,
-    ...paper.retrieval_profile.problem_spaces,
-    ...comparisonAspects,
+    ...paper.research_tags.modalities,
   ]
     .join(" ")
     .toLowerCase();
@@ -688,12 +693,12 @@ export function firstExternalLinks(links: LinkSet): Array<{ key: keyof LinkSet; 
     .filter((item): item is { key: keyof LinkSet; label: string; href: string } => Boolean(item.href));
 }
 
-export function relationTargetTitle(payload: SitePayload, relation: PaperRelation): string {
+export function relationTargetTitle(payload: SiteIndexPayload, relation: PaperRelation): string {
   const target = payload.papers.find((paper) => paper.paper_id === relation.target_paper_id);
   return target?.title ?? relation.target_paper_id;
 }
 
-export function relationTargetRoute(payload: SitePayload, relation: PaperRelation): string | null {
+export function relationTargetRoute(payload: SiteIndexPayload, relation: PaperRelation): string | null {
   const target = payload.papers.find((paper) => paper.paper_id === relation.target_paper_id);
   return target ? paperRoute(target.route_path, target.paper_id) : null;
 }

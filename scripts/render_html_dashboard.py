@@ -9,10 +9,6 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-
-INLINE_TOKEN = "__PAPER_NEIGHBORS_DATA__"
-
-
 def read_json(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8-sig") as handle:
         data = json.load(handle)
@@ -35,14 +31,6 @@ def ensure_dist(dist_dir: Path) -> None:
         raise FileNotFoundError(
             f"Frontend build output not found at {index_path}. Run `npm run build:web` first."
         )
-
-
-def replace_inline_data(index_html: str, payload: dict[str, Any]) -> str:
-    serialized = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
-    if INLINE_TOKEN in index_html:
-        return index_html.replace(INLINE_TOKEN, serialized)
-    script_tag = f'<script id="paper-neighbors-data" type="application/json">{serialized}</script>'
-    return index_html.replace("</body>", f"  {script_tag}\n</body>")
 
 
 def clear_legacy_html(site_dir: Path) -> None:
@@ -71,8 +59,6 @@ def copy_dist(dist_dir: Path, site_dir: Path) -> None:
 
 
 def publish_site(
-    payload: dict[str, Any],
-    *,
     dist_dir: Path,
     site_dir: Path,
 ) -> Path:
@@ -82,8 +68,6 @@ def publish_site(
     copy_dist(dist_dir, site_dir)
 
     index_path = site_dir / "index.html"
-    index_html = index_path.read_text(encoding="utf-8")
-    index_path.write_text(replace_inline_data(index_html, payload), encoding="utf-8")
     return index_path
 
 
@@ -102,7 +86,7 @@ def main() -> int:
     payload = read_json(Path(input_path))
     output_path = Path(args.output)
     dist_dir = Path(args.dist_dir) if args.dist_dir else default_dist_dir()
-    index_path = publish_site(payload, dist_dir=dist_dir, site_dir=output_path.parent)
+    index_path = publish_site(dist_dir=dist_dir, site_dir=output_path.parent)
 
     print(f"Published SPA site to {output_path.parent}")
     print(f"Entry page: {index_path}")

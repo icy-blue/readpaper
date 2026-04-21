@@ -9,6 +9,7 @@ Write these files under `outputs/site/`:
 - `index.md`
 - `paper-neighbors.json`
 - `index.html`
+- `papers/<paper-id>.json`
 - `papers/<paper-id>.md`
 - `assets/*`
 
@@ -37,24 +38,40 @@ The Markdown page should feel like a reading flow, not a flat archive dump.
 
 ## `paper-neighbors.json`
 
-Each paper payload should retain:
+Each paper payload should retain only homepage / discovery fields:
 
+- `title`
+- `authors`
+- `year`
+- `venue`
 - `reading_digest`
 - `editorial_review`
 - `links`
-- `research_problem`
-- `core_contributions`
-- `retrieval_profile`
-- `comparison_context`
+- `summary`
+- `research_tags`
 - `paper_neighbors`
-- `topics`
-- `paper_relations`
 
 At the top level, include:
 
 - `site_meta`
 - `navigation`
 - `filters`
+
+## `papers/<paper-id>.json`
+
+Each per-paper detail JSON should retain the full reading payload used by the SPA detail page, including:
+
+- `research_problem`
+- `core_contributions`
+- `method_core`
+- `benchmarks_or_eval`
+- `retrieval_profile`
+- `comparison_context`
+- `paper_neighbors`
+- `topics`
+- `paper_relations`
+- `figure_table_index`
+- abstracts, claims, editorial notes, and supporting metadata
 
 ## HTML site
 
@@ -67,6 +84,6 @@ The site should include:
 - SPA local navigation
 - search and filter controls
 - links between SPA detail routes and Markdown counterparts
-- single-paper detail routes with reading-focused layout
+- single-paper detail routes with reading-focused layout and per-paper JSON fetch
 - author / link metadata
 - editorial verdicts, reading routes, abstract / problem / contribution / comparison / evaluation sections, and folded materials panels

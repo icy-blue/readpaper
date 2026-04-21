@@ -16,6 +16,7 @@ from paper_neighbors import (
     format_support_labels,
     load_papers,
     match_source_label,
+    summarize_records,
     write_json,
     write_text,
 )
@@ -483,7 +484,8 @@ def main() -> int:
     remove_legacy_site_files(site_dir)
 
     records = backfill_records(papers, include_site_paths=True)
-    payload = build_site_payload(records)
+    summary_records = summarize_records(records)
+    payload = build_site_payload(summary_records)
     paper_lookup = {
         str(item.get("paper_id") or ""): item
         for item in records
@@ -498,6 +500,7 @@ def main() -> int:
         if not paper_id:
             continue
         write_text(paper_site_dir / f"{paper_id}.md", render_paper_page(record))
+        write_json(paper_site_dir / f"{paper_id}.json", record)
 
     print(f"Rendered Markdown site to {site_dir}")
     print(f"Paper count: {len(records)}")

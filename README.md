@@ -2,6 +2,12 @@
 
 本仓库用于把 `translate.icydev.cn` 上的论文内容整理成一个本地研究知识森林，并生成可浏览的 Markdown / HTML 阅读站点。
 
+前端站点现在采用“首页索引 + 单篇按需加载”的结构：
+
+- `outputs/site/paper-neighbors.json` 只承载首页发现、筛选、搜索和近邻入口所需的轻量索引
+- `outputs/site/papers/<paper-id>.json` 承载单篇详情页所需的完整阅读数据
+- 站点默认应通过本地 server 或静态托管访问，不再保证 `file://` 双击 `index.html` 后详情页可正常加载
+
 ## 目录约定
 
 - `outputs/papers/`: 归一化后的单篇论文 JSON
@@ -45,8 +51,9 @@ python3 scripts/render_html_dashboard.py \
 - `normalize_papers.py`: 从 `outputs/raw/` 和 `outputs/meta/` 重新组装 `outputs/papers/` 的标准化论文记录
 - `backfill_paper_neighbors.py`: 重新计算每篇论文的任务 / 方法 / 对比近邻
 - `render_markdown_site.py`: 生成站点需要的 Markdown 页面和 `paper-neighbors.json`
+- `render_markdown_site.py`: 同时生成 `outputs/site/papers/<paper-id>.json` 详情数据
 - `npm run build:web`: 重新构建前端静态资源
-- `render_html_dashboard.py`: 把最新 `paper-neighbors.json` 和前端构建产物发布到 `outputs/site/index.html`
+- `render_html_dashboard.py`: 把前端构建产物发布到 `outputs/site/`，并保留 JSON 数据文件供前端按需加载
 
 ## 常规工作流
 
@@ -67,6 +74,17 @@ python3 scripts/build_registry.py \
   --papers-dir outputs/papers \
   --registry state/paper_registry.json
 ```
+
+## 本地预览
+
+详情页会按需 `fetch` `outputs/site/papers/*.json`，请通过本地 server 打开站点。例如：
+
+```bash
+cd outputs/site
+python3 -m http.server 8000
+```
+
+然后访问 [http://localhost:8000/index.html](http://localhost:8000/index.html)。
 
 ## 注意事项
 

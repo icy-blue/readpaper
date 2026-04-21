@@ -858,6 +858,29 @@ def normalized_record(
     return payload
 
 
+def summary_record(record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "paper_id": str(record.get("paper_id") or ""),
+        "title": str(record.get("title") or ""),
+        "authors": ensure_strings(record.get("authors")),
+        "year": record.get("year"),
+        "venue": str(record.get("venue") or "Unknown"),
+        "citation_count": record.get("citation_count"),
+        "links": record.get("links") if isinstance(record.get("links"), dict) else {},
+        "paper_path": str(record.get("paper_path") or ""),
+        "route_path": str(record.get("route_path") or ""),
+        "summary": record.get("summary") if isinstance(record.get("summary"), dict) else {},
+        "reading_digest": record.get("reading_digest") if isinstance(record.get("reading_digest"), dict) else {},
+        "editorial_review": record.get("editorial_review") if isinstance(record.get("editorial_review"), dict) else {},
+        "research_tags": record.get("research_tags") if isinstance(record.get("research_tags"), dict) else {},
+        "paper_neighbors": record.get("paper_neighbors") if isinstance(record.get("paper_neighbors"), dict) else {},
+    }
+
+
+def summarize_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [summary_record(record) for record in records]
+
+
 def shared_values(left: list[str], right: list[str]) -> list[str]:
     return sorted(set(left) & set(right), key=normalize_label)
 

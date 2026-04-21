@@ -4,7 +4,7 @@ The primary derived payload is built from normalized paper JSON records and powe
 
 ## Expected derived payload
 
-`outputs/site/paper-neighbors.json` should expose at least:
+`outputs/site/paper-neighbors.json` should expose a site index payload at least:
 
 ```json
 {
@@ -34,25 +34,19 @@ The primary derived payload is built from normalized paper JSON records and powe
       "paper_id": "example-paper",
       "paper_path": "papers/example-paper.md",
       "route_path": "#/paper/example-paper",
-      "retrieval_profile": {
-        "problem_spaces": ["3D Generation"],
-        "task_axes": ["Image-to-3D"],
-        "approach_axes": ["Diffusion Model", "Mesh"],
-        "input_axes": ["single image"],
-        "output_axes": ["3D mesh"],
-        "modality_axes": ["image", "3D"],
-        "comparison_axes": ["LRM"]
+      "summary": {
+        "one_liner": "一句话结论"
       },
-      "comparison_context": {
-        "explicit_baselines": ["baseline a"],
-        "contrast_methods": ["method phrase a"],
-        "comparison_aspects": [
-          {
-            "aspect": "canonical space",
-            "difference": "显式建模 canonical space 以提升跨姿态一致性"
-          }
-        ],
-        "recommended_next_read": "Find3D"
+      "reading_digest": {
+        "recommended_route": "method"
+      },
+      "editorial_review": {
+        "verdict": "值得精读"
+      },
+      "research_tags": {
+        "themes": ["3D Generation"],
+        "tasks": ["Image-to-3D"],
+        "methods": ["Diffusion Model"]
       },
       "paper_neighbors": {
         "task": [],
@@ -95,8 +89,10 @@ The site should support a single-page HTML reading flow generated from structure
 - `outputs/site/index.html`
 - `outputs/site/assets/*`
 - `outputs/site/paper-neighbors.json`
+- `outputs/site/papers/<paper-id>.json`
 
 The React app should use hash routes such as `#/paper/<paper-id>` for detail pages.
+The homepage should load only `paper-neighbors.json`, while each detail page should fetch `papers/<paper-id>.json` on demand.
 
 ## Empty state
 
@@ -104,5 +100,6 @@ If there are no papers yet:
 
 - still write valid Markdown files
 - still write a valid `paper-neighbors.json`
+- still write an empty-but-valid `papers/` detail directory when publishing the SPA
 - still publish a valid single-page HTML site
 - explain that no processed papers exist yet

@@ -31,7 +31,7 @@ import {
   verdictTagClass,
 } from "../lib/paper";
 import { TooltipTag, TooltipText } from "../components/OverflowTooltip";
-import type { PaperRecord, SitePayload } from "../types";
+import type { PaperSummaryRecord, SiteIndexPayload } from "../types";
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -48,7 +48,7 @@ function DiscoveryPanel({
   sortBy,
   setSortBy,
 }: {
-  payload: SitePayload;
+  payload: SiteIndexPayload;
   query: string;
   setQuery: (value: string) => void;
   selectedThemes: string[];
@@ -132,7 +132,7 @@ function DiscoveryPanel({
   );
 }
 
-function positioningTags(paper: PaperRecord): string[] {
+function positioningTags(paper: PaperSummaryRecord): string[] {
   return [
     ...paper.reading_digest.positioning.task,
     ...paper.reading_digest.positioning.method,
@@ -141,7 +141,7 @@ function positioningTags(paper: PaperRecord): string[] {
   ].slice(0, 5);
 }
 
-function QuickEntryCard({ paper }: { paper: PaperRecord }) {
+function QuickEntryCard({ paper }: { paper: PaperSummaryRecord }) {
   return (
     <Card bordered={false} className="surface-card quick-entry-card">
       <Text className="section-kicker">推荐阅读</Text>
@@ -162,7 +162,7 @@ function QuickEntryCard({ paper }: { paper: PaperRecord }) {
   );
 }
 
-function PaperListCard({ paper }: { paper: PaperRecord }) {
+function PaperListCard({ paper }: { paper: PaperSummaryRecord }) {
   const externalLinks = firstExternalLinks(paper.links).slice(0, 3);
   const markdownLink = markdownHref(paper.paper_path);
 
@@ -211,7 +211,7 @@ function PaperListCard({ paper }: { paper: PaperRecord }) {
           },
           {
             title: "结果先看",
-            values: [cleanDisplayText(paper.reading_digest.result_headline || paper.benchmarks_or_eval.best_results[0], 82) || "暂无前置结果判断。"],
+            values: [cleanDisplayText(paper.reading_digest.result_headline, 82) || "暂无前置结果判断。"],
           },
         ].map((group) => (
           <Col xs={24} md={12} key={group.title}>
@@ -249,7 +249,7 @@ function PaperListCard({ paper }: { paper: PaperRecord }) {
   );
 }
 
-export function HomePage({ payload }: { payload: SitePayload }) {
+export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   const screens = Grid.useBreakpoint();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [query, setQuery] = useState("");

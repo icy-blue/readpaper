@@ -38,6 +38,7 @@ import {
   formatYear,
   importanceTagClass,
   markdownHref,
+  loadPaperDetail,
   paperRoute,
   recommendedRouteLabel,
   scoreLevelLabel,
@@ -45,7 +46,7 @@ import {
   sharedSignalPreview,
   verdictTagClass,
 } from "../lib/paper";
-import type { FigureTableIndexItem, NeighborItem, PaperRecord, SitePayload } from "../types";
+import type { FigureTableIndexItem, NeighborItem, PaperDetailPayload, PaperRecord, SiteIndexPayload } from "../types";
 import { TooltipTag, TooltipText } from "../components/OverflowTooltip";
 
 const { Title, Paragraph, Text } = Typography;
@@ -863,7 +864,7 @@ function MaterialsSection({
   highlightedFigureLabel,
 }: {
   paper: PaperRecord;
-  payload: SitePayload;
+  payload: SiteIndexPayload;
   debugMode: boolean;
   onSupportClick: (item: string) => void;
   activeFigureTab: "figures" | "tables";
@@ -1061,12 +1062,14 @@ function SidebarLinksCard({ paper }: { paper: PaperRecord }) {
   );
 }
 
-export function PaperDetailPage({ payload, debugMode }: { payload: SitePayload; debugMode: boolean }) {
+export function PaperDetailPage({ payload, debugMode }: { payload: SiteIndexPayload; debugMode: boolean }) {
   const screens = Grid.useBreakpoint();
   const navigate = useNavigate();
   const params = useParams();
   const { message } = AntApp.useApp();
-  const paper = payload.papers.find((item) => item.paper_id === params.paperId);
+  const paperId = params.paperId ?? "";
+  const [paper, setPaper] = useState<PaperDetailPayload | null>(null);
+  const [loadError, setLoadError] = useState("");
   const [activeFigureTab, setActiveFigureTab] = useState<"figures" | "tables">("figures");
   const [highlightedFigureLabel, setHighlightedFigureLabel] = useState<string | null>(null);
 
@@ -1083,15 +1086,74 @@ export function PaperDetailPage({ payload, debugMode }: { payload: SitePayload; 
   );
   const activeSection = useActiveSection(outlineItems.map((item) => item.key));
 
-  if (!paper) {
+  useEffect(() => {
+    let cancelled = false;
+    setPaper(null);
+    setLoadError("");
+    setActiveFigureTab("figures");
+    setHighlightedFigureLabel(null);
+
+    if (!paperId) {
+      setLoadError("缺少论文 ID。");
+      return;
+    }
+
+    loadPaperDetail(paperId)
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+        setPaper(result);
+      })
+      .catch((reason: unknown) => {
+        if (cancelled) {
+          return;
+        }
+        setLoadError(reason instanceof Error ? reason.message : "加载论文详情失败。");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [paperId]);
+
+  if (!paperId) {
     return (
       <Card bordered={false} className="surface-card">
-        <Empty description="没有找到这篇论文。" />
+        <Empty description="缺少论文 ID。" />
         <Button style={{ marginTop: 16 }} icon={<ArrowLeftOutlined />} onClick={() => navigate("/")}>
           返回首页
         </Button>
       </Card>
     );
+  }
+
+  if (!paper && !loadError) {
+    return (
+      <Card bordered={false} className="surface-card">
+        <Flex vertical align="center" gap={16} style={{ padding: "40px 0" }}>
+          <Text type="secondary">正在加载论文详情…</Text>
+        </Flex>
+      </Card>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Card bordered={false} className="surface-card">
+        <Empty description="论文详情加载失败。" />
+        <Paragraph type="secondary" style={{ whiteSpace: "pre-wrap", marginTop: 12 }}>
+          {loadError}
+        </Paragraph>
+        <Button style={{ marginTop: 16 }} icon={<ArrowLeftOutlined />} onClick={() => navigate("/")}>
+          返回首页
+        </Button>
+      </Card>
+    );
+  }
+
+  if (!paper) {
+    return null;
   }
 
   const handleSupportClick = async (item: string) => {
