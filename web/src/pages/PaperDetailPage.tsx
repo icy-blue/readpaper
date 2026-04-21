@@ -33,8 +33,10 @@ import {
   formatYear,
   markdownHref,
   paperRoute,
+  recommendedRouteLabel,
   scoreLevelLabel,
   sharedSignalPreview,
+  verdictTone,
 } from "../lib/paper";
 import type { FigureTableIndexItem, NeighborItem, PaperRecord, SitePayload } from "../types";
 
@@ -60,12 +62,9 @@ function sectionTargetFromSupport(item: string): string | null {
     return "evaluation";
   }
   if (content.includes("conclusion")) {
-    return "conclusion";
+    return "editorial-review";
   }
-  if (content.includes("figure") || content.includes("table")) {
-    return "figures";
-  }
-  return null;
+  return "materials-zone";
 }
 
 function labelFromSupport(item: string): { kind: "figures" | "tables"; label: string } | null {
@@ -98,10 +97,6 @@ function truncateText(value: string | null | undefined, maxChars: number): strin
     return "";
   }
   return text.length <= maxChars ? text : `${text.slice(0, maxChars - 1).trimEnd()}…`;
-}
-
-function nonEmpty(values: Array<string | null | undefined>): string[] {
-  return values.map((value) => (value ?? "").trim()).filter(Boolean);
 }
 
 function relationHintLabel(value: string | null | undefined): string | null {
@@ -152,21 +147,26 @@ function SectionCard({
   id,
   title,
   kicker,
+  summary,
   extra,
+  strong = false,
   children,
 }: {
   id: string;
   title: string;
   kicker?: string;
+  summary?: string | null;
   extra?: ReactNode;
+  strong?: boolean;
   children: ReactNode;
 }) {
   return (
-    <Card id={id} bordered={false} className="surface-card reading-section" extra={extra}>
+    <Card id={id} bordered={false} className={`surface-card reading-section ${strong ? "strong-section-card" : "soft-section-card"}`} extra={extra}>
       {kicker ? <Text className="section-kicker">{kicker}</Text> : null}
       <Title level={3} className="section-title">
         {title}
       </Title>
+      {summary ? <Paragraph className="section-summary">{summary}</Paragraph> : null}
       {children}
     </Card>
   );
@@ -230,113 +230,115 @@ function ExternalLinkButtons({ paper }: { paper: PaperRecord }) {
   );
 }
 
-function HeroHeader({ paper }: { paper: PaperRecord }) {
-  const primaryTags = compactList(
+function DecisionHero({ paper }: { paper: PaperRecord }) {
+  const digest = paper.reading_digest;
+  const narrative = [
+    { title: "问题", content: digest.narrative.problem },
+    { title: "方法", content: digest.narrative.method },
+    { title: "结果", content: digest.narrative.result },
+  ].filter((item) => item.content);
+  const positioning = compactList(
     [
-      ...paper.research_tags.methods,
-      ...paper.topics.map((topic) => topic.name),
-      ...paper.research_tags.tasks,
-      ...paper.research_tags.themes,
+      ...digest.positioning.task,
+      ...digest.positioning.method,
+      ...digest.positioning.modality,
+      ...digest.positioning.novelty,
     ],
-    8,
+    6,
   );
 
   return (
-    <Card bordered={false} className="hero-surface detail-hero">
-      <Space direction="vertical" size={18} style={{ width: "100%" }}>
+    <Card bordered={false} className="hero-surface detail-hero v2-hero">
+      <Space direction="vertical" size={20} style={{ width: "100%" }}>
         <Flex wrap="wrap" gap={8}>
           <Tag color="blue">{paper.venue || "未知 venue"}</Tag>
           <Tag color="cyan">{formatYear(paper.year)}</Tag>
           {paper.citation_count !== null ? <Tag color="gold">Citations {paper.citation_count}</Tag> : null}
-          {paper.summary.worth_long_term_graph ? <Tag color="success">Worth Tracking</Tag> : null}
+          {paper.editorial_review.verdict ? <Tag color={verdictTone(paper.editorial_review.verdict)}>{paper.editorial_review.verdict}</Tag> : null}
         </Flex>
 
         <div>
           <Title className="detail-display-title">{paper.title}</Title>
           <Paragraph className="author-line">
-            {paper.authors.length ? paper.authors.join(" / ") : "作者信息暂缺"}
-            {" · "}
-            {paper.venue || "未知 venue"}
-            {" · "}
-            {formatYear(paper.year)}
+            {paper.authors.length ? paper.authors.join(" / ") : "作者信息暂缺"} · {paper.venue || "未知 venue"} · {formatYear(paper.year)}
           </Paragraph>
-          <Paragraph className="hero-one-liner">
-            {paper.summary.one_liner || "暂无一句话总结。"}
+          <Paragraph className="hero-one-liner detail-one-liner">
+            {digest.value_statement || paper.summary.one_liner || "暂无首屏阅读判断。"}
           </Paragraph>
         </div>
 
-        <ExternalLinkButtons paper={paper} />
+        <Row gutter={[16, 16]}>
+          <Col xs={24} lg={15}>
+            <Card bordered={false} className="surface-card decision-strip-card">
+              <Text className="section-kicker">阅读判断条</Text>
+              <Space direction="vertical" size={10} style={{ width: "100%", marginTop: 12 }}>
+                {digest.best_for ? <Paragraph className="decision-line">适合人群：{digest.best_for}</Paragraph> : null}
+                <Paragraph className="decision-line">
+                  推荐路径：{recommendedRouteLabel(digest.recommended_route)}
+                </Paragraph>
+                <Paragraph className="decision-line">
+                  结果先看：{digest.result_headline || paper.benchmarks_or_eval.best_results[0] || "暂无前置结果判断。"}
+                </Paragraph>
+              </Space>
+            </Card>
+          </Col>
+          <Col xs={24} lg={9}>
+            <ExternalLinkButtons paper={paper} />
+          </Col>
+        </Row>
 
-        <div className="hero-tag-block">
-          <Text className="hero-tag-label">Primary Tags</Text>
-          <Flex wrap="wrap" gap={8} className="hero-tag-row">
-            {primaryTags.length ? (
-              primaryTags.map((tag) => (
+        {positioning.length ? (
+          <div className="hero-tag-block">
+            <Text className="hero-tag-label">定位标签</Text>
+            <Flex wrap="wrap" gap={8} className="hero-tag-row">
+              {positioning.map((tag) => (
                 <Tag key={`${paper.paper_id}-${tag}`} className="soft-tag">
                   {tag}
                 </Tag>
-              ))
-            ) : (
-              <Text type="secondary">暂无主标签</Text>
-            )}
-          </Flex>
-        </div>
+              ))}
+            </Flex>
+          </div>
+        ) : null}
+
+        {narrative.length ? (
+          <Row gutter={[16, 16]} className="decision-story-grid">
+            {narrative.map((item) => (
+              <Col xs={24} md={8} key={item.title}>
+                <Card bordered={false} className="subtle-card storyline-mini-card">
+                  <Text className="section-kicker">{item.title}</Text>
+                  <Paragraph className="storyline-copy">{item.content}</Paragraph>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        ) : null}
       </Space>
     </Card>
   );
 }
 
-function StorylineStrip({ paper }: { paper: PaperRecord }) {
-  const items = [
-    { title: "问题", content: paper.storyline.problem },
-    { title: "方法", content: paper.storyline.method },
-    { title: "结果", content: paper.storyline.outcome },
-  ].filter((item) => item.content);
-
-  if (!items.length) {
-    return null;
-  }
-
-  return (
-    <Card bordered={false} className="surface-card storyline-strip">
-      <Row gutter={[16, 16]}>
-        {items.map((item) => (
-          <Col xs={24} md={8} key={item.title}>
-            <div className="storyline-item">
-              <Text className="section-kicker">{item.title}</Text>
-              <Paragraph className="storyline-copy">{item.content}</Paragraph>
-            </div>
-          </Col>
-        ))}
-      </Row>
-    </Card>
-  );
-}
-
-function QuickScanCards({ paper }: { paper: PaperRecord }) {
+function DecisionCards({ paper }: { paper: PaperRecord }) {
+  const digest = paper.reading_digest;
   const cards = [
     {
-      title: "研究问题",
-      content: paper.research_problem.summary || "暂无研究问题摘要。",
-      tags: compactList([...paper.research_problem.gaps, ...paper.research_tags.tasks], 3),
+      title: "这篇解决什么",
+      content: paper.research_problem.summary || digest.narrative.problem || "暂无研究问题摘要。",
+      tags: compactList([...digest.positioning.task, ...paper.research_problem.gaps], 3),
     },
     {
-      title: "核心方法",
-      content: paper.method_core.approach_summary || "暂无方法概述。",
-      tags: compactList([...paper.research_tags.methods, ...paper.method_core.ingredients], 3),
+      title: "方法核心",
+      content: digest.narrative.method || paper.method_core.approach_summary || "暂无方法概述。",
+      tags: compactList([...digest.positioning.method, ...paper.method_core.innovations], 3),
     },
     {
       title: "关键结果",
-      content: paper.benchmarks_or_eval.best_results[0] || paper.benchmarks_or_eval.findings[0] || "暂无关键结果。",
-      tags: compactList(
-        [...paper.benchmarks_or_eval.datasets, ...paper.benchmarks_or_eval.metrics, ...paper.benchmarks_or_eval.baselines],
-        3,
-      ),
+      content: digest.result_headline || paper.benchmarks_or_eval.best_results[0] || paper.benchmarks_or_eval.findings[0] || "暂无关键结果。",
+      tags: compactList([...paper.benchmarks_or_eval.datasets, ...paper.benchmarks_or_eval.metrics], 3),
     },
     {
-      title: "阅读判断",
-      content: paper.summary.research_value.summary || "暂无阅读判断。",
-      tags: compactList([...paper.summary.research_value.points, ...paper.novelty_type], 3),
+      title: "为什么继续看",
+      content: digest.why_read[0] || paper.summary.research_value.summary || "暂无继续阅读理由。",
+      tags: compactList([...digest.why_read.slice(1), ...digest.positioning.novelty], 3),
     },
   ];
 
@@ -344,9 +346,9 @@ function QuickScanCards({ paper }: { paper: PaperRecord }) {
     <Row gutter={[16, 16]} className="quick-card-grid">
       {cards.map((item) => (
         <Col xs={24} md={12} xl={6} key={item.title}>
-          <Card bordered={false} className="surface-card quick-read-card standardized">
+          <Card bordered={false} className="surface-card quick-read-card decision-read-card">
             <Text className="section-kicker">{item.title}</Text>
-            <Paragraph className="quick-card-content">{truncateText(item.content, 90) || "暂无内容。"}</Paragraph>
+            <Paragraph className="quick-card-content">{truncateText(item.content, 92) || "暂无内容。"}</Paragraph>
             <Flex wrap="wrap" gap={8}>
               {item.tags.length ? (
                 item.tags.map((tag) => (
@@ -367,21 +369,26 @@ function QuickScanCards({ paper }: { paper: PaperRecord }) {
 
 function ResearchOverviewSection({ paper }: { paper: PaperRecord }) {
   return (
-    <SectionCard id="research-overview" title="研究概述" kicker="是什么">
+    <SectionCard
+      id="research-overview"
+      title="研究问题"
+      kicker="理解层 / 强 section"
+      strong
+      summary={paper.reading_digest.narrative.problem || paper.research_problem.summary}
+    >
       <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}>
+        <Col xs={24} lg={14}>
           <Card bordered={false} className="surface-card emphasis-card">
-            <Text className="section-kicker">研究问题</Text>
+            <Text className="section-kicker">问题与目标</Text>
             <Paragraph className="section-lead">{paper.research_problem.summary || "暂无研究问题摘要。"}</Paragraph>
             {paper.research_problem.goal ? (
-              <Alert
-                type="info"
-                showIcon
-                className="compact-alert"
-                message="研究目标"
-                description={paper.research_problem.goal}
-              />
+              <Alert type="info" showIcon className="compact-alert" message="研究目标" description={paper.research_problem.goal} />
             ) : null}
+          </Card>
+        </Col>
+        <Col xs={24} lg={10}>
+          <Card bordered={false} className="subtle-card">
+            <Text strong>研究缺口</Text>
             {paper.research_problem.gaps.length ? (
               <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
                 {paper.research_problem.gaps.map((gap) => (
@@ -390,58 +397,51 @@ function ResearchOverviewSection({ paper }: { paper: PaperRecord }) {
                   </Card>
                 ))}
               </Space>
-            ) : null}
-          </Card>
-        </Col>
-        <Col xs={24} lg={12}>
-          <Card bordered={false} className="surface-card">
-            <Text className="section-kicker">核心贡献</Text>
-            {paper.core_contributions.length ? (
-              <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
-                {paper.core_contributions.map((item) => (
-                  <Card key={item} bordered={false} className="subtle-card list-card">
-                    <Paragraph style={{ marginBottom: 0 }}>{item}</Paragraph>
-                  </Card>
-                ))}
-              </Space>
             ) : (
-              <EmptyBlock description="暂无核心贡献整理。" />
+              <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
+                暂无结构化研究缺口。
+              </Paragraph>
             )}
           </Card>
         </Col>
       </Row>
 
-      <Tabs
-        defaultActiveKey={paper.abstract_zh ? "zh" : "raw"}
-        items={[
-          {
-            key: "zh",
-            label: "中文摘要",
-            children: paper.abstract_zh ? <Paragraph className="long-copy">{paper.abstract_zh}</Paragraph> : <EmptyBlock description="暂无中文摘要。" />,
-          },
-          {
-            key: "raw",
-            label: "原始摘要",
-            children: paper.abstract_raw ? <Paragraph className="long-copy">{paper.abstract_raw}</Paragraph> : <EmptyBlock description="暂无原始摘要。" />,
-          },
-        ]}
-      />
+      <Card bordered={false} className="subtle-card">
+        <Text strong>核心贡献</Text>
+        {paper.core_contributions.length ? (
+          <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
+            {paper.core_contributions.map((item) => (
+              <Card key={item} bordered={false} className="subtle-card list-card">
+                <Paragraph style={{ marginBottom: 0 }}>{item}</Paragraph>
+              </Card>
+            ))}
+          </Space>
+        ) : (
+          <EmptyBlock description="暂无核心贡献整理。" />
+        )}
+      </Card>
     </SectionCard>
   );
 }
 
 function MethodCoreSection({ paper }: { paper: PaperRecord }) {
   return (
-    <SectionCard id="method-core" title="方法核心" kicker="怎么做">
+    <SectionCard
+      id="method-core"
+      title="方法主线"
+      kicker="理解层 / 强 section"
+      strong
+      summary={paper.reading_digest.narrative.method || paper.method_core.approach_summary}
+    >
       <Card bordered={false} className="surface-card emphasis-card">
-        <Text className="section-kicker">一句话方法总结</Text>
+        <Text className="section-kicker">一句话方法总述</Text>
         <Paragraph className="section-lead">{paper.method_core.approach_summary || "暂无方法概述。"}</Paragraph>
       </Card>
 
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
           <Card bordered={false} className="subtle-card">
-            <Text strong>流程</Text>
+            <Text strong>Pipeline</Text>
             {paper.method_core.pipeline_steps.length ? (
               <ol className="ordered-list">
                 {paper.method_core.pipeline_steps.map((step) => (
@@ -457,7 +457,7 @@ function MethodCoreSection({ paper }: { paper: PaperRecord }) {
         </Col>
         <Col xs={24} lg={12}>
           <Card bordered={false} className="subtle-card">
-            <Text strong>创新点</Text>
+            <Text strong>方法创新</Text>
             {paper.method_core.innovations.length ? (
               <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
                 {paper.method_core.innovations.map((item) => (
@@ -476,7 +476,7 @@ function MethodCoreSection({ paper }: { paper: PaperRecord }) {
       </Row>
 
       <Row gutter={[16, 16]}>
-        <Col xs={24} lg={8}>
+        <Col xs={24} md={8}>
           <Card bordered={false} className="subtle-card">
             <Text strong>Ingredients</Text>
             <div style={{ marginTop: 12 }}>
@@ -484,7 +484,7 @@ function MethodCoreSection({ paper }: { paper: PaperRecord }) {
             </div>
           </Card>
         </Col>
-        <Col xs={24} lg={8}>
+        <Col xs={24} md={8}>
           <Card bordered={false} className="subtle-card">
             <Text strong>Representation</Text>
             <div style={{ marginTop: 12 }}>
@@ -492,134 +492,15 @@ function MethodCoreSection({ paper }: { paper: PaperRecord }) {
             </div>
           </Card>
         </Col>
-        <Col xs={24} lg={8}>
+        <Col xs={24} md={8}>
           <Card bordered={false} className="subtle-card">
-            <Text strong>Supervision</Text>
+            <Text strong>Task Boundary</Text>
             <div style={{ marginTop: 12 }}>
-              <BadgeGroup values={paper.method_core.supervision} />
+              <BadgeGroup values={[...paper.inputs_outputs.inputs, ...paper.inputs_outputs.outputs]} />
             </div>
           </Card>
         </Col>
       </Row>
-
-      <Card bordered={false} className="subtle-card">
-        <Text strong>与相近方法差异</Text>
-        {paper.method_core.differences.length ? (
-          <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
-            {paper.method_core.differences.map((item) => (
-              <Card key={item} bordered={false} className="subtle-card list-card">
-                <Paragraph style={{ marginBottom: 0 }}>{item}</Paragraph>
-              </Card>
-            ))}
-          </Space>
-        ) : (
-          <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
-            暂无结构化差异说明。
-          </Paragraph>
-        )}
-      </Card>
-    </SectionCard>
-  );
-}
-
-function InputOutputSection({ paper }: { paper: PaperRecord }) {
-  const cards = [
-    { title: "输入", values: paper.inputs_outputs.inputs },
-    { title: "输出", values: paper.inputs_outputs.outputs },
-    { title: "模态", values: paper.inputs_outputs.modalities },
-    { title: "任务类型", values: paper.research_tags.tasks },
-  ];
-
-  return (
-    <SectionCard id="input-output" title="输入输出与任务" kicker="任务边界">
-      <Row gutter={[16, 16]}>
-        {cards.map((card) => (
-          <Col xs={24} md={12} xl={6} key={card.title}>
-            <Card bordered={false} className="subtle-card">
-              <Text strong>{card.title}</Text>
-              <div style={{ marginTop: 12 }}>
-                <BadgeGroup values={card.values} />
-              </div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
-      <Row gutter={[16, 16]}>
-        <Col xs={24} md={12}>
-          <Card bordered={false} className="subtle-card">
-            <Text strong>Representations</Text>
-            <div style={{ marginTop: 12 }}>
-              <BadgeGroup values={paper.research_tags.representations} color="processing" />
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} md={12}>
-          <Card bordered={false} className="subtle-card">
-            <Text strong>Task Tags</Text>
-            <div style={{ marginTop: 12 }}>
-              <BadgeGroup values={paper.research_tags.themes} color="gold" />
-            </div>
-          </Card>
-        </Col>
-      </Row>
-    </SectionCard>
-  );
-}
-
-function KeyClaimsSection({
-  paper,
-  onSupportClick,
-}: {
-  paper: PaperRecord;
-  onSupportClick: (item: string) => void;
-}) {
-  const [claimType, setClaimType] = useState<string>("all");
-  const filteredClaims = useMemo(
-    () => (claimType === "all" ? paper.key_claims : paper.key_claims.filter((item) => item.type === claimType)),
-    [claimType, paper.key_claims],
-  );
-
-  return (
-    <SectionCard id="claims" title="关键论断与证据" kicker="怎么证明">
-      <Tabs
-        activeKey={claimType}
-        onChange={setClaimType}
-        items={[
-          { key: "all", label: "All" },
-          { key: "method", label: "Method" },
-          { key: "experiment", label: "Experiment" },
-          { key: "capability", label: "Capability" },
-          { key: "limitation", label: "Limitation" },
-        ]}
-      />
-      {filteredClaims.length ? (
-        <Space direction="vertical" size={16} style={{ width: "100%" }}>
-          {filteredClaims.map((claim, index) => (
-            <Card key={`${paper.paper_id}-claim-${index}`} bordered={false} className="claim-card">
-              <Flex justify="space-between" align="start" gap={12} wrap="wrap">
-                <Paragraph className="claim-text">{claim.claim}</Paragraph>
-                <Tag color="geekblue">{claim.type}</Tag>
-              </Flex>
-              <Flex wrap="wrap" gap={8}>
-                {claim.support.map((item) => (
-                  <Button
-                    key={`${paper.paper_id}-${index}-${item}`}
-                    size="small"
-                    className="support-chip"
-                    onClick={() => onSupportClick(item)}
-                  >
-                    {item}
-                  </Button>
-                ))}
-                {claim.confidence ? <Tag color={confidenceTone(claim.confidence)}>可信度 {claim.confidence}</Tag> : null}
-              </Flex>
-            </Card>
-          ))}
-        </Space>
-      ) : (
-        <EmptyBlock description="当前筛选下暂无关键论断。" />
-      )}
     </SectionCard>
   );
 }
@@ -629,17 +510,23 @@ function EvaluationSection({ paper }: { paper: PaperRecord }) {
     { label: "Datasets", values: paper.benchmarks_or_eval.datasets },
     { label: "Metrics", values: paper.benchmarks_or_eval.metrics },
     { label: "Baselines", values: paper.benchmarks_or_eval.baselines },
-    { label: "Findings", values: paper.benchmarks_or_eval.findings, findings: true },
+    { label: "Key Findings", values: paper.benchmarks_or_eval.findings, findings: true },
   ];
 
   return (
-    <SectionCard id="evaluation" title="实验与评估" kicker="结果怎样">
-      {paper.benchmarks_or_eval.best_results[0] ? (
-        <Card bordered={false} className="surface-card emphasis-card best-result-card">
-          <Text className="section-kicker">高亮结果</Text>
-          <Paragraph className="section-lead">{paper.benchmarks_or_eval.best_results[0]}</Paragraph>
-        </Card>
-      ) : null}
+    <SectionCard
+      id="evaluation"
+      title="关键结果"
+      kicker="理解层 / 强 section"
+      strong
+      summary={paper.reading_digest.result_headline || paper.benchmarks_or_eval.best_results[0] || paper.benchmarks_or_eval.findings[0]}
+    >
+      <Card bordered={false} className="surface-card emphasis-card best-result-card">
+        <Text className="section-kicker">Result Banner</Text>
+        <Paragraph className="section-lead">
+          {paper.reading_digest.result_headline || paper.benchmarks_or_eval.best_results[0] || "暂无前置结果判断。"}
+        </Paragraph>
+      </Card>
 
       {paper.benchmarks_or_eval.experiment_setup_summary ? (
         <Card bordered={false} className="surface-card setup-summary-card">
@@ -684,16 +571,33 @@ function EvaluationSection({ paper }: { paper: PaperRecord }) {
   );
 }
 
-function ConclusionSection({ paper }: { paper: PaperRecord }) {
+function EditorialReviewSection({ paper }: { paper: PaperRecord }) {
   return (
-    <SectionCard id="conclusion" title="局限 / 作者结论 / 编辑判断" kicker="怎么判断">
+    <SectionCard
+      id="editorial-review"
+      title="编辑判断"
+      kicker="理解层 / 强 section"
+      strong
+      summary={paper.editorial_review.research_position || paper.editor_note?.summary || "帮助判断值不值得继续读。"}
+    >
       <Row gutter={[16, 16]}>
+        <Col xs={24} lg={9}>
+          <Card bordered={false} className="editor-note-card emphasis-card">
+            <Text className="section-kicker">总评</Text>
+            <Title level={4} style={{ marginTop: 10, marginBottom: 8 }}>
+              {paper.editorial_review.verdict || "暂无明确总评"}
+            </Title>
+            <Paragraph style={{ marginBottom: 0 }}>
+              {paper.editorial_review.research_position || paper.editor_note?.summary || "暂无编辑位置判断。"}
+            </Paragraph>
+          </Card>
+        </Col>
         <Col xs={24} lg={8}>
-          <Card bordered={false} className="subtle-card limitations-card">
-            <Text strong>局限</Text>
-            {paper.limitations.length ? (
+          <Card bordered={false} className="subtle-card">
+            <Text strong>值得看的点</Text>
+            {paper.editorial_review.strengths.length ? (
               <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
-                {paper.limitations.map((item) => (
+                {paper.editorial_review.strengths.map((item) => (
                   <Card key={item} bordered={false} className="subtle-card list-card">
                     <Paragraph style={{ marginBottom: 0 }}>{item}</Paragraph>
                   </Card>
@@ -701,127 +605,37 @@ function ConclusionSection({ paper }: { paper: PaperRecord }) {
               </Space>
             ) : (
               <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
-                暂无明确记录的局限。
+                暂无明确 strengths。
               </Paragraph>
             )}
           </Card>
         </Col>
-        <Col xs={24} lg={8}>
-          <Card bordered={false} className="subtle-card">
-            <Text strong>作者结论</Text>
-            <Paragraph className="long-copy" style={{ marginTop: 12, marginBottom: 0 }}>
-              {paper.author_conclusion || "暂无作者结论摘录。"}
-            </Paragraph>
-          </Card>
-        </Col>
-        <Col xs={24} lg={8}>
-          <Card bordered={false} className="editor-note-card emphasis-card">
-            <Text strong>编辑判断</Text>
-            <Text type="secondary">整理者观点</Text>
-            <Paragraph className="long-copy" style={{ marginTop: 12, marginBottom: 0 }}>
-              {paper.editor_note?.summary || "暂无编辑判断。"}
-            </Paragraph>
-            {paper.editor_note?.points.length ? (
+        <Col xs={24} lg={7}>
+          <Card bordered={false} className="subtle-card limitations-card">
+            <Text strong>谨慎点</Text>
+            {paper.editorial_review.cautions.length || paper.limitations.length ? (
               <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
-                {paper.editor_note.points.map((item) => (
+                {(paper.editorial_review.cautions.length ? paper.editorial_review.cautions : paper.limitations).map((item) => (
                   <Card key={item} bordered={false} className="subtle-card list-card">
                     <Paragraph style={{ marginBottom: 0 }}>{item}</Paragraph>
                   </Card>
                 ))}
               </Space>
-            ) : null}
+            ) : (
+              <Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
+                暂无明确 cautions。
+              </Paragraph>
+            )}
           </Card>
         </Col>
       </Row>
-    </SectionCard>
-  );
-}
 
-function FigureTableSection({
-  paper,
-  activeKey,
-  setActiveKey,
-  highlightedLabel,
-}: {
-  paper: PaperRecord;
-  activeKey: "figures" | "tables";
-  setActiveKey: (key: "figures" | "tables") => void;
-  highlightedLabel: string | null;
-}) {
-  const [query, setQuery] = useState("");
-
-  const figureItems = useMemo(() => filterFigureTableItems(paper.figure_table_index.figures, query), [paper.figure_table_index.figures, query]);
-  const tableItems = useMemo(() => filterFigureTableItems(paper.figure_table_index.tables, query), [paper.figure_table_index.tables, query]);
-
-  const renderItem = (item: FigureTableIndexItem) => (
-    <Card
-      key={item.label}
-      bordered={false}
-      className={`subtle-card figure-item-card ${highlightedLabel === item.label ? "is-highlighted" : ""}`}
-    >
-      <Flex justify="space-between" align="start" gap={12} wrap="wrap">
-        <Text strong>{item.label}</Text>
-        <Flex wrap="wrap" gap={8}>
-          <Tag color={item.importance === "high" ? "gold" : item.importance === "medium" ? "blue" : "default"}>
-            {item.importance}
-          </Tag>
-          <Tag>{item.role}</Tag>
-        </Flex>
-      </Flex>
-      <Paragraph className="long-copy" style={{ marginTop: 8, marginBottom: 0 }}>
-        {item.caption}
-      </Paragraph>
-    </Card>
-  );
-
-  return (
-    <SectionCard
-      id="figures"
-      title="图表索引"
-      kicker="证据入口"
-      extra={
-        <Input
-          allowClear
-          placeholder="搜索 Figure / Table label"
-          prefix={<FileSearchOutlined />}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="compact-search"
-        />
-      }
-    >
-      {!paper.figure_table_index.figures.length && !paper.figure_table_index.tables.length ? (
-        <EmptyBlock description="暂无图表索引。" />
-      ) : (
-        <Tabs
-          activeKey={activeKey}
-          onChange={(value) => setActiveKey(value as "figures" | "tables")}
-          items={[
-            {
-              key: "figures",
-              label: `Figures (${figureItems.length})`,
-              children: figureItems.length ? (
-                <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                  {figureItems.map(renderItem)}
-                </Space>
-              ) : (
-                <EmptyBlock description="没有命中 Figure。" />
-              ),
-            },
-            {
-              key: "tables",
-              label: `Tables (${tableItems.length})`,
-              children: tableItems.length ? (
-                <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                  {tableItems.map(renderItem)}
-                </Space>
-              ) : (
-                <EmptyBlock description="没有命中 Table。" />
-              ),
-            },
-          ]}
-        />
-      )}
+      {paper.editorial_review.next_read_hint ? (
+        <Card bordered={false} className="surface-card emphasis-card">
+          <Text className="section-kicker">下一篇建议</Text>
+          <Paragraph className="section-lead">{paper.editorial_review.next_read_hint}</Paragraph>
+        </Card>
+      ) : null}
     </SectionCard>
   );
 }
@@ -830,7 +644,7 @@ function ComparisonSection({ paper }: { paper: PaperRecord }) {
   const context = paper.comparison_context;
 
   return (
-    <SectionCard id="comparison" title="对比阅读" kicker="拿谁来比">
+    <SectionCard id="comparison" title="对比阅读" kicker="理解层 / 辅助 section" summary={context.recommended_next_read || "拿谁来比，为什么值得比。"}>
       <Row gutter={[16, 16]}>
         <Col xs={24} md={12}>
           <Card bordered={false} className="subtle-card">
@@ -850,8 +664,8 @@ function ComparisonSection({ paper }: { paper: PaperRecord }) {
         </Col>
       </Row>
 
-      <Card bordered={false} className="surface-card">
-        <Text className="section-kicker">对比维度</Text>
+      <Card bordered={false} className="subtle-card">
+        <Text strong>对比维度</Text>
         {context.comparison_aspects.length ? (
           <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
             {context.comparison_aspects.map((item) => (
@@ -867,14 +681,122 @@ function ComparisonSection({ paper }: { paper: PaperRecord }) {
           </Paragraph>
         )}
       </Card>
-
-      {context.recommended_next_read ? (
-        <Card bordered={false} className="surface-card emphasis-card">
-          <Text className="section-kicker">一句推荐</Text>
-          <Paragraph className="section-lead">{context.recommended_next_read}</Paragraph>
-        </Card>
-      ) : null}
     </SectionCard>
+  );
+}
+
+function ClaimsPanel({
+  paper,
+  onSupportClick,
+}: {
+  paper: PaperRecord;
+  onSupportClick: (item: string) => void;
+}) {
+  const [claimType, setClaimType] = useState<string>("all");
+  const filteredClaims = useMemo(
+    () => (claimType === "all" ? paper.key_claims : paper.key_claims.filter((item) => item.type === claimType)),
+    [claimType, paper.key_claims],
+  );
+
+  return (
+    <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      <Tabs
+        activeKey={claimType}
+        onChange={setClaimType}
+        items={[
+          { key: "all", label: "All" },
+          { key: "method", label: "Method" },
+          { key: "experiment", label: "Experiment" },
+          { key: "capability", label: "Capability" },
+          { key: "limitation", label: "Limitation" },
+        ]}
+      />
+      {filteredClaims.length ? (
+        filteredClaims.map((claim, index) => (
+          <Card key={`${paper.paper_id}-claim-${index}`} bordered={false} className="claim-card">
+            <Flex justify="space-between" align="start" gap={12} wrap="wrap">
+              <Paragraph className="claim-text">{claim.claim}</Paragraph>
+              <Tag color="geekblue">{claim.type}</Tag>
+            </Flex>
+            <Flex wrap="wrap" gap={8}>
+              {claim.support.map((item) => (
+                <Button key={`${paper.paper_id}-${index}-${item}`} size="small" className="support-chip" onClick={() => onSupportClick(item)}>
+                  {item}
+                </Button>
+              ))}
+              {claim.confidence ? <Tag color={confidenceTone(claim.confidence)}>可信度 {claim.confidence}</Tag> : null}
+            </Flex>
+          </Card>
+        ))
+      ) : (
+        <EmptyBlock description="当前筛选下暂无关键论断。" />
+      )}
+    </Space>
+  );
+}
+
+function FigureTablePanel({
+  paper,
+  activeKey,
+  setActiveKey,
+  highlightedLabel,
+}: {
+  paper: PaperRecord;
+  activeKey: "figures" | "tables";
+  setActiveKey: (key: "figures" | "tables") => void;
+  highlightedLabel: string | null;
+}) {
+  const [query, setQuery] = useState("");
+
+  const figureItems = useMemo(() => filterFigureTableItems(paper.figure_table_index.figures, query), [paper.figure_table_index.figures, query]);
+  const tableItems = useMemo(() => filterFigureTableItems(paper.figure_table_index.tables, query), [paper.figure_table_index.tables, query]);
+
+  const renderItem = (item: FigureTableIndexItem) => (
+    <Card key={item.label} bordered={false} className={`subtle-card figure-item-card ${highlightedLabel === item.label ? "is-highlighted" : ""}`}>
+      <Flex justify="space-between" align="start" gap={12} wrap="wrap">
+        <Text strong>{item.label}</Text>
+        <Flex wrap="wrap" gap={8}>
+          <Tag color={item.importance === "high" ? "gold" : item.importance === "medium" ? "blue" : "default"}>{item.importance}</Tag>
+          <Tag>{item.role}</Tag>
+        </Flex>
+      </Flex>
+      <Paragraph className="long-copy" style={{ marginTop: 8, marginBottom: 0 }}>
+        {item.caption}
+      </Paragraph>
+    </Card>
+  );
+
+  if (!paper.figure_table_index.figures.length && !paper.figure_table_index.tables.length) {
+    return <EmptyBlock description="暂无图表索引。" />;
+  }
+
+  return (
+    <Space direction="vertical" size={14} style={{ width: "100%" }}>
+      <Input
+        allowClear
+        placeholder="搜索 Figure / Table label"
+        prefix={<FileSearchOutlined />}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        className="compact-search"
+      />
+      <Tabs
+        activeKey={activeKey}
+        onChange={(value) => setActiveKey(value as "figures" | "tables")}
+        items={[
+          {
+            key: "figures",
+            label: `Figures (${figureItems.length})`,
+            children: figureItems.length ? <Space direction="vertical" size={12} style={{ width: "100%" }}>{figureItems.map(renderItem)}</Space> : <EmptyBlock description="没有命中 Figure。" />,
+          },
+          {
+            key: "tables",
+            label: `Tables (${tableItems.length})`,
+            children: tableItems.length ? <Space direction="vertical" size={12} style={{ width: "100%" }}>{tableItems.map(renderItem)}</Space> : <EmptyBlock description="没有命中 Table。" />,
+          },
+        ]}
+      />
+    </Space>
   );
 }
 
@@ -896,13 +818,9 @@ function NeighborList({ items }: { items: NeighborItem[] }) {
               <Paragraph type="secondary" style={{ marginTop: 6, marginBottom: 0 }}>
                 {item.reason}
               </Paragraph>
-              {item.relation_hint ? (
-                <Paragraph style={{ marginTop: 8, marginBottom: 0 }}>{relationHintLabel(item.relation_hint)}</Paragraph>
-              ) : null}
+              {item.relation_hint ? <Paragraph style={{ marginTop: 8, marginBottom: 0 }}>{relationHintLabel(item.relation_hint)}</Paragraph> : null}
             </div>
-            <Tag color={item.score_level === "high" ? "gold" : item.score_level === "medium" ? "blue" : "default"}>
-              {scoreLevelLabel(item.score_level)}
-            </Tag>
+            <Tag color={item.score_level === "high" ? "gold" : item.score_level === "medium" ? "blue" : "default"}>{scoreLevelLabel(item.score_level)}</Tag>
           </Flex>
           <Flex wrap="wrap" gap={8} style={{ marginTop: 10 }}>
             {sharedSignalPreview(item.shared_signals).map((signal) => (
@@ -917,16 +835,124 @@ function NeighborList({ items }: { items: NeighborItem[] }) {
   );
 }
 
-function NeighborSection({ paper, payload }: { paper: PaperRecord; payload: SitePayload }) {
+function MaterialsSection({
+  paper,
+  payload,
+  debugMode,
+  onSupportClick,
+  activeFigureTab,
+  setActiveFigureTab,
+  highlightedFigureLabel,
+}: {
+  paper: PaperRecord;
+  payload: SitePayload;
+  debugMode: boolean;
+  onSupportClick: (item: string) => void;
+  activeFigureTab: "figures" | "tables";
+  setActiveFigureTab: (key: "figures" | "tables") => void;
+  highlightedFigureLabel: string | null;
+}) {
+  const { message } = AntApp.useApp();
+
+  const handleCopy = async () => {
+    try {
+      await copyText(JSON.stringify(paper, null, 2));
+      message.success("已复制结构化 JSON。");
+    } catch {
+      message.error("复制失败。");
+    }
+  };
+
+  const abstractTabs = [
+    {
+      key: "zh",
+      label: "中文摘要",
+      children: paper.abstract_zh ? <Paragraph className="long-copy">{paper.abstract_zh}</Paragraph> : <EmptyBlock description="暂无中文摘要。" />,
+    },
+    {
+      key: "raw",
+      label: "原始摘要",
+      children: paper.abstract_raw ? <Paragraph className="long-copy">{paper.abstract_raw}</Paragraph> : <EmptyBlock description="暂无原始摘要。" />,
+    },
+  ];
+
+  const items = [
+    {
+      key: "claims",
+      label: "Claims & Evidence",
+      children: <ClaimsPanel paper={paper} onSupportClick={onSupportClick} />,
+    },
+    {
+      key: "figures",
+      label: "图表索引",
+      children: (
+        <FigureTablePanel
+          paper={paper}
+          activeKey={activeFigureTab}
+          setActiveKey={setActiveFigureTab}
+          highlightedLabel={highlightedFigureLabel}
+        />
+      ),
+    },
+    {
+      key: "neighbors",
+      label: "Related Papers",
+      children: (
+        <Tabs
+          items={payload.navigation.neighbor_tabs.map((tab) => ({
+            key: tab.key,
+            label: tab.label,
+            children: <NeighborList items={paper.paper_neighbors[tab.key]} />,
+          }))}
+        />
+      ),
+    },
+    {
+      key: "abstracts",
+      label: "摘要与原文",
+      children: <Tabs defaultActiveKey={paper.abstract_zh ? "zh" : "raw"} items={abstractTabs} />,
+    },
+    {
+      key: "retrieval",
+      label: "检索画像",
+      children: (
+        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+          {flattenRetrievalProfile(paper.retrieval_profile).map((group) => (
+            <Card key={group.label} bordered={false} className="subtle-card">
+              <Text strong>{group.label}</Text>
+              <div style={{ marginTop: 10 }}>
+                <BadgeGroup values={group.values} />
+              </div>
+            </Card>
+          ))}
+        </Space>
+      ),
+    },
+  ];
+
+  if (debugMode) {
+    items.push({
+      key: "debug",
+      label: "JSON / Debug",
+      children: (
+        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+          <Button icon={<CopyOutlined />} onClick={handleCopy}>
+            复制 JSON
+          </Button>
+          <pre className="debug-json-block">{JSON.stringify(paper, null, 2)}</pre>
+        </Space>
+      ),
+    });
+  }
+
   return (
-    <SectionCard id="neighbors" title="相邻论文" kicker="下一篇看什么">
-      <Tabs
-        items={payload.navigation.neighbor_tabs.map((tab) => ({
-          key: tab.key,
-          label: tab.label,
-          children: <NeighborList items={paper.paper_neighbors[tab.key]} />,
-        }))}
-      />
+    <SectionCard
+      id="materials-zone"
+      title="资料区"
+      kicker="按需展开"
+      summary="把 Claims、图表、近邻、摘要和检索画像收进后半段，避免正文一直等权展开。"
+    >
+      <Collapse defaultActiveKey={[]} items={items} />
     </SectionCard>
   );
 }
@@ -937,10 +963,48 @@ function OutlineCard({ items, activeId }: { items: Array<{ key: string; label: s
       <Text className="section-kicker">页面目录</Text>
       <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 14 }}>
         {items.map((item) => (
+          <Button key={item.key} block className={item.key === activeId ? "toc-button is-active" : "toc-button"} onClick={() => scrollToId(item.key)}>
+            {item.label}
+          </Button>
+        ))}
+      </Space>
+    </Card>
+  );
+}
+
+function SidebarSnapshotCard({ paper }: { paper: PaperRecord }) {
+  return (
+    <Card bordered={false} className="surface-card sidebar-card">
+      <Text className="section-kicker">Paper Snapshot</Text>
+      <Title level={4} className="panel-title">
+        阅读定位
+      </Title>
+      <MetaLine label="Venue / Year" value={`${paper.venue || "未知"} / ${formatYear(paper.year)}`} />
+      <MetaLine label="Citations" value={paper.citation_count ?? "暂无"} />
+      <MetaLine label="Verdict" value={paper.editorial_review.verdict || "暂无"} />
+      <MetaLine label="Route" value={recommendedRouteLabel(paper.reading_digest.recommended_route)} />
+      <MetaLine label="Task" value={<BadgeGroup values={paper.reading_digest.positioning.task} color="gold" />} />
+      <MetaLine label="Method" value={<BadgeGroup values={paper.reading_digest.positioning.method} color="green" />} />
+    </Card>
+  );
+}
+
+function SidebarReadingRouteCard({ paper }: { paper: PaperRecord }) {
+  const routeTargets = [
+    { key: "method-core", label: "先看方法" },
+    { key: "evaluation", label: "先看实验" },
+    { key: "comparison", label: "先看对比" },
+  ];
+
+  return (
+    <Card bordered={false} className="surface-card sidebar-card">
+      <Text className="section-kicker">Reading Route</Text>
+      <Space direction="vertical" size={8} style={{ width: "100%", marginTop: 12 }}>
+        {routeTargets.map((item) => (
           <Button
             key={item.key}
             block
-            className={item.key === activeId ? "toc-button is-active" : "toc-button"}
+            type={item.label === recommendedRouteLabel(paper.reading_digest.recommended_route) ? "primary" : "default"}
             onClick={() => scrollToId(item.key)}
           >
             {item.label}
@@ -951,31 +1015,14 @@ function OutlineCard({ items, activeId }: { items: Array<{ key: string; label: s
   );
 }
 
-function SidebarMetaCard({ paper }: { paper: PaperRecord }) {
-  return (
-    <Card bordered={false} className="surface-card sidebar-card">
-      <Text className="section-kicker">元信息</Text>
-      <Title level={4} className="panel-title">
-        阅读定位
-      </Title>
-      <MetaLine label="Venue / Year" value={`${paper.venue || "未知"} / ${formatYear(paper.year)}`} />
-      <MetaLine label="Citations" value={paper.citation_count ?? "暂无"} />
-      <MetaLine label="Novelty" value={<BadgeGroup values={paper.novelty_type} />} />
-      <MetaLine label="Modalities" value={<BadgeGroup values={paper.research_tags.modalities} color="processing" />} />
-      <MetaLine label="Representations" value={<BadgeGroup values={paper.research_tags.representations} color="purple" />} />
-    </Card>
-  );
-}
-
-function SidebarTagsLinksCard({ paper }: { paper: PaperRecord }) {
+function SidebarLinksCard({ paper }: { paper: PaperRecord }) {
   const links = firstExternalLinks(paper.links);
 
   return (
     <Card bordered={false} className="surface-card sidebar-card">
-      <Text className="section-kicker">标签与外链</Text>
-      <MetaLine label="Topics" value={<BadgeGroup values={paper.topics.map((topic) => topic.name)} color="magenta" />} />
-      <MetaLine label="Tasks" value={<BadgeGroup values={paper.research_tags.tasks} color="gold" />} />
-      <MetaLine label="Methods" value={<BadgeGroup values={paper.research_tags.methods} color="green" />} />
+      <Text className="section-kicker">Links & Tags</Text>
+      <MetaLine label="Novelty" value={<BadgeGroup values={paper.reading_digest.positioning.novelty} color="magenta" />} />
+      <MetaLine label="Modalities" value={<BadgeGroup values={paper.reading_digest.positioning.modality} color="processing" />} />
       <MetaLine
         label="Links"
         value={
@@ -996,69 +1043,6 @@ function SidebarTagsLinksCard({ paper }: { paper: PaperRecord }) {
   );
 }
 
-function RetrievalProfileSection({ paper }: { paper: PaperRecord }) {
-  return (
-    <SectionCard id="retrieval-profile" title="检索画像" kicker="折叠附加信息">
-      <Collapse
-        items={[
-          {
-            key: "retrieval-profile-panel",
-            label: "查看检索画像",
-            children: (
-              <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                {flattenRetrievalProfile(paper.retrieval_profile).map((group) => (
-                  <Card key={group.label} bordered={false} className="subtle-card">
-                    <Text strong>{group.label}</Text>
-                    <div style={{ marginTop: 10 }}>
-                      <BadgeGroup values={group.values} />
-                    </div>
-                  </Card>
-                ))}
-              </Space>
-            ),
-          },
-        ]}
-      />
-    </SectionCard>
-  );
-}
-
-function DebugJsonSection({ paper }: { paper: PaperRecord }) {
-  const { message } = AntApp.useApp();
-
-  const handleCopy = async () => {
-    try {
-      await copyText(JSON.stringify(paper, null, 2));
-      message.success("已复制结构化 JSON。");
-    } catch {
-      message.error("复制失败。");
-    }
-  };
-
-  return (
-    <SectionCard
-      id="debug-json"
-      title="原始结构化记录"
-      kicker="Debug"
-      extra={
-        <Button icon={<CopyOutlined />} onClick={handleCopy}>
-          复制 JSON
-        </Button>
-      }
-    >
-      <Collapse
-        items={[
-          {
-            key: "debug-json-panel",
-            label: "查看只读 JSON",
-            children: <pre className="debug-json-block">{JSON.stringify(paper, null, 2)}</pre>,
-          },
-        ]}
-      />
-    </SectionCard>
-  );
-}
-
 export function PaperDetailPage({ payload, debugMode }: { payload: SitePayload; debugMode: boolean }) {
   const screens = Grid.useBreakpoint();
   const navigate = useNavigate();
@@ -1070,15 +1054,12 @@ export function PaperDetailPage({ payload, debugMode }: { payload: SitePayload; 
 
   const outlineItems = useMemo(
     () => [
-      { key: "research-overview", label: "研究概述" },
-      { key: "method-core", label: "方法核心" },
-      { key: "input-output", label: "输入输出" },
-      { key: "claims", label: "关键论断" },
-      { key: "evaluation", label: "实验评估" },
-      { key: "conclusion", label: "局限与结论" },
-      { key: "figures", label: "图表索引" },
+      { key: "research-overview", label: "研究问题" },
+      { key: "method-core", label: "方法主线" },
+      { key: "evaluation", label: "关键结果" },
+      { key: "editorial-review", label: "编辑判断" },
       { key: "comparison", label: "对比阅读" },
-      { key: "neighbors", label: "相邻论文" },
+      { key: "materials-zone", label: "资料区" },
     ],
     [],
   );
@@ -1106,7 +1087,7 @@ export function PaperDetailPage({ payload, debugMode }: { payload: SitePayload; 
     if (labelTarget) {
       setActiveFigureTab(labelTarget.kind);
       setHighlightedFigureLabel(labelTarget.label);
-      scrollToId("figures");
+      scrollToId("materials-zone");
       return;
     }
 
@@ -1121,40 +1102,39 @@ export function PaperDetailPage({ payload, debugMode }: { payload: SitePayload; 
   const sidebar = (
     <Space direction="vertical" size={16} style={{ width: "100%" }}>
       <OutlineCard items={outlineItems} activeId={activeSection} />
-      <SidebarMetaCard paper={paper} />
-      <SidebarTagsLinksCard paper={paper} />
+      <SidebarSnapshotCard paper={paper} />
+      <SidebarReadingRouteCard paper={paper} />
+      <SidebarLinksCard paper={paper} />
     </Space>
   );
 
   return (
     <div className="page-stack">
-      <HeroHeader paper={paper} />
-      <StorylineStrip paper={paper} />
-      <QuickScanCards paper={paper} />
+      <DecisionHero paper={paper} />
+      <DecisionCards paper={paper} />
+
+      {!screens.xl ? <div>{sidebar}</div> : null}
 
       <Row gutter={[24, 24]} align="top">
         <Col xs={24} xl={17}>
           <Space direction="vertical" size={18} style={{ width: "100%" }}>
             <ResearchOverviewSection paper={paper} />
             <MethodCoreSection paper={paper} />
-            <InputOutputSection paper={paper} />
-            <KeyClaimsSection paper={paper} onSupportClick={handleSupportClick} />
             <EvaluationSection paper={paper} />
-            <ConclusionSection paper={paper} />
-            <FigureTableSection
+            <EditorialReviewSection paper={paper} />
+            <ComparisonSection paper={paper} />
+            <MaterialsSection
               paper={paper}
-              activeKey={activeFigureTab}
-              setActiveKey={(key) => {
+              payload={payload}
+              debugMode={debugMode}
+              onSupportClick={handleSupportClick}
+              activeFigureTab={activeFigureTab}
+              setActiveFigureTab={(key) => {
                 setActiveFigureTab(key);
                 setHighlightedFigureLabel(null);
               }}
-              highlightedLabel={highlightedFigureLabel}
+              highlightedFigureLabel={highlightedFigureLabel}
             />
-            <ComparisonSection paper={paper} />
-            <NeighborSection paper={paper} payload={payload} />
-            {!screens.xl ? sidebar : null}
-            <RetrievalProfileSection paper={paper} />
-            {debugMode ? <DebugJsonSection paper={paper} /> : null}
           </Space>
         </Col>
 

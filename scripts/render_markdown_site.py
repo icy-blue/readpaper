@@ -107,6 +107,16 @@ def render_comparison_context(record: dict[str, Any]) -> list[str]:
     return lines
 
 
+def render_route_label(value: str) -> str:
+    mapping = {
+        "method": "先看方法",
+        "evaluation": "先看实验",
+        "comparison": "先看对比",
+        "overview": "先看概述",
+    }
+    return mapping.get(value, value or "先看概述")
+
+
 def render_neighbor_section(title: str, items: list[dict[str, Any]]) -> list[str]:
     lines = [f"## {title}", ""]
     if not items:
@@ -181,6 +191,8 @@ def remove_legacy_site_files(site_dir: Path) -> None:
 
 def render_paper_page(record: dict[str, Any]) -> str:
     title = str(record.get("title") or record.get("paper_id") or "Untitled")
+    reading_digest = record.get("reading_digest", {}) if isinstance(record.get("reading_digest"), dict) else {}
+    editorial_review = record.get("editorial_review", {}) if isinstance(record.get("editorial_review"), dict) else {}
     summary = record.get("summary", {}) if isinstance(record.get("summary"), dict) else {}
     method_core = record.get("method_core", {}) if isinstance(record.get("method_core"), dict) else {}
     eval_block = record.get("benchmarks_or_eval", {}) if isinstance(record.get("benchmarks_or_eval"), dict) else {}
@@ -215,37 +227,67 @@ def render_paper_page(record: dict[str, Any]) -> str:
 
     lines.extend([
         "",
-        "## 一句话结论",
-        "",
-        str(summary.get("one_liner") or "暂无"),
+        "## 决策层",
         "",
     ])
+    value_statement = str(reading_digest.get("value_statement") or "").strip()
+    best_for = str(reading_digest.get("best_for") or "").strip()
+    recommended_route = str(reading_digest.get("recommended_route") or "").strip()
+    result_headline = str(reading_digest.get("result_headline") or "").strip()
+    verdict = str(editorial_review.get("verdict") or "").strip()
+    if value_statement:
+        lines.append(value_statement)
+        lines.append("")
+    if summary.get("one_liner"):
+        lines.append(f"- 一句话结论: {summary.get('one_liner')}")
+    if best_for:
+        lines.append(f"- 适合谁读: {best_for}")
+    if recommended_route:
+        lines.append(f"- 阅读路径: {render_route_label(recommended_route)}")
+    if verdict:
+        lines.append(f"- 编辑结论: {verdict}")
+    if result_headline:
+        lines.append(f"- 结果先看: {result_headline}")
+    for item in ensure_strings(reading_digest.get("why_read")):
+        lines.append(f"- 为什么继续读: {item}")
+    narrative = reading_digest.get("narrative") if isinstance(reading_digest.get("narrative"), dict) else {}
+    narrative_parts = [
+        f"{key}: {value}"
+        for key, value in [
+            ("问题", narrative.get("problem")),
+            ("方法", narrative.get("method")),
+            ("结果", narrative.get("result")),
+        ]
+        if isinstance(value, str) and value.strip()
+    ]
+    if narrative_parts:
+        lines.append("- 三段故事线: " + " | ".join(narrative_parts))
+    lines.append("")
 
     abstract_raw = str(record.get("abstract_raw") or "").strip()
     abstract_zh = str(record.get("abstract_zh") or "").strip()
-    if abstract_raw:
-        lines.extend(["## 英文摘要", "", abstract_raw, ""])
-    if abstract_zh:
-        lines.extend(["## 中文摘要", "", abstract_zh, ""])
 
     abstract_summary = str(summary.get("abstract_summary") or "")
     research_value = summary.get("research_value") if isinstance(summary.get("research_value"), dict) else {}
     research_value_summary = str(research_value.get("summary") or "").strip() if isinstance(research_value, dict) else ""
     research_value_points = ensure_strings(research_value.get("points")) if isinstance(research_value, dict) else []
     storyline = record.get("storyline", {}) if isinstance(record.get("storyline"), dict) else {}
+    lines.extend(["## 理解层", ""])
     if abstract_summary:
-        lines.extend(["## 摘要概览", "", abstract_summary, ""])
+        lines.append(f"- 摘要概览: {abstract_summary}")
+    if research_value_summary:
+        lines.append(f"- 阅读价值: {research_value_summary}")
+    for item in research_value_points:
+        lines.append(f"- 价值线索: {item}")
     if storyline:
-        storyline_parts = [f"{key}: {value}" for key, value in [("问题", storyline.get("problem")), ("方法", storyline.get("method")), ("结果", storyline.get("outcome"))] if isinstance(value, str) and value.strip()]
+        storyline_parts = [
+            f"{key}: {value}"
+            for key, value in [("问题", storyline.get("problem")), ("方法", storyline.get("method")), ("结果", storyline.get("outcome"))]
+            if isinstance(value, str) and value.strip()
+        ]
         if storyline_parts:
-            lines.extend(["## Storyline", "", "- " + " | ".join(storyline_parts), ""])
-    if research_value_summary or research_value_points:
-        lines.extend(["## 长期价值", ""])
-        if research_value_summary:
-            lines.append(f"- 总结: {research_value_summary}")
-        for item in research_value_points:
-            lines.append(f"- {item}")
-        lines.append("")
+            lines.append("- Storyline: " + " | ".join(storyline_parts))
+    lines.append("")
 
     research_problem = record.get("research_problem", {}) if isinstance(record.get("research_problem"), dict) else {}
     research_problem_summary = str(research_problem.get("summary") or "").strip() if isinstance(research_problem, dict) else ""
@@ -267,25 +309,7 @@ def render_paper_page(record: dict[str, Any]) -> str:
             lines.append(f"- {item}")
         lines.append("")
 
-    lines.extend(["## 核心论断", ""])
-    if claims:
-        for item in claims:
-            if not isinstance(item, dict):
-                continue
-            lines.append(f"- {item.get('claim') or ''}")
-            claim_type = str(item.get("type") or "").strip()
-            if claim_type:
-                lines.append(f"  type: {claim_type}")
-            support = ensure_strings(item.get("support"))
-            confidence = str(item.get("confidence") or "")
-            if support:
-                lines.append(f"  支撑: {render_support_line(support)}")
-            if confidence:
-                lines.append(f"  置信度: {confidence_label(confidence)}")
-    else:
-        lines.append("- 暂无核心论断。")
-
-    lines.extend(["", "## 方法核心", ""])
+    lines.extend(["## 方法核心", ""])
     approach_summary = str(method_core.get("approach_summary") or "").strip()
     if approach_summary:
         lines.append(f"- {display_label('approach_summary')}: {approach_summary}")
@@ -322,25 +346,64 @@ def render_paper_page(record: dict[str, Any]) -> str:
     editor_note = record.get("editor_note") if isinstance(record.get("editor_note"), dict) else {}
     editor_note_summary = str(editor_note.get("summary") or "").strip() if isinstance(editor_note, dict) else ""
     editor_note_points = ensure_strings(editor_note.get("points")) if isinstance(editor_note, dict) else []
-    if editor_note_summary or editor_note_points:
-        lines.extend(["", "## 编者按", ""])
-        if editor_note_summary:
-            lines.append(f"- summary: {editor_note_summary}")
-        for item in editor_note_points:
-            lines.append(f"- {item}")
-        lines.append("")
+    lines.extend(["", "## 编辑判断", ""])
+    if verdict:
+        lines.append(f"- verdict: {verdict}")
+    for item in ensure_strings(editorial_review.get("strengths")):
+        lines.append(f"- strength: {item}")
+    for item in ensure_strings(editorial_review.get("cautions")):
+        lines.append(f"- caution: {item}")
+    research_position = str(editorial_review.get("research_position") or "").strip()
+    next_read_hint = str(editorial_review.get("next_read_hint") or "").strip()
+    if research_position:
+        lines.append(f"- position: {research_position}")
+    if next_read_hint:
+        lines.append(f"- next: {next_read_hint}")
+    if editor_note_summary:
+        lines.append(f"- editor_note: {editor_note_summary}")
+    for item in editor_note_points:
+        lines.append(f"- editor_point: {item}")
+    lines.append("")
+
+    lines.extend(render_comparison_context(record))
+    lines.extend(["<details>", "<summary>资料层</summary>", ""])
+
+    lines.extend(["## 核心论断", ""])
+    if claims:
+        for item in claims:
+            if not isinstance(item, dict):
+                continue
+            lines.append(f"- {item.get('claim') or ''}")
+            claim_type = str(item.get("type") or "").strip()
+            if claim_type:
+                lines.append(f"  type: {claim_type}")
+            support = ensure_strings(item.get("support"))
+            confidence = str(item.get("confidence") or "")
+            if support:
+                lines.append(f"  支撑: {render_support_line(support)}")
+            if confidence:
+                lines.append(f"  置信度: {confidence_label(confidence)}")
+    else:
+        lines.append("- 暂无核心论断。")
+    lines.append("")
+
+    if abstract_raw:
+        lines.extend(["## 英文摘要", "", abstract_raw, ""])
+    if abstract_zh:
+        lines.extend(["## 中文摘要", "", abstract_zh, ""])
 
     limitations = ensure_strings(record.get("limitations"))
-    lines.extend(["", "## 局限", ""])
+    lines.extend(["## 局限", ""])
     if limitations:
         for item in limitations:
             lines.append(f"- {item}")
     else:
         lines.append("- 暂无论文局限记录。")
+    lines.append("")
 
     novelty = ensure_strings(record.get("novelty_type"))
     if novelty:
-        lines.extend(["", "## 创新类型", "", "- " + " / ".join(novelty), ""])
+        lines.extend(["## 创新类型", "", "- " + " / ".join(novelty), ""])
 
     lines.extend(["## 研究标签", ""])
     research_tags = record.get("research_tags", {}) if isinstance(record.get("research_tags"), dict) else {}
@@ -373,7 +436,6 @@ def render_paper_page(record: dict[str, Any]) -> str:
             lines.append(line)
         lines.append("")
 
-    lines.extend(render_comparison_context(record))
     lines.extend(render_neighbor_section("相似论文：任务维度", ensure_strings_dicts(neighbors.get("task"))))
     lines.extend(render_neighbor_section("相似论文：技术方法维度", ensure_strings_dicts(neighbors.get("method"))))
     lines.extend(render_neighbor_section("相似论文：对比方法维度", ensure_strings_dicts(neighbors.get("comparison"))))
@@ -393,6 +455,18 @@ def render_paper_page(record: dict[str, Any]) -> str:
                 lines.append(
                     f"- 表：{item.get('label') or 'Table'} | {item.get('role') or ''} | {item.get('importance') or ''}: {item.get('caption') or ''}"
                 )
+    lines.append("")
+
+    retrieval = record.get("retrieval_profile") if isinstance(record.get("retrieval_profile"), dict) else {}
+    if retrieval:
+        lines.extend(["## 检索画像", ""])
+        for key in ("problem_spaces", "task_axes", "approach_axes", "input_axes", "output_axes", "modality_axes", "comparison_axes"):
+            values = ensure_strings(retrieval.get(key))
+            if values:
+                lines.append(f"- {display_label(key)}: " + " / ".join(values))
+        lines.append("")
+
+    lines.extend(["</details>"])
     return "\n".join(lines) + "\n"
 
 

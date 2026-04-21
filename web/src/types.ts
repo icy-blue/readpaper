@@ -49,6 +49,25 @@ export interface SummaryBlock {
   worth_long_term_graph: boolean;
 }
 
+export interface ReadingDigest {
+  value_statement: string | null;
+  best_for: string | null;
+  why_read: string[];
+  recommended_route: "method" | "evaluation" | "comparison" | "overview" | string;
+  positioning: {
+    task: string[];
+    modality: string[];
+    method: string[];
+    novelty: string[];
+  };
+  narrative: {
+    problem: string | null;
+    method: string | null;
+    result: string | null;
+  };
+  result_headline: string | null;
+}
+
 export interface Storyline {
   problem: string | null;
   method: string | null;
@@ -114,6 +133,14 @@ export interface ComparisonContext {
   recommended_next_read: string | null;
 }
 
+export interface EditorialReview {
+  verdict: "值得精读" | "值得浏览" | "只记结论" | string | null;
+  strengths: string[];
+  cautions: string[];
+  research_position: string | null;
+  next_read_hint: string | null;
+}
+
 export interface NeighborItem {
   paper_id: string;
   title: string;
@@ -167,6 +194,7 @@ export interface PaperRecord {
   abstract_raw: string | null;
   abstract_zh: string | null;
   summary: SummaryBlock;
+  reading_digest: ReadingDigest;
   storyline: Storyline;
   research_problem: ResearchProblem;
   core_contributions: string[];
@@ -179,6 +207,7 @@ export interface PaperRecord {
     summary: string | null;
     points: string[];
   } | null;
+  editorial_review: EditorialReview;
   limitations: string[];
   novelty_type: string[];
   research_tags: ResearchTags;

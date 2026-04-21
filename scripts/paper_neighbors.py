@@ -26,6 +26,8 @@ DISPLAY_LABELS = {
     "data": "Data",
     "abstract_raw": "英文摘要",
     "abstract_zh": "中文摘要",
+    "reading_digest": "阅读摘要",
+    "editorial_review": "编辑判断",
     "research_problem": "研究问题",
     "storyline": "故事线",
     "core_contributions": "核心贡献",
@@ -269,6 +271,90 @@ def summary_research_value(summary: dict[str, Any]) -> dict[str, Any]:
     if isinstance(value, str) and value.strip():
         return {"summary": value.strip(), "points": []}
     return {"summary": None, "points": []}
+
+
+def reading_digest_block(record: dict[str, Any]) -> dict[str, Any]:
+    value = record.get("reading_digest")
+    if isinstance(value, dict):
+        positioning = value.get("positioning") if isinstance(value.get("positioning"), dict) else {}
+        narrative = value.get("narrative") if isinstance(value.get("narrative"), dict) else {}
+        return {
+            "value_statement": str(value.get("value_statement") or "") or None,
+            "best_for": str(value.get("best_for") or "") or None,
+            "why_read": ensure_strings(value.get("why_read")),
+            "recommended_route": str(value.get("recommended_route") or "") or "overview",
+            "positioning": {
+                "task": ensure_strings(positioning.get("task")),
+                "modality": ensure_strings(positioning.get("modality")),
+                "method": ensure_strings(positioning.get("method")),
+                "novelty": ensure_strings(positioning.get("novelty")),
+            },
+            "narrative": {
+                "problem": str(narrative.get("problem") or "") or None,
+                "method": str(narrative.get("method") or "") or None,
+                "result": str(narrative.get("result") or "") or None,
+            },
+            "result_headline": str(value.get("result_headline") or "") or None,
+        }
+
+    summary = summary_block(record)
+    research_value = summary_research_value(summary)
+    storyline = storyline_block(record)
+    research_problem = research_problem_block(record)
+    method_core = method_core_block(record)
+    eval_block = record.get("benchmarks_or_eval") if isinstance(record.get("benchmarks_or_eval"), dict) else {}
+    novelty = novelty_tags(record)
+    tags = record.get("research_tags") if isinstance(record.get("research_tags"), dict) else {}
+    why_read = merge_string_lists(
+        research_value.get("points"),
+        ensure_strings(method_core.get("innovations")),
+        ensure_strings(eval_block.get("best_results")),
+        ensure_strings(eval_block.get("findings")),
+        max_items=3,
+    )
+    return {
+        "value_statement": research_value.get("summary") or storyline.get("method") or research_problem.get("summary"),
+        "best_for": None,
+        "why_read": why_read,
+        "recommended_route": "overview",
+        "positioning": {
+            "task": ensure_strings(tags.get("tasks"))[:2],
+            "modality": ensure_strings(tags.get("modalities"))[:3],
+            "method": ensure_strings(tags.get("methods"))[:2],
+            "novelty": novelty[:2],
+        },
+        "narrative": {
+            "problem": storyline.get("problem") or research_problem.get("summary"),
+            "method": storyline.get("method") or method_core.get("approach_summary"),
+            "result": storyline.get("outcome") or (ensure_strings(eval_block.get("best_results"))[:1] or [None])[0],
+        },
+        "result_headline": (ensure_strings(eval_block.get("best_results"))[:1] or ensure_strings(eval_block.get("findings"))[:1] or [storyline.get("outcome")])[0],
+    }
+
+
+def editorial_review_block(record: dict[str, Any]) -> dict[str, Any]:
+    value = record.get("editorial_review")
+    if isinstance(value, dict):
+        verdict = str(value.get("verdict") or "") or None
+        return {
+            "verdict": verdict,
+            "strengths": ensure_strings(value.get("strengths")),
+            "cautions": ensure_strings(value.get("cautions")),
+            "research_position": str(value.get("research_position") or "") or None,
+            "next_read_hint": str(value.get("next_read_hint") or "") or None,
+        }
+
+    editor_note = editor_note_block(record)
+    limitations = paper_limitations(record.get("limitations"))
+    comparison_context = comparison_context_block(record)
+    next_read_target = str(comparison_context.get("recommended_next_read") or "") or None
+    return {
+        "verdict": "值得浏览" if editor_note or next_read_target else None,
+        "strengths": ensure_strings((editor_note or {}).get("points")),
+        "cautions": limitations[:3],
+        "research_position": str((editor_note or {}).get("summary") or "") or None,
+        "next_read_hint": f"可继续对比 {next_read_target}。" if next_read_target else None,
+    }
 
 
 def storyline_block(record: dict[str, Any]) -> dict[str, Any]:
@@ -538,6 +624,8 @@ def normalized_record(
     research_value = summary_research_value(summary)
     research_problem = research_problem_block(record)
     editor_note = editor_note_block(record)
+    reading_digest = reading_digest_block(record)
+    editorial_review = editorial_review_block(record)
     storyline = storyline_block(record)
     comparison_context_payload = comparison_context_block(
         {
@@ -570,6 +658,7 @@ def normalized_record(
             "research_value": research_value,
             "worth_long_term_graph": bool(summary.get("worth_long_term_graph")),
         },
+        "reading_digest": reading_digest,
         "storyline": storyline,
         "research_problem": research_problem,
         "core_contributions": ensure_strings(record.get("core_contributions")),
@@ -607,6 +696,7 @@ def normalized_record(
         },
         "author_conclusion": str(record.get("author_conclusion") or "") or None,
         "editor_note": editor_note,
+        "editorial_review": editorial_review,
         "limitations": paper_limitations(record.get("limitations")),
         "novelty_type": ensure_strings(record.get("novelty_type")),
         "research_tags": {

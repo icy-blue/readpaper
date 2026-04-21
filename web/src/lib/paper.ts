@@ -1,4 +1,5 @@
 import type {
+  EditorialReview,
   FigureTableIndexItem,
   LinkSet,
   NeighborItem,
@@ -110,6 +111,34 @@ function validateSummaryBlock(issues: string[], path: string, value: unknown): v
   expectStringArray(issues, `${path}.research_value.points`, researchValue.points);
 }
 
+function validateReadingDigest(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectOptionalString(issues, `${path}.value_statement`, record.value_statement);
+  expectOptionalString(issues, `${path}.best_for`, record.best_for);
+  expectStringArray(issues, `${path}.why_read`, record.why_read);
+  expectString(issues, `${path}.recommended_route`, record.recommended_route);
+
+  const positioning = expectRecord(issues, `${path}.positioning`, record.positioning);
+  if (positioning) {
+    expectStringArray(issues, `${path}.positioning.task`, positioning.task);
+    expectStringArray(issues, `${path}.positioning.modality`, positioning.modality);
+    expectStringArray(issues, `${path}.positioning.method`, positioning.method);
+    expectStringArray(issues, `${path}.positioning.novelty`, positioning.novelty);
+  }
+
+  const narrative = expectRecord(issues, `${path}.narrative`, record.narrative);
+  if (narrative) {
+    expectOptionalString(issues, `${path}.narrative.problem`, narrative.problem);
+    expectOptionalString(issues, `${path}.narrative.method`, narrative.method);
+    expectOptionalString(issues, `${path}.narrative.result`, narrative.result);
+  }
+
+  expectOptionalString(issues, `${path}.result_headline`, record.result_headline);
+}
+
 function validateStoryline(issues: string[], path: string, value: unknown): void {
   const record = expectRecord(issues, path, value);
   if (!record) {
@@ -219,6 +248,18 @@ function validateComparisonContext(issues: string[], path: string, value: unknow
   });
 }
 
+function validateEditorialReview(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectOptionalString(issues, `${path}.verdict`, record.verdict);
+  expectStringArray(issues, `${path}.strengths`, record.strengths);
+  expectStringArray(issues, `${path}.cautions`, record.cautions);
+  expectOptionalString(issues, `${path}.research_position`, record.research_position);
+  expectOptionalString(issues, `${path}.next_read_hint`, record.next_read_hint);
+}
+
 function validateNeighborGroups(issues: string[], path: string, value: unknown): void {
   const record = expectRecord(issues, path, value);
   if (!record) {
@@ -309,6 +350,7 @@ function validatePaperRecord(issues: string[], path: string, value: unknown): vo
 
   validateLinkSet(issues, `${path}.links`, record.links);
   validateSummaryBlock(issues, `${path}.summary`, record.summary);
+  validateReadingDigest(issues, `${path}.reading_digest`, record.reading_digest);
   validateStoryline(issues, `${path}.storyline`, record.storyline);
   validateResearchProblem(issues, `${path}.research_problem`, record.research_problem);
   expectStringArray(issues, `${path}.core_contributions`, record.core_contributions);
@@ -317,6 +359,7 @@ function validatePaperRecord(issues: string[], path: string, value: unknown): vo
   validateInputsOutputs(issues, `${path}.inputs_outputs`, record.inputs_outputs);
   validateBenchmarks(issues, `${path}.benchmarks_or_eval`, record.benchmarks_or_eval);
   validateEditorNote(issues, `${path}.editor_note`, record.editor_note);
+  validateEditorialReview(issues, `${path}.editorial_review`, record.editorial_review);
   expectStringArray(issues, `${path}.limitations`, record.limitations);
   expectStringArray(issues, `${path}.novelty_type`, record.novelty_type);
   validateResearchTags(issues, `${path}.research_tags`, record.research_tags);
@@ -444,6 +487,17 @@ export function searchableText(paper: PaperRecord): string {
     paper.abstract_raw ?? "",
     paper.abstract_zh ?? "",
     paper.summary.one_liner,
+    paper.reading_digest.value_statement ?? "",
+    paper.reading_digest.best_for ?? "",
+    ...paper.reading_digest.why_read,
+    paper.reading_digest.result_headline ?? "",
+    ...paper.reading_digest.positioning.task,
+    ...paper.reading_digest.positioning.modality,
+    ...paper.reading_digest.positioning.method,
+    ...paper.reading_digest.positioning.novelty,
+    paper.reading_digest.narrative.problem ?? "",
+    paper.reading_digest.narrative.method ?? "",
+    paper.reading_digest.narrative.result ?? "",
     paper.summary.abstract_summary ?? "",
     paper.summary.research_value.summary ?? "",
     ...paper.summary.research_value.points,
@@ -457,6 +511,11 @@ export function searchableText(paper: PaperRecord): string {
     paper.author_conclusion ?? "",
     paper.editor_note?.summary ?? "",
     ...(paper.editor_note?.points ?? []),
+    paper.editorial_review.verdict ?? "",
+    ...paper.editorial_review.strengths,
+    ...paper.editorial_review.cautions,
+    paper.editorial_review.research_position ?? "",
+    paper.editorial_review.next_read_hint ?? "",
     ...paper.research_tags.themes,
     ...paper.research_tags.tasks,
     ...paper.research_tags.methods,
@@ -466,6 +525,29 @@ export function searchableText(paper: PaperRecord): string {
   ]
     .join(" ")
     .toLowerCase();
+}
+
+export function recommendedRouteLabel(value: PaperRecord["reading_digest"]["recommended_route"]): string {
+  if (value === "method") {
+    return "先看方法";
+  }
+  if (value === "evaluation") {
+    return "先看实验";
+  }
+  if (value === "comparison") {
+    return "先看对比";
+  }
+  return "先看概述";
+}
+
+export function verdictTone(value: EditorialReview["verdict"]): "gold" | "blue" | "default" {
+  if (value === "值得精读") {
+    return "gold";
+  }
+  if (value === "值得浏览") {
+    return "blue";
+  }
+  return "default";
 }
 
 export function matchesTags(paperTags: string[], selected: string[]): boolean {

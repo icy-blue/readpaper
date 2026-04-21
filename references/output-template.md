@@ -29,30 +29,18 @@ Include:
 Each `papers/<paper-id>.md` should include:
 
 - title and metadata
-- links block
-- one-line conclusion
-- storyline strip
-- English / Chinese abstract when available
-- research problem
-- core contributions
-- key claims with support
-- method core
-- inputs / outputs when available
-- evaluation snapshot
-- author conclusion / editor note when available
-- limitations
-- research tags
-- topics / paper relations when available
-- comparison context
-- task / method / comparison neighbors
-- figure / table index
+- a decision layer with `reading_digest` and `editorial_review`
+- a understanding layer with research problem, method core, evaluation, and comparison context
+- a materials layer folded toward the end for claims, figure / table index, abstracts, neighbors, retrieval profile, and debug-style structured data when needed
 
-Do not add a dedicated `retrieval_profile` section to the reading pages.
+The Markdown page should feel like a reading flow, not a flat archive dump.
 
 ## `paper-neighbors.json`
 
 Each paper payload should retain:
 
+- `reading_digest`
+- `editorial_review`
 - `links`
 - `research_problem`
 - `core_contributions`
@@ -74,11 +62,11 @@ Generate a React single-page site from structured data and publish the build art
 
 The site should include:
 
-- summary cards
-- storyline strip
+- summary cards sourced from `reading_digest`
+- a decision / understanding / materials reading flow
 - SPA local navigation
 - search and filter controls
 - links between SPA detail routes and Markdown counterparts
 - single-paper detail routes with reading-focused layout
 - author / link metadata
-- abstract, problem, contribution, comparison, evaluation, figure index, and neighbor sections
+- editorial verdicts, reading routes, abstract / problem / contribution / comparison / evaluation sections, and folded materials panels

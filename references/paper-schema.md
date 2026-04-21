@@ -32,6 +32,24 @@ Write one JSON file per canonical paper at `outputs/papers/<paper-id>.json`.
     },
     "worth_long_term_graph": true
   },
+  "reading_digest": {
+    "value_statement": "首屏一句话价值判断",
+    "best_for": "适合谁读",
+    "why_read": ["继续读的理由 1", "继续读的理由 2"],
+    "recommended_route": "method",
+    "positioning": {
+      "task": ["Open-Vocabulary Segmentation"],
+      "modality": ["text", "3D"],
+      "method": ["Large Language Model"],
+      "novelty": ["representation"]
+    },
+    "narrative": {
+      "problem": "现有方法在开放世界部件理解上缺少稳定空间建模",
+      "method": "通过 LLM-guided canonical spatial modeling 建模规范空间",
+      "result": "提升开放世界 promptable segmentation 的稳定性"
+    },
+    "result_headline": "在开放词汇分割设定下结果更稳。"
+  },
   "storyline": {
     "problem": "现有开放词汇 3D part segmentation 缺少规范空间建模",
     "method": "通过 LLM-guided canonical spatial modeling 建模规范空间",
@@ -77,6 +95,13 @@ Write one JSON file per canonical paper at `outputs/papers/<paper-id>.json`.
   "editor_note": {
     "summary": "你的编者按/阅读备注",
     "points": ["为什么值得看", "接下来最适合拿谁做对比"]
+  },
+  "editorial_review": {
+    "verdict": "值得精读",
+    "strengths": ["方法线清楚", "结果信号强"],
+    "cautions": ["局限仍集中在特定设定"],
+    "research_position": "可作为该方向的阅读入口或对比样本",
+    "next_read_hint": "可继续对比 Find3D。"
   },
   "limitations": ["局限 1", "局限 2"],
   "novelty_type": ["representation", "decoder flexibility"],
@@ -157,11 +182,20 @@ Write one JSON file per canonical paper at `outputs/papers/<paper-id>.json`.
 - `authors`, `abstract_raw`, `citation_count`: Semantic Scholar is the preferred enrichment source when available.
 - `links.doi` / `links.arxiv`: try Semantic Scholar `externalIds`; otherwise keep `null`.
 - `summary.one_liner`: keep it under 120 Chinese characters when possible.
+- `reading_digest.value_statement`: keep it under 80 Chinese characters when possible.
+- `reading_digest.best_for`: keep it under 70 Chinese characters when possible.
+- `reading_digest.why_read[]`: keep each item under 72 Chinese characters when possible.
+- `reading_digest.result_headline`: keep it under 88 Chinese characters when possible.
+- `reading_digest.recommended_route`: use `method`, `evaluation`, `comparison`, or `overview`.
+- `reading_digest.positioning`: keep only front-end useful定位标签; do not dump every tag.
 - `storyline.problem` / `storyline.method` / `storyline.outcome`: keep each item short enough for a two-line first-screen strip.
 - `research_problem.summary`: keep it under 100 Chinese characters when possible.
 - `method_core.approach_summary`: keep it under 100 Chinese characters when possible.
 - `benchmarks_or_eval.findings`: prefer short bullet-like results; each item should stay under 80 Chinese characters when possible.
 - `editor_note.summary`: keep it under 120 Chinese characters when possible.
+- `editorial_review.verdict`: use `值得精读`, `值得浏览`, `只记结论`, or `null`.
+- `editorial_review.strengths[]` / `editorial_review.cautions[]`: keep each item under 72 Chinese characters when possible.
+- `editorial_review.research_position`: keep it under 80 Chinese characters when possible.
 - `paper_neighbors.*[].reason_short`: keep it under 50 Chinese characters when possible.
 - `benchmarks_or_eval.experiment_setup_summary`: keep it concise and focused on setup, not results.
 - `key_claims[].type`: use `method`, `experiment`, `capability`, or `limitation` when grounded; otherwise keep a stable custom string or omit the claim.
@@ -175,5 +209,6 @@ Write one JSON file per canonical paper at `outputs/papers/<paper-id>.json`.
 - Do not write legacy `pdf_url`.
 - Do not write legacy `method_core.problem`.
 - Do not keep `research_problem`, `summary.research_value`, or `editor_note` as plain strings.
+- Do not populate `reading_digest` or `editorial_review` with generic filler that is not grounded in existing tags, findings, or notes.
 - Do not infer `authors`, `doi`, `arxiv`, or `abstract_raw` without a grounded source.
 - Do not fabricate `topics` or `paper_relations` just to fill the schema.

@@ -52,6 +52,24 @@ def make_record(
             },
             "worth_long_term_graph": True,
         },
+        "reading_digest": {
+            "value_statement": "值得看的测试论文。",
+            "best_for": "适合测试读者。",
+            "why_read": ["理由一", "理由二"],
+            "recommended_route": "method",
+            "positioning": {
+                "task": tasks[:2],
+                "modality": modalities[:3],
+                "method": methods[:2],
+                "novelty": [],
+            },
+            "narrative": {
+                "problem": "test problem",
+                "method": "test method",
+                "result": "test result",
+            },
+            "result_headline": "test result headline",
+        },
         "storyline": {
             "problem": "test problem",
             "method": "test method",
@@ -97,6 +115,13 @@ def make_record(
         "editor_note": {
             "summary": "editor summary",
             "points": ["editor point"],
+        },
+        "editorial_review": {
+            "verdict": "值得浏览",
+            "strengths": ["strength a"],
+            "cautions": [],
+            "research_position": "position a",
+            "next_read_hint": "next a",
         },
         "limitations": [],
         "novelty_type": [],
@@ -315,6 +340,8 @@ class PaperNeighborsTests(unittest.TestCase):
         self.assertEqual(payload["papers"][0]["route_path"], "#/paper/payload-paper")
         self.assertIn("themes", payload["filters"])
         self.assertIn("storyline", payload["papers"][0])
+        self.assertIn("reading_digest", payload["papers"][0])
+        self.assertIn("editorial_review", payload["papers"][0])
 
 
 if __name__ == "__main__":

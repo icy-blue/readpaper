@@ -601,6 +601,208 @@ def shorten_text(text: str | None, max_chars: int) -> str | None:
     return cleaned[: max_chars - 1].rstrip("，,；;：: ") + "…"
 
 
+def merge_unique_texts(*groups: list[str]) -> list[str]:
+    merged: list[str] = []
+    for group in groups:
+        for item in group:
+            cleaned = normalize_text(item)
+            if cleaned and cleaned not in merged:
+                merged.append(cleaned)
+    return merged
+
+
+def summarize_tag_mix(task: str | None, method: str | None, theme: str | None) -> str | None:
+    if task and method:
+        return shorten_text(f"把 {task} 放到 {method} 语境里看的一篇代表工作。", 60)
+    if task and theme:
+        return shorten_text(f"一篇围绕 {theme} 中 {task} 展开的代表性工作。", 60)
+    if task:
+        return shorten_text(f"一篇围绕 {task} 展开的代表性工作。", 60)
+    if method and theme:
+        return shorten_text(f"适合用来理解 {theme} 中 {method} 这条路线。", 60)
+    if method:
+        return shorten_text(f"适合用来快速把握 {method} 这条方法路线。", 60)
+    if theme:
+        return shorten_text(f"适合作为 {theme} 方向的快速入口。", 60)
+    return None
+
+
+def infer_recommended_route(
+    *,
+    pipeline_steps: list[str],
+    innovations: list[str],
+    best_results: list[str],
+    findings: list[str],
+    comparison_context: dict[str, Any],
+) -> str:
+    if len(pipeline_steps) >= 2 and innovations:
+        return "method"
+    if best_results or len(findings) >= 2:
+        return "evaluation"
+    if (
+        ensure_strings(comparison_context.get("explicit_baselines"))
+        or ensure_strings(comparison_context.get("contrast_methods"))
+        or comparison_context.get("comparison_aspects")
+    ):
+        return "comparison"
+    return "overview"
+
+
+def build_reading_digest(
+    *,
+    themes: list[str],
+    tasks: list[str],
+    methods: list[str],
+    modalities: list[str],
+    novelty_type: list[str],
+    storyline: dict[str, str | None],
+    research_problem: dict[str, Any],
+    method_core: dict[str, Any],
+    findings: list[str],
+    best_results: list[str],
+    comparison_context: dict[str, Any],
+    research_value: dict[str, Any],
+    editor_note: dict[str, Any] | None,
+) -> dict[str, Any]:
+    task = tasks[0] if tasks else None
+    method = methods[0] if methods else None
+    theme = themes[0] if themes else None
+    best_for_parts: list[str] = []
+    if tasks:
+        best_for_parts.append("关注 " + " / ".join(tasks[:2]))
+    elif themes:
+        best_for_parts.append("关注 " + themes[0])
+    if methods:
+        best_for_parts.append("想看 " + " / ".join(methods[:2]))
+    elif novelty_type:
+        best_for_parts.append("想看 " + " / ".join(novelty_type[:2]))
+    best_for = shorten_text("适合 " + "，".join(best_for_parts) + " 的读者。", 70) if best_for_parts else None
+
+    why_read_candidates = merge_unique_texts(
+        ensure_strings(editor_note.get("points")) if isinstance(editor_note, dict) else [],
+        ensure_strings(research_value.get("points")) if isinstance(research_value, dict) else [],
+        ensure_strings(method_core.get("innovations")),
+        best_results,
+        findings,
+    )
+    why_read = [item for item in (shorten_text(candidate, 72) for candidate in why_read_candidates) if item][:3]
+
+    return {
+        "value_statement": (
+            shorten_text((editor_note or {}).get("summary"), 80)
+            or shorten_text(research_value.get("summary"), 80)
+            or summarize_tag_mix(task, method, theme)
+            or shorten_text(storyline.get("method"), 80)
+            or shorten_text(research_problem.get("summary"), 80)
+        ),
+        "best_for": best_for,
+        "why_read": why_read,
+        "recommended_route": infer_recommended_route(
+            pipeline_steps=ensure_strings(method_core.get("pipeline_steps")),
+            innovations=ensure_strings(method_core.get("innovations")),
+            best_results=best_results,
+            findings=findings,
+            comparison_context=comparison_context,
+        ),
+        "positioning": {
+            "task": tasks[:2],
+            "modality": modalities[:3],
+            "method": methods[:2],
+            "novelty": novelty_type[:2],
+        },
+        "narrative": {
+            "problem": shorten_text(storyline.get("problem") or research_problem.get("summary"), 70),
+            "method": shorten_text(storyline.get("method") or method_core.get("approach_summary"), 70),
+            "result": shorten_text(storyline.get("outcome") or (best_results[0] if best_results else None) or (findings[0] if findings else None), 70),
+        },
+        "result_headline": shorten_text(
+            (best_results[0] if best_results else None)
+            or (findings[0] if findings else None)
+            or storyline.get("outcome"),
+            88,
+        ),
+    }
+
+
+def infer_editorial_verdict(
+    *,
+    pipeline_steps: list[str],
+    innovations: list[str],
+    best_results: list[str],
+    findings: list[str],
+    comparison_context: dict[str, Any],
+) -> str | None:
+    has_method_signal = len(pipeline_steps) >= 2 and bool(innovations)
+    has_eval_signal = bool(best_results or findings)
+    has_comparison_signal = bool(
+        ensure_strings(comparison_context.get("explicit_baselines"))
+        or ensure_strings(comparison_context.get("contrast_methods"))
+        or comparison_context.get("comparison_aspects")
+    )
+    if has_method_signal and has_eval_signal:
+        return "值得精读"
+    if has_method_signal or has_eval_signal or has_comparison_signal:
+        return "值得浏览"
+    if findings:
+        return "只记结论"
+    return None
+
+
+def build_editorial_review(
+    *,
+    themes: list[str],
+    tasks: list[str],
+    methods: list[str],
+    novelty_type: list[str],
+    method_core: dict[str, Any],
+    findings: list[str],
+    best_results: list[str],
+    limitations: list[str],
+    comparison_context: dict[str, Any],
+    editor_note: dict[str, Any] | None,
+) -> dict[str, Any]:
+    strengths = merge_unique_texts(
+        ensure_strings(method_core.get("innovations")),
+        best_results,
+        findings,
+        ensure_strings((editor_note or {}).get("points")) if isinstance(editor_note, dict) else [],
+    )
+    cautions = [
+        item
+        for item in (shorten_text(candidate, 72) for candidate in limitations[:3])
+        if item
+    ][:3]
+    position_parts: list[str] = []
+    if themes:
+        position_parts.append(themes[0])
+    if tasks:
+        position_parts.append(tasks[0])
+    if methods:
+        position_parts.append(methods[0])
+    elif novelty_type:
+        position_parts.append(novelty_type[0])
+    research_position = None
+    if position_parts:
+        research_position = shorten_text("可作为 " + " / ".join(position_parts) + " 的阅读入口或对比样本。", 80)
+    next_read_target = (
+        str(comparison_context.get("recommended_next_read") or "").strip()
+        or (ensure_strings(comparison_context.get("explicit_baselines"))[:1] or [None])[0]
+    )
+    return {
+        "verdict": infer_editorial_verdict(
+            pipeline_steps=ensure_strings(method_core.get("pipeline_steps")),
+            innovations=ensure_strings(method_core.get("innovations")),
+            best_results=best_results,
+            findings=findings,
+            comparison_context=comparison_context,
+        ),
+        "strengths": [item for item in (shorten_text(candidate, 72) for candidate in strengths) if item][:3],
+        "cautions": cautions,
+        "research_position": research_position,
+        "next_read_hint": shorten_text(f"可继续对比 {next_read_target}。", 72) if next_read_target else None,
+    }
+
+
 def collect_sentences(
     texts: list[str],
     *,
@@ -1034,6 +1236,52 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
     }
     if comparison_context["explicit_baselines"]:
         comparison_context["recommended_next_read"] = comparison_context["explicit_baselines"][0]
+    research_value = build_research_value(themes, tasks, methods, findings)
+    editor_note = build_editor_note(themes, comparison_context["explicit_baselines"], findings)
+    method_core_payload = {
+        "approach_summary": method_core_summary["approach_summary"],
+        "pipeline_steps": method_core_summary["pipeline_steps"],
+        "innovations": method_core_summary["innovations"],
+        "ingredients": methods,
+        "representation": representations,
+        "supervision": [],
+        "differences": method_core_summary["differences"],
+    }
+    benchmarks_payload = {
+        "datasets": [],
+        "metrics": extract_metrics("\n".join([experiments_text, *[item["caption"] for item in figure_table_index["tables"] if isinstance(item, dict)]])),
+        "baselines": comparison_context["explicit_baselines"],
+        "findings": findings,
+        "best_results": findings[:1],
+        "experiment_setup_summary": experiment_setup_summary,
+    }
+    reading_digest = build_reading_digest(
+        themes=themes,
+        tasks=tasks,
+        methods=methods,
+        modalities=modalities,
+        novelty_type=novelty_type,
+        storyline=storyline,
+        research_problem=research_problem,
+        method_core=method_core_payload,
+        findings=findings,
+        best_results=benchmarks_payload["best_results"],
+        comparison_context=comparison_context,
+        research_value=research_value,
+        editor_note=editor_note,
+    )
+    editorial_review = build_editorial_review(
+        themes=themes,
+        tasks=tasks,
+        methods=methods,
+        novelty_type=novelty_type,
+        method_core=method_core_payload,
+        findings=findings,
+        best_results=benchmarks_payload["best_results"],
+        limitations=limitations,
+        comparison_context=comparison_context,
+        editor_note=editor_note,
+    )
 
     return {
         "paper_id": paper_id,
@@ -1049,37 +1297,24 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
         "summary": {
             "one_liner": summary_one_liner,
             "abstract_summary": shorten_text(abstract_zh, 220),
-            "research_value": build_research_value(themes, tasks, methods, findings),
+            "research_value": research_value,
             "worth_long_term_graph": bool(tasks or methods or citation_count),
         },
+        "reading_digest": reading_digest,
         "storyline": storyline,
         "research_problem": research_problem,
         "core_contributions": contributions,
         "key_claims": claims,
-        "method_core": {
-            "approach_summary": method_core_summary["approach_summary"],
-            "pipeline_steps": method_core_summary["pipeline_steps"],
-            "innovations": method_core_summary["innovations"],
-            "ingredients": methods,
-            "representation": representations,
-            "supervision": [],
-            "differences": method_core_summary["differences"],
-        },
+        "method_core": method_core_payload,
         "inputs_outputs": {
             "inputs": inputs,
             "outputs": outputs,
             "modalities": modalities,
         },
-        "benchmarks_or_eval": {
-            "datasets": [],
-            "metrics": extract_metrics("\n".join([experiments_text, *[item["caption"] for item in figure_table_index["tables"] if isinstance(item, dict)]])),
-            "baselines": comparison_context["explicit_baselines"],
-            "findings": findings,
-            "best_results": findings[:1],
-            "experiment_setup_summary": experiment_setup_summary,
-        },
+        "benchmarks_or_eval": benchmarks_payload,
         "author_conclusion": author_conclusion,
-        "editor_note": build_editor_note(themes, comparison_context["explicit_baselines"], findings),
+        "editor_note": editor_note,
+        "editorial_review": editorial_review,
         "limitations": limitations,
         "novelty_type": novelty_type,
         "research_tags": {

@@ -272,6 +272,15 @@ a {
   margin-bottom: 0 !important;
 }
 
+.panel-support-copy,
+.section-summary,
+.paper-support-line,
+.quick-entry-copy,
+.decision-line {
+  margin-bottom: 0 !important;
+  color: var(--text-secondary);
+}
+
 .reading-section .ant-card-body {
   display: grid;
   gap: 18px;
@@ -279,6 +288,11 @@ a {
 
 .section-title {
   font-family: Baskerville, "Iowan Old Style", "Times New Roman", "Songti SC", serif;
+}
+
+.section-summary {
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .search-input,
@@ -331,6 +345,30 @@ a {
   margin-top: 2px;
 }
 
+.paper-decision-tags {
+  margin-bottom: 10px;
+}
+
+.paper-support-line {
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.paper-micro-card .ant-card-body,
+.quick-entry-card .ant-card-body {
+  display: grid;
+  gap: 10px;
+}
+
+.quick-entry-card {
+  background: linear-gradient(180deg, rgba(255, 251, 243, 0.98), rgba(244, 236, 220, 0.96));
+}
+
+.quick-entry-copy {
+  font-size: 14px;
+  line-height: 1.7;
+}
+
 .storyline-strip {
   background: linear-gradient(180deg, rgba(243, 238, 228, 0.98), rgba(250, 246, 239, 0.96));
 }
@@ -355,6 +393,10 @@ a {
 
 .quick-read-card.standardized .ant-card-body {
   min-height: 210px;
+}
+
+.decision-read-card .ant-card-body {
+  min-height: 188px;
 }
 
 .section-lead {
@@ -405,6 +447,15 @@ a {
 
 .setup-summary-card {
   background: linear-gradient(180deg, rgba(248, 244, 236, 0.98), rgba(255, 250, 244, 0.98));
+}
+
+.strong-section-card {
+  background: linear-gradient(180deg, rgba(255, 252, 246, 0.98), rgba(247, 239, 226, 0.96));
+  border-color: rgba(166, 112, 40, 0.16);
+}
+
+.soft-section-card {
+  background: rgba(255, 251, 245, 0.9);
 }
 
 .eval-group-card .ant-card-body {
@@ -493,6 +544,52 @@ a {
 
 .secondary-panel {
   background: linear-gradient(180deg, rgba(255, 251, 245, 0.96), rgba(249, 243, 232, 0.92));
+}
+
+.control-panel-card {
+  background: linear-gradient(180deg, rgba(255, 250, 244, 0.97), rgba(248, 241, 230, 0.94));
+}
+
+.research-console-hero {
+  background:
+    radial-gradient(circle at top right, rgba(35, 82, 74, 0.1), transparent 24%),
+    radial-gradient(circle at bottom left, rgba(190, 143, 72, 0.16), transparent 26%),
+    linear-gradient(140deg, rgba(255, 251, 244, 0.98), rgba(241, 232, 214, 0.94));
+}
+
+.hero-quick-entry-grid {
+  margin-top: 24px;
+}
+
+.decision-paper-card {
+  background: linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(248, 242, 232, 0.96));
+}
+
+.v2-hero .ant-card-body {
+  display: grid;
+  gap: 22px;
+}
+
+.decision-strip-card {
+  background: linear-gradient(180deg, rgba(232, 241, 236, 0.96), rgba(246, 250, 248, 0.96));
+}
+
+.decision-strip-card .ant-card-body {
+  display: grid;
+  gap: 8px;
+}
+
+.decision-line {
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.decision-story-grid .ant-card {
+  height: 100%;
+}
+
+.storyline-mini-card {
+  background: rgba(255, 253, 249, 0.98);
 }
 
 .debug-json-block {
@@ -586,6 +683,11 @@ a {
   }
 
   .quick-read-card.standardized .ant-card-body {
+    min-height: 0;
+  }
+
+  .decision-read-card .ant-card-body,
+  .quick-entry-card .ant-card-body {
     min-height: 0;
   }
 }
