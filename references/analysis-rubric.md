@@ -14,8 +14,15 @@ Extract knowledge for future retrieval, comparison, and idea generation.
 
 - `abstract_zh`: prefer the translated abstract unit from the conversation.
 - `abstract_raw`: prefer Semantic Scholar abstract; otherwise keep `null`.
-- `research_problem`: write the shortest grounded formulation of the problem.
+- `research_problem`: write the shortest grounded formulation of the problem. Prefer missing over wrong-field content.
 - `storyline`: compress the paper into `problem`, `method`, and `outcome` for first-screen scanning.
+- `storyline.problem`: must describe the research gap or task difficulty, not method or result.
+- `storyline.method`: must describe the core method action or mechanism, not evaluation.
+- `storyline.outcome`: must describe the result or observed gain, not problem framing.
+- `reading_digest.value_statement`: write a reading-value judgment, not a content recap.
+- `reading_digest.best_for`: write a reader profile sentence, not a task/method tag dump.
+- `reading_digest.why_read`: write 2 to 3 reading reasons; do not emit `任务:` / `方法:` label strings.
+- `method_core.innovations`: keep short innovation sentences only; do not copy long method paragraphs or section headings.
 - `core_contributions`: keep 2 to 4 concrete items.
 - `key_claims`: keep 2 to 5 falsifiable or comparable claims.
 - `key_claims[].type`: classify each claim as `method`, `experiment`, `capability`, or `limitation` when possible.

@@ -198,6 +198,33 @@ def clean_display_list(values: Any, *, max_chars: int, limit: int | None = None)
     return cleaned
 
 
+def is_atomic_tag(text: str) -> bool:
+    label = normalize_label(text)
+    if not label:
+        return False
+    if len(label) > 36:
+        return False
+    if any(token in label for token in ("。", "！", "？", "；", ";", "：", ":")):
+        return False
+    if len(label.split()) > 6:
+        return False
+    return True
+
+
+def clean_display_tag_list(values: Any, *, max_chars: int, limit: int | None = None) -> list[str]:
+    cleaned: list[str] = []
+    for item in ensure_strings(values):
+        display = display_value(item)
+        if not display or not is_atomic_tag(display):
+            continue
+        text = clean_display_text(display, max_chars=max_chars)
+        if text and text not in cleaned:
+            cleaned.append(text)
+            if limit is not None and len(cleaned) >= limit:
+                break
+    return cleaned
+
+
 def is_curation_limitation(value: str) -> bool:
     text = normalize_label(value)
     return any(text.startswith(prefix) for prefix in CURATION_LIMITATION_PREFIXES)
@@ -707,16 +734,16 @@ def normalized_record(
             "why_read": clean_display_list(reading_digest.get("why_read"), max_chars=64, limit=3),
             "recommended_route": str(reading_digest.get("recommended_route") or "overview"),
             "positioning": {
-                "task": clean_display_list((reading_digest.get("positioning") or {}).get("task"), max_chars=28, limit=4)
+                "task": clean_display_tag_list((reading_digest.get("positioning") or {}).get("task"), max_chars=28, limit=4)
                 if isinstance(reading_digest.get("positioning"), dict)
                 else [],
-                "modality": clean_display_list((reading_digest.get("positioning") or {}).get("modality"), max_chars=24, limit=4)
+                "modality": clean_display_tag_list((reading_digest.get("positioning") or {}).get("modality"), max_chars=24, limit=4)
                 if isinstance(reading_digest.get("positioning"), dict)
                 else [],
-                "method": clean_display_list((reading_digest.get("positioning") or {}).get("method"), max_chars=28, limit=4)
+                "method": clean_display_tag_list((reading_digest.get("positioning") or {}).get("method"), max_chars=28, limit=4)
                 if isinstance(reading_digest.get("positioning"), dict)
                 else [],
-                "novelty": clean_display_list((reading_digest.get("positioning") or {}).get("novelty"), max_chars=24, limit=4)
+                "novelty": clean_display_tag_list((reading_digest.get("positioning") or {}).get("novelty"), max_chars=24, limit=4)
                 if isinstance(reading_digest.get("positioning"), dict)
                 else [],
             },
@@ -758,15 +785,15 @@ def normalized_record(
             "approach_summary": clean_display_text(str(method_core.get("approach_summary") or ""), max_chars=110),
             "pipeline_steps": clean_display_list(method_core.get("pipeline_steps"), max_chars=105, limit=4),
             "innovations": clean_display_list(method_core.get("innovations"), max_chars=90, limit=4),
-            "ingredients": clean_display_list(method_core.get("ingredients"), max_chars=32, limit=6),
-            "representation": clean_display_list(method_core.get("representation"), max_chars=32, limit=6),
+            "ingredients": clean_display_tag_list(method_core.get("ingredients"), max_chars=32, limit=6),
+            "representation": clean_display_tag_list(method_core.get("representation"), max_chars=32, limit=6),
             "supervision": clean_display_list(method_core.get("supervision"), max_chars=48, limit=4),
             "differences": clean_display_list(method_core.get("differences"), max_chars=90, limit=4),
         },
         "inputs_outputs": {
-            "inputs": clean_display_list(inputs_outputs.get("inputs"), max_chars=28, limit=6),
-            "outputs": clean_display_list(inputs_outputs.get("outputs"), max_chars=28, limit=6),
-            "modalities": clean_display_list(inputs_outputs.get("modalities"), max_chars=24, limit=6),
+            "inputs": clean_display_tag_list(inputs_outputs.get("inputs"), max_chars=28, limit=6),
+            "outputs": clean_display_tag_list(inputs_outputs.get("outputs"), max_chars=28, limit=6),
+            "modalities": clean_display_tag_list(inputs_outputs.get("modalities"), max_chars=24, limit=6),
         },
         "benchmarks_or_eval": {
             "datasets": clean_display_list(eval_block.get("datasets"), max_chars=30, limit=8),
@@ -791,8 +818,8 @@ def normalized_record(
             "themes": tag_group(record, "themes"),
             "tasks": tag_group(record, "tasks"),
             "methods": tag_group(record, "methods"),
-            "modalities": clean_display_list(tag_group(record, "modalities"), max_chars=24, limit=6),
-            "representations": clean_display_list(tag_group(record, "representations"), max_chars=28, limit=6),
+            "modalities": clean_display_tag_list(tag_group(record, "modalities"), max_chars=24, limit=6),
+            "representations": clean_display_tag_list(tag_group(record, "representations"), max_chars=28, limit=6),
         },
         "retrieval_profile": {
             "problem_spaces": ensure_strings(retrieval_profile.get("problem_spaces")),

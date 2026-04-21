@@ -183,14 +183,21 @@ Write one JSON file per canonical paper at `outputs/papers/<paper-id>.json`.
 - `links.doi` / `links.arxiv`: try Semantic Scholar `externalIds`; otherwise keep `null`.
 - `summary.one_liner`: keep it under 120 Chinese characters when possible.
 - `reading_digest.value_statement`: keep it under 80 Chinese characters when possible.
+  It must be a reading-value judgment, not a paper-content recap.
 - `reading_digest.best_for`: keep it under 70 Chinese characters when possible.
+  It must describe the target reader, not concatenate task/method labels mechanically.
 - `reading_digest.why_read[]`: keep each item under 72 Chinese characters when possible.
+  Each item must be a reading reason sentence; do not emit `任务:` / `方法:`-style tag text.
 - `reading_digest.result_headline`: keep it under 88 Chinese characters when possible.
+  It must come from a result sentence; leave it empty instead of backfilling with problem text.
 - `reading_digest.recommended_route`: use `method`, `evaluation`, `comparison`, or `overview`.
 - `reading_digest.positioning`: keep only front-end useful定位标签; do not dump every tag.
 - `storyline.problem` / `storyline.method` / `storyline.outcome`: keep each item short enough for a two-line first-screen strip.
+  `problem` is only for the research gap, `method` only for the method action, and `outcome` only for the result.
 - `research_problem.summary`: keep it under 100 Chinese characters when possible.
+  It must describe the problem definition, not conclusion-style result text.
 - `method_core.approach_summary`: keep it under 100 Chinese characters when possible.
+- `method_core.innovations[]`: keep each item as a short innovation sentence; do not copy section titles, numbered fragments, or long paragraphs.
 - `benchmarks_or_eval.findings`: prefer short bullet-like results; each item should stay under 80 Chinese characters when possible.
 - `editor_note.summary`: keep it under 120 Chinese characters when possible.
 - `editorial_review.verdict`: use `值得精读`, `值得浏览`, `只记结论`, or `null`.

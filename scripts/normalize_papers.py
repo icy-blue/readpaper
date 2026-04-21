@@ -31,9 +31,10 @@ SEMANTIC_SCHOLAR_FIELDS = [
 USER_AGENT = "translate-paper-forest/1.0"
 
 URL_PATTERN = re.compile(r"https?://[^\s)>\]\"']+")
-SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[。！？!?])\s+|\n+")
+SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[。！？!?])\s*|\n+")
 DOI_PATTERN = re.compile(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", re.IGNORECASE)
 GITHUB_PATTERN = re.compile(r"https?://(?:www\.)?github\.com/[^\s)>\]\"']+", re.IGNORECASE)
+LEADING_SECTION_PATTERN = re.compile(r"^(?:#+\s*|\d+(?:\.\d+)*[.)]?\s+)")
 
 TASK_KEYWORDS = [
     (re.compile(r"text[- ]to[- ]3d|text to 3d", re.IGNORECASE), "Text-to-3D"),
@@ -104,6 +105,24 @@ RELATION_HINTS = {
     "contrast_method_match": "路线对比对象",
     "fallback_contrast": "同任务差异路线",
 }
+
+RESULT_KEYWORDS = ("优于", "显著", "达到", "提升", "state-of-the-art", "improve", "outperform", "sota")
+METHOD_KEYWORDS_ZH = ("提出", "构建", "设计", "通过", "采用", "引入", "建立", "框架", "方法")
+PROBLEM_KEYWORDS_ZH = ("问题", "挑战", "困难", "缺口", "不足", "受限", "仍然", "缺乏", "脆弱")
+GOAL_KEYWORDS_ZH = ("目标", "旨在", "希望", "要解决", "为了解决", "为此", "以实现", "需要")
+DISPLAY_SENTENCE_MARKERS = (
+    "我们提出",
+    "本文提出",
+    "我们设计",
+    "我们构建",
+    "我们引入",
+    "我们采用",
+    "我们的方法",
+    "我们认为",
+    "该方法",
+    "该框架",
+    "CoSMo3D",
+)
 
 
 @dataclass
@@ -590,10 +609,97 @@ def strip_inline_urls(text: str) -> str:
     return normalize_text(URL_PATTERN.sub("", text or "")).strip()
 
 
+def normalize_sentence_candidate(text: str) -> str:
+    cleaned = strip_inline_urls(text)
+    cleaned = LEADING_SECTION_PATTERN.sub("", cleaned)
+    cleaned = re.sub(r"^[-*•]+\s*", "", cleaned)
+    cleaned = re.sub(r"\[[0-9,\s]+\]", "", cleaned)
+    cleaned = re.sub(r"^(?:如图\s*\d+[a-zA-Z()（）]*所示[,:：，]?\s*)", "", cleaned)
+    cleaned = re.sub(r"^(?:整体框架如图\s*\d+\s*所示[。,:：，]?\s*)", "", cleaned)
+    if any(token in cleaned for token in ("###", "第 3.", "第3.", "3.2.", "3.3.", "4.1.")):
+        for marker in DISPLAY_SENTENCE_MARKERS:
+            marker_index = cleaned.find(marker)
+            if marker_index <= 0:
+                continue
+            prefix = cleaned[:marker_index]
+            if "###" in prefix or "第" in prefix or "节" in prefix or re.search(r"\d", prefix) or ":" in prefix or "：" in prefix:
+                cleaned = cleaned[marker_index:]
+                break
+    cleaned = re.sub(r"^(?:在此框架下,|为此,|具体而言,|此外,|其中,)\s*", "", cleaned)
+    if cleaned.startswith("给定一个 ") and "我们的方法" in cleaned:
+        cleaned = cleaned[cleaned.find("我们的方法") :]
+    return normalize_text(cleaned)
+
+
+def sentence_fragment_score(text: str) -> int:
+    score = 0
+    if any(token in text for token in ("…", "...")):
+        score += 2
+    if text.startswith(("其中", "此外", "同时", "首先", "然后", "最后")):
+        score += 1
+    if "##" in text:
+        score += 3
+    if text.count("，") + text.count(",") >= 3:
+        score += 2
+    if any(token in text for token in ("损失定义", "形式上", "更多", "参见补充材料", "\\(", "\\[", "λ_", "L_")):
+        score += 2
+    if len(text) < 14:
+        score += 1
+    if len(text) > 88:
+        score += 1
+    return score
+
+
+def sentence_has_any(text: str, keywords: tuple[str, ...]) -> bool:
+    lowered = text.lower()
+    return any(keyword.lower() in lowered for keyword in keywords)
+
+
+def is_result_sentence(text: str) -> bool:
+    return sentence_has_any(text, RESULT_KEYWORDS)
+
+
+def is_method_sentence(text: str) -> bool:
+    return sentence_has_any(text, METHOD_KEYWORDS_ZH + ("framework", "pipeline", "align", "encode", "train"))
+
+
+def is_problem_sentence(text: str) -> bool:
+    return sentence_has_any(text, PROBLEM_KEYWORDS_ZH + ("problem", "challenge", "limited", "brittle"))
+
+
+def is_goal_sentence(text: str) -> bool:
+    return sentence_has_any(text, GOAL_KEYWORDS_ZH + ("to address", "to solve", "aim to", "need to"))
+
+
+def looks_like_section_heading(text: str) -> bool:
+    if not text:
+        return True
+    if text.startswith("#"):
+        return True
+    if re.match(r"^\d+(?:\.\d+)*[.)]?\s*$", text):
+        return True
+    if len(text.split()) <= 6 and not re.search(r"[。！？!?，,:;]", text) and all(
+        token[:1].isupper() for token in text.split() if token and token[0].isalpha()
+    ):
+        return True
+    return False
+
+
+def clean_sentence_candidates(texts: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for text in texts:
+        candidate = normalize_sentence_candidate(text)
+        if not candidate or looks_like_section_heading(candidate):
+            continue
+        if candidate not in cleaned:
+            cleaned.append(candidate)
+    return cleaned
+
+
 def shorten_text(text: str | None, max_chars: int) -> str | None:
     if not text:
         return None
-    cleaned = strip_inline_urls(text)
+    cleaned = normalize_sentence_candidate(text)
     if not cleaned:
         return None
     if len(cleaned) <= max_chars:
@@ -669,31 +775,41 @@ def build_reading_digest(
     theme = themes[0] if themes else None
     best_for_parts: list[str] = []
     if tasks:
-        best_for_parts.append("关注 " + " / ".join(tasks[:2]))
+        best_for_parts.append("想看 " + " / ".join(tasks[:2]))
     elif themes:
-        best_for_parts.append("关注 " + themes[0])
+        best_for_parts.append("想看 " + themes[0])
     if methods:
-        best_for_parts.append("想看 " + " / ".join(methods[:2]))
+        best_for_parts.append("并关注 " + " / ".join(methods[:2]))
     elif novelty_type:
-        best_for_parts.append("想看 " + " / ".join(novelty_type[:2]))
-    best_for = shorten_text("适合 " + "，".join(best_for_parts) + " 的读者。", 70) if best_for_parts else None
+        best_for_parts.append("并关注 " + " / ".join(novelty_type[:2]))
+    best_for = shorten_text("适合" + "，".join(best_for_parts) + "的读者。", 70) if best_for_parts else None
 
     why_read_candidates = merge_unique_texts(
         ensure_strings(editor_note.get("points")) if isinstance(editor_note, dict) else [],
         ensure_strings(research_value.get("points")) if isinstance(research_value, dict) else [],
-        ensure_strings(method_core.get("innovations")),
         best_results,
         findings,
     )
-    why_read = [item for item in (shorten_text(candidate, 72) for candidate in why_read_candidates) if item][:3]
+    why_read = [
+        item
+        for item in (shorten_text(candidate, 72) for candidate in why_read_candidates)
+        if item and not item.startswith(("任务：", "任务:", "方法：", "方法:"))
+    ][:3]
+
+    storyline_problem = shorten_text(storyline.get("problem"), 70) if storyline.get("problem") and not is_result_sentence(storyline.get("problem") or "") else None
+    storyline_method = shorten_text(storyline.get("method"), 70) if storyline.get("method") and is_method_sentence(storyline.get("method") or "") and not is_result_sentence(storyline.get("method") or "") else None
+    storyline_outcome = shorten_text(storyline.get("outcome"), 70) if storyline.get("outcome") and is_result_sentence(storyline.get("outcome") or "") else None
+    research_problem_summary = shorten_text(research_problem.get("summary"), 70) if research_problem.get("summary") and not is_result_sentence(research_problem.get("summary") or "") and not is_method_sentence(research_problem.get("summary") or "") else None
+    approach_summary = shorten_text(method_core.get("approach_summary"), 70) if method_core.get("approach_summary") and is_method_sentence(method_core.get("approach_summary") or "") and not is_result_sentence(method_core.get("approach_summary") or "") else None
+    best_result = next((shorten_text(item, 70) for item in best_results if is_result_sentence(item)), None)
+    finding_result = next((shorten_text(item, 70) for item in findings if is_result_sentence(item)), None)
+    result_headline = next((shorten_text(item, 88) for item in [*best_results, *findings] if is_result_sentence(item)), None)
 
     return {
         "value_statement": (
             shorten_text((editor_note or {}).get("summary"), 80)
             or shorten_text(research_value.get("summary"), 80)
             or summarize_tag_mix(task, method, theme)
-            or shorten_text(storyline.get("method"), 80)
-            or shorten_text(research_problem.get("summary"), 80)
         ),
         "best_for": best_for,
         "why_read": why_read,
@@ -711,16 +827,11 @@ def build_reading_digest(
             "novelty": novelty_type[:2],
         },
         "narrative": {
-            "problem": shorten_text(storyline.get("problem") or research_problem.get("summary"), 70),
-            "method": shorten_text(storyline.get("method") or method_core.get("approach_summary"), 70),
-            "result": shorten_text(storyline.get("outcome") or (best_results[0] if best_results else None) or (findings[0] if findings else None), 70),
+            "problem": storyline_problem or research_problem_summary,
+            "method": storyline_method or approach_summary,
+            "result": storyline_outcome or best_result or finding_result,
         },
-        "result_headline": shorten_text(
-            (best_results[0] if best_results else None)
-            or (findings[0] if findings else None)
-            or storyline.get("outcome"),
-            88,
-        ),
+        "result_headline": result_headline,
     }
 
 
@@ -846,6 +957,61 @@ def pick_sentence(
     return fallback_matches[0] if fallback_matches else None
 
 
+def select_semantic_sentences(
+    texts: list[str],
+    *,
+    prefer_keywords: tuple[str, ...] = (),
+    allow: Any = None,
+    deny: Any = None,
+    max_items: int = 4,
+    max_chars: int = 90,
+) -> list[str]:
+    ranked: list[tuple[tuple[int, int, int, int], str]] = []
+    seen: set[str] = set()
+    for source_index, text in enumerate(texts):
+        for sentence_index, sentence in enumerate(split_sentences(text)):
+            cleaned = normalize_sentence_candidate(sentence)
+            if not cleaned or looks_like_section_heading(cleaned):
+                continue
+            if allow and not allow(cleaned):
+                continue
+            if deny and deny(cleaned):
+                continue
+            shortened = shorten_text(cleaned, max_chars)
+            if not shortened or shortened in seen:
+                continue
+            score = (
+                0 if prefer_keywords and sentence_has_any(cleaned, prefer_keywords) else 1,
+                sentence_fragment_score(cleaned),
+                len(shortened),
+                source_index,
+                sentence_index,
+            )
+            ranked.append((score, shortened))
+            seen.add(shortened)
+    ranked.sort(key=lambda item: item[0])
+    return [sentence for _, sentence in ranked[:max_items]]
+
+
+def select_semantic_sentence(
+    texts: list[str],
+    *,
+    prefer_keywords: tuple[str, ...] = (),
+    allow: Any = None,
+    deny: Any = None,
+    max_chars: int = 90,
+) -> str | None:
+    candidates = select_semantic_sentences(
+        texts,
+        prefer_keywords=prefer_keywords,
+        allow=allow,
+        deny=deny,
+        max_items=1,
+        max_chars=max_chars,
+    )
+    return candidates[0] if candidates else None
+
+
 def classify_claim_type(text: str) -> str:
     lowered = text.lower()
     if any(token in text for token in ("局限", "限制", "future work", "仍然存在")):
@@ -895,44 +1061,55 @@ def extract_core_contributions(abstract_zh: str, conclusion: str) -> list[str]:
 
 
 def extract_storyline(abstract_zh: str, introduction: str, method_text: str, conclusion: str) -> dict[str, str | None]:
-    problem = pick_sentence(
+    problem = select_semantic_sentence(
         [introduction, abstract_zh],
-        keywords=("问题", "挑战", "困难", "目标", "仍然", "brittle", "problem", "challenge"),
-        max_chars=60,
+        prefer_keywords=PROBLEM_KEYWORDS_ZH + ("problem", "challenge", "task", "brittle"),
+        allow=lambda text: (is_problem_sentence(text) or "任务" in text or "开放世界" in text) and not is_result_sentence(text) and not text.startswith(("我们提出", "本文提出")),
+        deny=lambda text: is_result_sentence(text),
+        max_chars=70,
     )
-    method = pick_sentence(
-        [method_text, abstract_zh],
-        keywords=("我们提出", "本文提出", "通过", "采用", "设计", "框架", "pipeline"),
-        max_chars=60,
+    method = select_semantic_sentence(
+        [abstract_zh, method_text],
+        prefer_keywords=("我们提出", "本文提出", "设计", "构建", "双分支", "规范空间", "框架", "pipeline", "framework"),
+        allow=lambda text: is_method_sentence(text) and not is_result_sentence(text),
+        deny=lambda text: is_result_sentence(text) or text.startswith("给定一个 "),
+        max_chars=70,
     )
-    outcome = pick_sentence(
+    outcome = select_semantic_sentence(
         [conclusion, abstract_zh],
-        keywords=("优于", "提升", "达到", "显著", "state-of-the-art", "improve"),
-        max_chars=60,
+        prefer_keywords=RESULT_KEYWORDS,
+        allow=is_result_sentence,
+        max_chars=70,
     )
     return {"problem": problem, "method": method, "outcome": outcome}
 
 
 def extract_research_problem(introduction: str, abstract_zh: str) -> dict[str, Any]:
-    summary = pick_sentence(
+    summary = select_semantic_sentence(
         [introduction, abstract_zh],
-        keywords=("问题", "挑战", "困难", "task", "problem", "challenge"),
+        prefer_keywords=PROBLEM_KEYWORDS_ZH + ("problem", "challenge", "task"),
+        allow=lambda text: (is_problem_sentence(text) or "任务" in text or "场景" in text) and not is_result_sentence(text) and not text.startswith(("我们提出", "本文提出")),
+        deny=lambda text: is_result_sentence(text) or is_method_sentence(text),
         max_chars=100,
     )
-    gaps = collect_sentences(
+    gaps = select_semantic_sentences(
         [introduction, abstract_zh],
-        keywords=("现有", "已有", "仍然", "难以", "不足", "缺乏", "brittle", "limited", "challenge"),
+        prefer_keywords=("现有", "已有", "仍然", "难以", "不足", "缺乏", "受限", "brittle", "limited", "challenge"),
+        allow=lambda text: sentence_has_any(text, ("现有", "已有", "仍然", "难以", "不足", "缺乏", "受限", "brittle", "limited", "challenge")) and not is_result_sentence(text),
+        deny=lambda text: is_result_sentence(text) or text.startswith(("我们提出", "本文提出")),
         max_items=4,
         max_chars=90,
     )
-    goal = pick_sentence(
+    goal = select_semantic_sentence(
         [introduction, abstract_zh],
-        keywords=("目标", "旨在", "为了解决", "to address", "we propose", "我们提出"),
+        prefer_keywords=GOAL_KEYWORDS_ZH + ("实现", "建立", "to address", "to solve", "aim to"),
+        allow=lambda text: is_goal_sentence(text) and "我们提出" not in text and "本文提出" not in text and not is_result_sentence(text) and not is_method_sentence(text),
+        deny=lambda text: is_result_sentence(text) or text.startswith(("心理物理学研究", "心理物理学证据")),
         max_chars=100,
     )
     return {
         "summary": summary,
-        "gaps": [item for item in gaps if item != summary][:4],
+        "gaps": [item for item in gaps if item != summary and item != goal][:4],
         "goal": goal,
     }
 
@@ -995,31 +1172,51 @@ def extract_findings(abstract_zh: str, conclusion: str) -> list[str]:
 
 
 def extract_pipeline_steps(method_text: str, abstract_zh: str) -> list[str]:
-    steps = collect_sentences(
+    steps = select_semantic_sentences(
         paragraph_blocks(method_text),
-        keywords=("首先", "然后", "最后", "通过", "使用", "采用", "encode", "align", "train"),
+        prefer_keywords=("首先", "然后", "最后", "通过", "使用", "采用", "encode", "align", "train"),
+        allow=lambda text: is_method_sentence(text) and not is_result_sentence(text),
+        deny=lambda text: is_result_sentence(text),
         max_items=4,
         max_chars=90,
     )
     if steps:
         return steps
-    return collect_sentences([method_text, abstract_zh], max_items=4, max_chars=90)
-
-
-def extract_method_core(method_text: str, abstract_zh: str, contributions: list[str], findings: list[str]) -> dict[str, Any]:
-    approach_summary = pick_sentence(
+    return select_semantic_sentences(
         [method_text, abstract_zh],
-        keywords=("我们提出", "本文提出", "通过", "采用", "框架", "pipeline", "framework"),
-        max_chars=100,
-    )
-    innovations = collect_sentences(
-        [method_text, abstract_zh, "\n".join(contributions)],
-        keywords=("创新", "新", "提出", "引入", "设计", "canonical", "对齐", "校准"),
+        prefer_keywords=("通过", "采用", "构建", "设计", "encode", "align", "train"),
+        allow=lambda text: is_method_sentence(text) and not is_result_sentence(text),
+        deny=lambda text: is_result_sentence(text),
         max_items=4,
         max_chars=90,
     )
+
+
+def extract_method_core(method_text: str, abstract_zh: str, contributions: list[str], findings: list[str]) -> dict[str, Any]:
+    approach_summary = select_semantic_sentence(
+        [abstract_zh, method_text],
+        prefer_keywords=("我们提出", "本文提出", "设计", "构建", "双分支", "规范空间", "框架", "pipeline", "framework"),
+        allow=lambda text: is_method_sentence(text) and not is_result_sentence(text),
+        deny=lambda text: is_result_sentence(text) or text.startswith("给定一个 "),
+        max_chars=88,
+    )
+    innovations = select_semantic_sentences(
+        [abstract_zh, "\n".join(contributions), *paragraph_blocks(method_text)[:12]],
+        prefer_keywords=("创新", "提出", "引入", "设计", "构建", "数据集", "双分支", "canonical", "对齐", "校准"),
+        allow=lambda text: (sentence_has_any(text, ("提出", "引入", "设计", "构建", "创建", "双分支", "数据集", "对齐", "校准")) or is_method_sentence(text)) and not is_result_sentence(text),
+        deny=lambda text: is_result_sentence(text) or sentence_has_any(text, ("损失定义", "形式上", "更多数据集细节", "补充材料")),
+        max_items=4,
+        max_chars=78,
+    )
     if not innovations:
-        innovations = contributions[:3]
+        innovations = select_semantic_sentences(
+            ["\n".join(contributions)],
+            prefer_keywords=("提出", "引入", "设计", "构建"),
+            allow=lambda text: is_method_sentence(text) and not is_result_sentence(text),
+            deny=lambda text: is_result_sentence(text),
+            max_items=3,
+            max_chars=90,
+        )
     differences = collect_sentences(
         ["\n".join(findings), "\n".join(innovations)],
         keywords=("优于", "提升", "不同", "区别", "相比", "contrast"),
@@ -1039,9 +1236,9 @@ def build_research_value(themes: list[str], tasks: list[str], methods: list[str]
     summary = shorten_text(f"适合作为 {theme_label} 方向的持续阅读入口。", 60)
     points: list[str] = []
     if tasks:
-        points.append(f"任务：{' / '.join(tasks[:2])}")
+        points.append(f"适合放到 {' / '.join(tasks[:2])} 的问题线上对比阅读。")
     if methods:
-        points.append(f"方法：{' / '.join(methods[:2])}")
+        points.append(f"可用于理解 {' / '.join(methods[:2])} 这条方法路线。")
     if findings:
         points.append(findings[0])
     return {
@@ -1053,17 +1250,21 @@ def build_research_value(themes: list[str], tasks: list[str], methods: list[str]
 def build_editor_note(themes: list[str], comparison_baselines: list[str], findings: list[str]) -> dict[str, Any] | None:
     if not themes and not comparison_baselines and not findings:
         return None
+    summary = None
+    if themes:
+        summary = shorten_text(f"可作为 {themes[0]} 方向的代表样本。", 120)
+    elif comparison_baselines:
+        summary = shorten_text(f"适合与 {comparison_baselines[0]} 做对比阅读。", 120)
+    elif findings:
+        summary = shorten_text("结果信号明确，值得继续读。", 120)
     points: list[str] = []
-    if findings:
-        points.append(findings[0])
     if comparison_baselines:
         points.append(f"可优先与 {comparison_baselines[0]} 对比阅读。")
-    if themes:
-        points.append(f"适合作为 {themes[0]} 方向的代表样本。")
-    summary = points[0] if points else None
+    if findings:
+        points.append(findings[0])
     return {
-        "summary": shorten_text(summary, 120),
-        "points": [item for item in (shorten_text(point, 90) for point in points[1:]) if item][:3],
+        "summary": summary,
+        "points": [item for item in (shorten_text(point, 90) for point in points) if item][:3],
     }
 
 

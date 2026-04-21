@@ -198,7 +198,7 @@ function BadgeGroup({ values, color }: { values: string[]; color?: string }) {
   return (
     <Flex wrap="wrap" gap={8}>
       {values.map((value) => (
-        <TooltipTag key={value} label={displayValueLabel(value)} maxChars={24} className={chipToneClass(color)} />
+        <TooltipTag key={value} label={displayValueLabel(value)} className={chipToneClass(color)} />
       ))}
     </Flex>
   );
@@ -245,11 +245,6 @@ function ExternalLinkButtons({ paper }: { paper: PaperRecord }) {
 
 function DecisionHero({ paper }: { paper: PaperRecord }) {
   const digest = paper.reading_digest;
-  const narrative = [
-    { title: "问题", content: digest.narrative.problem },
-    { title: "方法", content: digest.narrative.method },
-    { title: "结果", content: digest.narrative.result },
-  ].filter((item) => item.content);
   const positioning = compactList(
     [
       ...digest.positioning.task,
@@ -309,23 +304,10 @@ function DecisionHero({ paper }: { paper: PaperRecord }) {
             <Text className="hero-tag-label">定位标签</Text>
             <Flex wrap="wrap" gap={8} className="hero-tag-row">
               {positioning.map((tag) => (
-                <TooltipTag key={`${paper.paper_id}-${tag}`} label={tag} maxChars={22} className="chip-tag chip-tag-tone-blue" />
+                <TooltipTag key={`${paper.paper_id}-${tag}`} label={tag} className="chip-tag chip-tag-tone-blue" />
               ))}
             </Flex>
           </div>
-        ) : null}
-
-        {narrative.length ? (
-          <Row gutter={[16, 16]} className="decision-story-grid">
-            {narrative.map((item) => (
-              <Col xs={24} md={8} key={item.title}>
-                <Card bordered={false} className="subtle-card storyline-mini-card">
-                  <Text className="section-kicker">{item.title}</Text>
-                  <Paragraph className="storyline-copy">{cleanDisplayText(item.content, 88)}</Paragraph>
-                </Card>
-              </Col>
-            ))}
-          </Row>
         ) : null}
       </Space>
     </Card>
@@ -333,46 +315,51 @@ function DecisionHero({ paper }: { paper: PaperRecord }) {
 }
 
 function DecisionCards({ paper }: { paper: PaperRecord }) {
-  const digest = paper.reading_digest;
   const cards = [
     {
-      title: "先看问题",
-      content: firstText([paper.storyline.problem, digest.narrative.problem, paper.research_problem.goal, paper.research_problem.summary], 88) || "暂无研究问题摘要。",
-      tags: compactList([...digest.positioning.task, ...paper.research_problem.gaps], 3),
+      title: "研究问题",
+      content: firstText([paper.storyline.problem, paper.research_problem.summary], 88),
+      tags: compactList(paper.reading_digest.positioning.task, 3),
     },
     {
-      title: "再看方法",
-      content: firstText([paper.method_core.approach_summary, digest.narrative.method, paper.storyline.method], 88) || "暂无方法概述。",
-      tags: compactList([...digest.positioning.method, ...paper.method_core.innovations], 3),
+      title: "方法概述",
+      content: firstText([paper.storyline.method, paper.method_core.approach_summary], 88),
+      tags: compactList(
+        [
+          ...paper.reading_digest.positioning.method,
+          ...paper.method_core.ingredients,
+          ...paper.method_core.representation,
+          ...paper.inputs_outputs.inputs,
+          ...paper.inputs_outputs.outputs,
+        ],
+        4,
+      ),
     },
     {
       title: "实验结论",
-      content: firstText([digest.result_headline, paper.benchmarks_or_eval.best_results[0], paper.benchmarks_or_eval.findings[0], paper.storyline.outcome], 88) || "暂无关键结果。",
+      content: firstText([paper.storyline.outcome, paper.reading_digest.result_headline, paper.benchmarks_or_eval.best_results[0]], 88),
       tags: compactList([...paper.benchmarks_or_eval.datasets, ...paper.benchmarks_or_eval.metrics], 3),
     },
-    {
-      title: "值不值得读",
-      content: firstText([digest.why_read[0], paper.summary.research_value.summary, paper.editorial_review.research_position], 80) || "暂无继续阅读理由。",
-      tags: compactList([...digest.why_read.slice(1), ...digest.positioning.novelty], 3),
-    },
-  ];
+  ].filter((item) => item.content);
+
+  if (!cards.length) {
+    return null;
+  }
 
   return (
     <Row gutter={[16, 16]} className="quick-card-grid">
       {cards.map((item) => (
-        <Col xs={24} md={12} xl={6} key={item.title}>
+        <Col xs={24} md={12} xl={8} key={item.title}>
           <Card bordered={false} className="surface-card quick-read-card decision-read-card">
             <Text className="section-kicker">{item.title}</Text>
-            <TooltipText text={item.content || "暂无内容。"} as="paragraph" maxChars={92} className="quick-card-content" />
-            <Flex wrap="wrap" gap={8}>
-              {item.tags.length ? (
-                item.tags.map((tag) => (
-                  <TooltipTag key={`${item.title}-${tag}`} label={displayValueLabel(tag)} maxChars={24} className="chip-tag chip-tag-tone-blue" />
-                ))
-              ) : (
-                <Text type="secondary">暂无标签</Text>
-              )}
-            </Flex>
+            <TooltipText text={item.content} as="paragraph" rows={3} className="quick-card-content" />
+            {item.tags.length ? (
+              <Flex wrap="wrap" gap={8}>
+                {item.tags.map((tag) => (
+                  <TooltipTag key={`${item.title}-${tag}`} label={displayValueLabel(tag)} className="chip-tag chip-tag-tone-blue" />
+                ))}
+              </Flex>
+            ) : null}
           </Card>
         </Col>
       ))}
@@ -580,7 +567,7 @@ function EvaluationSection({ paper }: { paper: PaperRecord }) {
                 ) : (
                   <Flex wrap="wrap" gap={8} style={{ marginTop: 12 }}>
                     {group.values.map((item) => (
-                      <TooltipTag key={item} label={item} maxChars={24} className="chip-tag chip-tag-tone-blue" />
+                      <TooltipTag key={item} label={item} className="chip-tag chip-tag-tone-blue" />
                     ))}
                   </Flex>
                 )

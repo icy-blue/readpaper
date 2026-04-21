@@ -11,7 +11,14 @@ from urllib.error import URLError
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from normalize_papers import normalize_raw_file, semantic_scholar_title_match  # noqa: E402
+from normalize_papers import (  # noqa: E402
+    build_reading_digest,
+    extract_method_core,
+    extract_research_problem,
+    extract_storyline,
+    normalize_raw_file,
+    semantic_scholar_title_match,
+)
 
 
 def raw_payload(*, pdf_url: str | None = "https://translate.local/paper.pdf") -> dict[str, object]:
@@ -79,6 +86,91 @@ def raw_payload(*, pdf_url: str | None = "https://translate.local/paper.pdf") ->
 
 
 class NormalizePapersTests(unittest.TestCase):
+    def test_extract_storyline_and_research_problem_keep_field_semantics(self) -> None:
+        abstract_zh = (
+            "开放世界可提示三维语义分割仍然较为脆弱，因为语义是在输入传感器坐标系中推断的。"
+            "为了解决这一问题，我们提出 CoSMo3D，通过规范空间建模提升开放词汇分割的稳定性。"
+            "实验表明该方法显著优于现有方法。"
+        )
+        introduction = (
+            "现有方法仍然受限于几何—文本匹配机制，在跨类别场景中容易失效。"
+            "我们的目标是建立面向开放世界 3D 部件理解的规范空间建模。"
+        )
+        method_text = (
+            "我们提出一个双分支框架，通过 LLM 引导的类内与跨类别对齐构建规范空间先验。"
+        )
+        conclusion = "实验表明该方法显著优于现有方法，在开放世界可提示三维分割任务上达到当前最优。"
+
+        storyline = extract_storyline(abstract_zh, introduction, method_text, conclusion)
+        research_problem = extract_research_problem(introduction, abstract_zh)
+
+        self.assertIsNotNone(storyline["problem"])
+        self.assertTrue("脆弱" in storyline["problem"] or "受限" in storyline["problem"])
+        self.assertNotIn("显著优于", storyline["problem"])
+        self.assertIsNotNone(storyline["method"])
+        self.assertIn("我们提出", storyline["method"])
+        self.assertIsNotNone(storyline["outcome"])
+        self.assertIn("显著优于", storyline["outcome"])
+        self.assertIsNotNone(research_problem["summary"])
+        self.assertNotIn("显著优于", research_problem["summary"])
+        self.assertNotIn("我们提出", research_problem["summary"])
+        self.assertEqual(research_problem["goal"], "我们的目标是建立面向开放世界 3D 部件理解的规范空间建模。")
+        self.assertNotIn("心理物理学", research_problem["goal"] or "")
+        self.assertTrue(all("显著优于" not in item for item in research_problem["gaps"]))
+
+    def test_extract_method_core_and_reading_digest_produce_display_friendly_summary(self) -> None:
+        method_text = (
+            "## 3.2. 统一的跨类别规范数据集\n"
+            "我们提出一个双分支框架，通过规范映射锚定与规范边界框校准实现开放世界 3D 部件推理。"
+            "首先构建统一的跨类别规范数据集。然后学习规范空间先验。最后把规范嵌入用于部件预测。"
+        )
+        abstract_zh = "我们提出 CoSMo3D，通过规范空间建模提升开放词汇分割的稳定性。"
+        contributions = ["我们引入跨类别规范空间先验。", "实验表明该方法显著优于现有方法。"]
+        findings = ["实验表明该方法显著优于现有方法。"]
+
+        method_core = extract_method_core(method_text, abstract_zh, contributions, findings)
+        self.assertIsNotNone(method_core["approach_summary"])
+        self.assertFalse((method_core["approach_summary"] or "").startswith("给定一个"))
+        self.assertTrue(all("##" not in item for item in method_core["innovations"]))
+        self.assertTrue(all(not item.startswith("3.2") for item in method_core["innovations"]))
+
+        reading_digest = build_reading_digest(
+            themes=["3D Understanding"],
+            tasks=["Open-Vocabulary Segmentation"],
+            methods=["Large Language Model"],
+            modalities=["3D", "text"],
+            novelty_type=["representation"],
+            storyline={
+                "problem": "开放世界可提示三维语义分割仍然较为脆弱。",
+                "method": "我们提出 CoSMo3D，通过规范空间建模提升开放词汇分割稳定性。",
+                "outcome": "实验表明该方法显著优于现有方法。",
+            },
+            research_problem={
+                "summary": "现有方法仍然受限于几何—文本匹配机制。",
+                "gaps": ["现有方法仍然受限于几何—文本匹配机制。"],
+                "goal": "建立规范空间建模。",
+            },
+            method_core=method_core,
+            findings=findings,
+            best_results=findings,
+            comparison_context={"explicit_baselines": ["Find3D"], "contrast_methods": [], "comparison_aspects": []},
+            research_value={
+                "summary": "适合作为 3D Understanding 方向的持续阅读入口。",
+                "points": ["适合作为开放词汇分割方向的对比样本。", "可用于理解 Large Language Model 这条方法路线。"],
+            },
+            editor_note={
+                "summary": "可作为 3D Understanding 方向的代表样本。",
+                "points": ["可优先与 Find3D 对比阅读。", "实验表明该方法显著优于现有方法。"],
+            },
+        )
+
+        self.assertNotIn("任务:", " ".join(reading_digest["why_read"]))
+        self.assertNotIn("方法:", " ".join(reading_digest["why_read"]))
+        self.assertNotIn("我们提出", reading_digest["value_statement"] or "")
+        self.assertEqual(reading_digest["narrative"]["problem"], "开放世界可提示三维语义分割仍然较为脆弱。")
+        self.assertEqual(reading_digest["narrative"]["result"], "实验表明该方法显著优于现有方法。")
+        self.assertEqual(reading_digest["result_headline"], "实验表明该方法显著优于现有方法。")
+
     def test_semantic_title_match_accepts_exact_title_and_year(self) -> None:
         def fake_fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
             self.assertIn("Demo+Paper", url)

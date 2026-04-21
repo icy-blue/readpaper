@@ -165,7 +165,7 @@ a {
 
 .detail-display-title {
   font-size: clamp(30px, 3.4vw, 44px) !important;
-  max-width: 18ch;
+  max-width: none;
 }
 
 .hero-description,
@@ -641,18 +641,19 @@ a {
 
 .chip-tag {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   min-height: 28px;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
   margin-inline-end: 0 !important;
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid transparent !important;
   font-size: 13px;
   line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-overflow: unset;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .chip-tag-tone-blue,
