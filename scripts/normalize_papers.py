@@ -351,48 +351,23 @@ def classify_links(urls: list[str], title: str, abstract_zh: str, semantic_paper
     return links
 
 
-def infer_figure_role(label: str, caption: str, *, is_table: bool) -> str:
-    lowered = f"{label} {caption}".lower()
-    if "ablation" in lowered:
-        return "ablation"
-    if "failure" in lowered:
-        return "failure_case"
-    if any(token in lowered for token in ("framework", "overview", "pipeline", "architecture")):
-        return "method_overview"
-    if any(token in lowered for token in ("qualitative", "visual", "comparison")) and not is_table:
-        return "qualitative_result"
-    if is_table or any(token in lowered for token in ("quantitative", "evaluation", "result", "miou", "iou")):
-        return "quantitative_result"
-    return "method_overview" if not is_table and label.endswith("1") else "qualitative_result"
-
-
-def infer_item_importance(label: str, role: str) -> str:
-    if label.endswith("1") or role in {"method_overview", "quantitative_result"}:
-        return "high"
-    if role in {"ablation", "qualitative_result"}:
-        return "medium"
-    return "low"
-
-
-def normalize_figure_table_items(items: list[dict[str, Any]], *, label_key: str, is_table: bool) -> list[dict[str, str]]:
-    normalized: list[dict[str, str]] = []
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        label = normalize_text(str(item.get(label_key) or ""))
-        caption = normalize_text(str(item.get("caption") or ""))
-        if not label and not caption:
-            continue
-        role = infer_figure_role(label, caption, is_table=is_table)
-        normalized.append(
-            {
-                "label": label,
-                "caption": caption,
-                "role": role,
-                "importance": infer_item_importance(label, role),
-            }
-        )
-    return normalized
+def validate_figure_table_items(errors: list[str], path: str, value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        errors.append(f"{path} must be a list")
+        return []
+    result: list[dict[str, str]] = []
+    for index, item in enumerate(value):
+        record = validate_record(errors, f"{path}[{index}]", item)
+        label = validate_string_field(errors, f"{path}[{index}].label", record.get("label"), required=True) or ""
+        caption = validate_string_field(errors, f"{path}[{index}].caption", record.get("caption"), required=True) or ""
+        role = validate_string_field(errors, f"{path}[{index}].role", record.get("role"), required=True) or ""
+        importance = validate_string_field(errors, f"{path}[{index}].importance", record.get("importance"), required=True) or ""
+        if role not in {"method_overview", "qualitative_result", "quantitative_result", "ablation", "failure_case"}:
+            errors.append(f"{path}[{index}].role must be a supported reading role")
+        if importance not in {"high", "medium", "low"}:
+            errors.append(f"{path}[{index}].importance must be high, medium, or low")
+        result.append({"label": label, "caption": caption, "role": role, "importance": importance})
+    return result
 
 
 def read_extractor_version(config_path: Path) -> str:
@@ -416,10 +391,6 @@ def meta_artifact_is_current(meta_path: Path, extractor_version: str) -> bool:
 def looks_like_sentence_label(value: str) -> bool:
     text = normalize_text(value)
     lowered = text.lower()
-    if any(token in text for token in ("。", "！", "？", "；", ";")):
-        return True
-    if lowered.endswith("."):
-        return True
     if text.startswith(LABEL_SENTENCE_PREFIXES):
         return True
     return lowered.startswith(LABEL_SENTENCE_PREFIXES_EN)
@@ -815,6 +786,14 @@ def validate_paper_relations(errors: list[str], value: Any) -> list[dict[str, An
     return result
 
 
+def validate_figure_table_index(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.figure_table_index", value)
+    return {
+        "figures": validate_figure_table_items(errors, "meta.figure_table_index.figures", block.get("figures")),
+        "tables": validate_figure_table_items(errors, "meta.figure_table_index.tables", block.get("tables")),
+    }
+
+
 def validate_meta_payload(meta_path: Path, payload: Any, paper_id: str, extractor_version: str) -> dict[str, Any]:
     errors: list[str] = []
     artifact = validate_record(errors, "artifact", payload)
@@ -851,6 +830,7 @@ def validate_meta_payload(meta_path: Path, payload: Any, paper_id: str, extracto
         "retrieval_profile": validate_retrieval_profile(errors, meta.get("retrieval_profile")),
         "comparison_context": validate_comparison_context(errors, meta.get("comparison_context")),
         "paper_relations": validate_paper_relations(errors, meta.get("paper_relations")),
+        "figure_table_index": validate_figure_table_index(errors, meta.get("figure_table_index")),
     }
 
     if errors:
@@ -889,13 +869,6 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
     sections = extract_sections(conversation)
     abstract_zh = sections["abstract"][0] if sections["abstract"] else None
     meta = meta_artifact["meta"]
-
-    figures = conversation.get("figures") if isinstance(conversation.get("figures"), list) else []
-    tables = conversation.get("tables") if isinstance(conversation.get("tables"), list) else []
-    figure_table_index = {
-        "figures": normalize_figure_table_items(figures, label_key="figure_label", is_table=False),
-        "tables": normalize_figure_table_items(tables, label_key="table_label", is_table=True),
-    }
 
     links = classify_links(extract_urls(conversation), title, abstract_zh or "", semantic_paper)
     pdf_url = conversation.get("pdf_url")
@@ -947,7 +920,7 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
         "comparison_context": meta["comparison_context"],
         "paper_neighbors": paper_neighbor_defaults(),
         "paper_relations": meta["paper_relations"],
-        "figure_table_index": figure_table_index,
+        "figure_table_index": meta["figure_table_index"],
     }
 
 

@@ -51,7 +51,11 @@ Do not infer claims from absent sections. Prefer missing over invented.
     "topics": [],
     "retrieval_profile": {},
     "comparison_context": {},
-    "paper_relations": []
+    "paper_relations": [],
+    "figure_table_index": {
+      "figures": [],
+      "tables": []
+    }
   }
 }
 ```
@@ -135,6 +139,8 @@ Treat these as hard limits, not suggestions.
 - `key_claims[].claim` must be falsifiable or comparable.
 - `key_claims[].support` must cite grounded evidence such as `section:4. Experiments`, `figure:Figure 2`, or `table:Table 1`.
 - Use `limitations` only for paper-side limitations, not extraction caveats.
+- `figure_table_index` must be produced by the skill, including `role` and `importance`.
+- Do not rely on keyword heuristics outside the skill to infer figure or table roles.
 
 ## Versioning
 

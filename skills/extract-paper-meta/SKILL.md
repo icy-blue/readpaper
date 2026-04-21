@@ -30,4 +30,5 @@ It does not write the final paper record.
 - Keep every field short enough for the current front-end reading cards.
 - Prefer missing over guessed.
 - Do not copy long paragraphs into structured fields.
+- Infer `figure_table_index` with native reasoning from the paper context instead of keyword rules in the assembler.
 - Do not write the final paper record schema here; only write the intermediate meta artifact schema.

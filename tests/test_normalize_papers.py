@@ -196,6 +196,24 @@ def meta_artifact(*, version: str = "meta-v1") -> dict[str, object]:
                 "recommended_next_read": "BaselineNet",
             },
             "paper_relations": [],
+            "figure_table_index": {
+                "figures": [
+                    {
+                        "label": "Figure 1",
+                        "caption": "Method overview.",
+                        "role": "failure_case",
+                        "importance": "medium",
+                    }
+                ],
+                "tables": [
+                    {
+                        "label": "Table 1",
+                        "caption": "Quantitative comparison on benchmark.",
+                        "role": "ablation",
+                        "importance": "low",
+                    }
+                ],
+            },
         },
     }
 
@@ -306,8 +324,8 @@ class NormalizePapersTests(unittest.TestCase):
         self.assertEqual(record["research_problem"]["goal"], "提升单图 3D 资产生成的稳定性与质量。")
         self.assertEqual(record["method_core"]["representation"], ["Mesh"])
         self.assertEqual(record["research_tags"]["tasks"], ["Image-to-3D"])
-        self.assertEqual(record["figure_table_index"]["figures"][0]["role"], "method_overview")
-        self.assertEqual(record["figure_table_index"]["tables"][0]["role"], "quantitative_result")
+        self.assertEqual(record["figure_table_index"]["figures"][0]["role"], "failure_case")
+        self.assertEqual(record["figure_table_index"]["tables"][0]["role"], "ablation")
 
     def test_normalize_falls_back_to_semantic_pdf_and_network_errors_do_not_abort(self) -> None:
         def fake_fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
@@ -408,6 +426,20 @@ class NormalizePapersTests(unittest.TestCase):
         self.assertEqual(record["links"]["project"], "https://project.local/demo")
         self.assertEqual(record["links"]["code"], "https://github.com/demo/repo")
         self.assertEqual(record["links"]["data"], "https://huggingface.co/datasets/demo")
+
+    def test_validate_meta_payload_allows_label_punctuation_without_sentence_rejection(self) -> None:
+        payload = meta_artifact()
+        meta = payload["meta"]  # type: ignore[index]
+        assert isinstance(meta, dict)
+        inputs_outputs = meta["inputs_outputs"]
+        assert isinstance(inputs_outputs, dict)
+        inputs_outputs["outputs"] = ["3D asset."]
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            meta_path = Path(tempdir) / "demo-paper.json"
+            validated = validate_meta_payload(meta_path, payload, "demo-paper", "meta-v1")
+
+        self.assertEqual(validated["meta"]["inputs_outputs"]["outputs"], ["3D asset."])
 
 
 if __name__ == "__main__":
