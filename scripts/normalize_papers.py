@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Normalize translate raw payloads into paper records."""
+"""Assemble paper records from raw translate payloads and meta artifacts."""
 
 from __future__ import annotations
 
@@ -16,6 +16,9 @@ from pathlib import Path
 from typing import Any
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_EXTRACTOR_CONFIG = REPO_ROOT / "extractor-config.json"
+
 SEMANTIC_SCHOLAR_BASE_URL = "https://api.semanticscholar.org/graph/v1"
 SEMANTIC_SCHOLAR_FIELDS = [
     "title",
@@ -31,97 +34,25 @@ SEMANTIC_SCHOLAR_FIELDS = [
 USER_AGENT = "translate-paper-forest/1.0"
 
 URL_PATTERN = re.compile(r"https?://[^\s)>\]\"']+")
-SENTENCE_SPLIT_PATTERN = re.compile(r"(?<=[。！？!?])\s*|\n+")
 DOI_PATTERN = re.compile(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", re.IGNORECASE)
 GITHUB_PATTERN = re.compile(r"https?://(?:www\.)?github\.com/[^\s)>\]\"']+", re.IGNORECASE)
-LEADING_SECTION_PATTERN = re.compile(r"^(?:#+\s*|\d+(?:\.\d+)*[.)]?\s+)")
-
-TASK_KEYWORDS = [
-    (re.compile(r"text[- ]to[- ]3d|text to 3d", re.IGNORECASE), "Text-to-3D"),
-    (re.compile(r"image[- ]to[- ]3d|one image to", re.IGNORECASE), "Image-to-3D"),
-    (re.compile(r"scene generation", re.IGNORECASE), "3D Scene Generation"),
-    (re.compile(r"novel view synthesis|view synthesis", re.IGNORECASE), "Novel View Synthesis"),
-    (re.compile(r"semantic segmentation", re.IGNORECASE), "Semantic Segmentation"),
-    (re.compile(r"open[- ]world|open[- ]vocabulary segmentation", re.IGNORECASE), "Open-Vocabulary Segmentation"),
-    (re.compile(r"object detection|目标检测", re.IGNORECASE), "Object Detection"),
-    (re.compile(r"keypoint", re.IGNORECASE), "Keypoint Detection"),
-    (re.compile(r"ocr", re.IGNORECASE), "OCR"),
-    (re.compile(r"registration|relocalization|matching|alignment", re.IGNORECASE), "Registration and Alignment"),
-    (re.compile(r"normal estimation", re.IGNORECASE), "Point Cloud Normal Estimation"),
-    (re.compile(r"surface reconstruction", re.IGNORECASE), "Surface Reconstruction"),
-    (re.compile(r"3d generation|3d asset", re.IGNORECASE), "3D Generation"),
-    (re.compile(r"3d reconstruction", re.IGNORECASE), "3D Reconstruction"),
-]
-
-METHOD_KEYWORDS = [
-    (re.compile(r"transformer", re.IGNORECASE), "Transformer"),
-    (re.compile(r"diffusion", re.IGNORECASE), "Diffusion Model"),
-    (re.compile(r"rectified flow", re.IGNORECASE), "Rectified Flow"),
-    (re.compile(r"graph neural network|gnn", re.IGNORECASE), "Graph Neural Network"),
-    (re.compile(r"convolution|cnn", re.IGNORECASE), "Convolutional Network"),
-    (re.compile(r"large multimodal model|mllm", re.IGNORECASE), "Large Multimodal Model"),
-    (re.compile(r"large language model|llm", re.IGNORECASE), "Large Language Model"),
-    (re.compile(r"implicit neural representation", re.IGNORECASE), "Implicit Neural Representation"),
-    (re.compile(r"poisson", re.IGNORECASE), "Poisson Solver"),
-]
-
-REPRESENTATION_KEYWORDS = [
-    (re.compile(r"\bmesh\b|网格", re.IGNORECASE), "Mesh"),
-    (re.compile(r"point cloud|点云", re.IGNORECASE), "Point Cloud"),
-    (re.compile(r"3d gaussian|高斯", re.IGNORECASE), "3D Gaussians"),
-    (re.compile(r"radiance field|辐射场|nerf", re.IGNORECASE), "Radiance Fields"),
-    (re.compile(r"voxel|体素", re.IGNORECASE), "Voxel"),
-    (re.compile(r"latent|潜变量", re.IGNORECASE), "Latent Representation"),
-    (re.compile(r"bounding box|框", re.IGNORECASE), "Bounding Box"),
-    (re.compile(r"normal|法向", re.IGNORECASE), "Normals"),
-]
-
-METRIC_KEYWORDS = [
-    "PSNR",
-    "SSIM",
-    "LPIPS",
-    "IoU",
-    "mIoU",
-    "mAP",
-    "F1",
-    "MAE",
-    "RTE",
-    "RRE",
-    "Chamfer Distance",
-]
-
-NOVELTY_KEYWORDS = [
-    (re.compile(r"latent|表征|representation", re.IGNORECASE), "representation"),
-    (re.compile(r"transformer|architecture|框架", re.IGNORECASE), "architecture"),
-    (re.compile(r"training|数据引擎|训练流程|reinforcement", re.IGNORECASE), "training recipe"),
-    (re.compile(r"physics|物理", re.IGNORECASE), "physics prior"),
-    (re.compile(r"decoder|解码", re.IGNORECASE), "decoder flexibility"),
-]
-
-RELATION_HINTS = {
-    "task_overlap": "同任务代表方法",
-    "method_overlap": "同路线近邻",
-    "baseline_match": "显式对比对象",
-    "contrast_method_match": "路线对比对象",
-    "fallback_contrast": "同任务差异路线",
-}
-
-RESULT_KEYWORDS = ("优于", "显著", "达到", "提升", "state-of-the-art", "improve", "outperform", "sota")
-METHOD_KEYWORDS_ZH = ("提出", "构建", "设计", "通过", "采用", "引入", "建立", "框架", "方法")
-PROBLEM_KEYWORDS_ZH = ("问题", "挑战", "困难", "缺口", "不足", "受限", "仍然", "缺乏", "脆弱")
-GOAL_KEYWORDS_ZH = ("目标", "旨在", "希望", "要解决", "为了解决", "为此", "以实现", "需要")
-DISPLAY_SENTENCE_MARKERS = (
-    "我们提出",
-    "本文提出",
-    "我们设计",
-    "我们构建",
-    "我们引入",
-    "我们采用",
-    "我们的方法",
-    "我们认为",
+LABEL_SENTENCE_PREFIXES = (
+    "我们",
+    "本文",
     "该方法",
-    "该框架",
-    "CoSMo3D",
+    "该工作",
+    "适合",
+    "通过",
+    "实验",
+    "结果",
+    "为了",
+)
+LABEL_SENTENCE_PREFIXES_EN = (
+    "we ",
+    "our ",
+    "this paper",
+    "the paper",
+    "it ",
 )
 
 
@@ -155,8 +86,7 @@ def write_json(path: Path, payload: Any) -> None:
 def normalize_text(value: str) -> str:
     text = unicodedata.normalize("NFKC", value or "")
     text = text.replace("∗", " ").replace("*", " ")
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def normalize_title(value: str) -> str:
@@ -170,6 +100,20 @@ def normalize_key(value: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def compact_markdown(text: str) -> str:
+    content = text.replace("\r\n", "\n").strip()
+    return re.sub(r"\n{3,}", "\n\n", content).strip()
+
+
+def strip_heading(text: str) -> str:
+    lines = compact_markdown(text).splitlines()
+    while lines and lines[0].lstrip().startswith("#"):
+        lines.pop(0)
+        if lines and not lines[0].strip():
+            lines.pop(0)
+    return compact_markdown("\n".join(lines))
+
+
 def ensure_strings(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -179,54 +123,6 @@ def ensure_strings(value: Any) -> list[str]:
             cleaned = normalize_text(item)
             if cleaned and cleaned not in result:
                 result.append(cleaned)
-    return result
-
-
-def unique(values: list[str]) -> list[str]:
-    result: list[str] = []
-    for value in values:
-        cleaned = normalize_text(value)
-        if cleaned and cleaned not in result:
-            result.append(cleaned)
-    return result
-
-
-def compact_markdown(text: str) -> str:
-    content = text.replace("\r\n", "\n").strip()
-    content = re.sub(r"\n{3,}", "\n\n", content)
-    return content.strip()
-
-
-def strip_heading(text: str) -> str:
-    content = compact_markdown(text)
-    lines = content.splitlines()
-    while lines and lines[0].lstrip().startswith("#"):
-        lines.pop(0)
-        if lines and not lines[0].strip():
-            lines.pop(0)
-    return compact_markdown("\n".join(lines))
-
-
-def split_sentences(text: str) -> list[str]:
-    flattened = compact_markdown(text).replace("\n", " ")
-    parts = [normalize_text(part) for part in SENTENCE_SPLIT_PATTERN.split(flattened)]
-    return [part for part in parts if len(part) >= 8]
-
-
-def first_sentence(text: str) -> str | None:
-    sentences = split_sentences(text)
-    return sentences[0] if sentences else None
-
-
-def paragraph_blocks(text: str) -> list[str]:
-    return [normalize_text(part) for part in compact_markdown(text).split("\n\n") if normalize_text(part)]
-
-
-def match_any(patterns: list[tuple[re.Pattern[str], str]], text: str) -> list[str]:
-    result: list[str] = []
-    for pattern, label in patterns:
-        if pattern.search(text) and label not in result:
-            result.append(label)
     return result
 
 
@@ -253,8 +149,7 @@ def semantic_scholar_fields(include_external_ids: bool) -> str:
 
 
 def build_semantic_scholar_url(route: str, params: dict[str, Any]) -> str:
-    query = urllib.parse.urlencode(params, doseq=True)
-    return f"{SEMANTIC_SCHOLAR_BASE_URL}{route}?{query}"
+    return f"{SEMANTIC_SCHOLAR_BASE_URL}{route}?{urllib.parse.urlencode(params, doseq=True)}"
 
 
 def parse_external_ids(payload: dict[str, Any]) -> tuple[str | None, str | None]:
@@ -263,7 +158,9 @@ def parse_external_ids(payload: dict[str, Any]) -> tuple[str | None, str | None]
         return None, None
     doi = external_ids.get("DOI") or external_ids.get("doi")
     arxiv = external_ids.get("ArXiv") or external_ids.get("ARXIV") or external_ids.get("arXiv")
-    return normalize_text(str(doi)) if isinstance(doi, str) and doi.strip() else None, normalize_text(str(arxiv)) if isinstance(arxiv, str) and arxiv.strip() else None
+    doi_text = normalize_text(str(doi)) if isinstance(doi, str) and doi.strip() else None
+    arxiv_text = normalize_text(str(arxiv)) if isinstance(arxiv, str) and arxiv.strip() else None
+    return doi_text, arxiv_text
 
 
 def parse_semantic_scholar_candidate(payload: dict[str, Any]) -> SemanticScholarPaper:
@@ -271,19 +168,15 @@ def parse_semantic_scholar_candidate(payload: dict[str, Any]) -> SemanticScholar
     author_names: list[str] = []
     if isinstance(authors, list):
         for author in authors:
-            if isinstance(author, dict):
-                name = author.get("name")
-                if isinstance(name, str):
-                    cleaned = normalize_text(name)
-                    if cleaned and cleaned not in author_names:
-                        author_names.append(cleaned)
+            if isinstance(author, dict) and isinstance(author.get("name"), str):
+                cleaned = normalize_text(str(author["name"]))
+                if cleaned and cleaned not in author_names:
+                    author_names.append(cleaned)
 
     open_access_pdf = payload.get("openAccessPdf")
     pdf_url = None
-    if isinstance(open_access_pdf, dict):
-        candidate_url = open_access_pdf.get("url")
-        if isinstance(candidate_url, str) and candidate_url.strip():
-            pdf_url = candidate_url.strip()
+    if isinstance(open_access_pdf, dict) and isinstance(open_access_pdf.get("url"), str) and str(open_access_pdf["url"]).strip():
+        pdf_url = str(open_access_pdf["url"]).strip()
 
     citation_count = payload.get("citationCount")
     year = payload.get("year")
@@ -303,12 +196,7 @@ def parse_semantic_scholar_candidate(payload: dict[str, Any]) -> SemanticScholar
     )
 
 
-def semantic_scholar_title_match(
-    title: str,
-    year: int | None,
-    *,
-    fetcher: Any = fetch_json,
-) -> SemanticScholarPaper | None:
+def semantic_scholar_title_match(title: str, year: int | None, *, fetcher: Any = fetch_json) -> SemanticScholarPaper | None:
     headers = semantic_scholar_headers()
     normalized_title = normalize_key(title)
     if not normalized_title:
@@ -318,7 +206,6 @@ def semantic_scholar_title_match(
         ("/paper/search/match", {"query": title}),
         ("/paper/search", {"query": title, "limit": 5}),
     ]
-
     for route, base_params in routes:
         payload: Any | None = None
         for include_external_ids in (True, False):
@@ -336,7 +223,6 @@ def semantic_scholar_title_match(
             except Exception:
                 payload = None
                 break
-
         if payload is None:
             continue
 
@@ -358,10 +244,8 @@ def semantic_scholar_title_match(
 
 def message_unit_id(message: dict[str, Any]) -> str:
     translation_status = message.get("translation_status")
-    if isinstance(translation_status, dict):
-        current_unit_id = translation_status.get("current_unit_id")
-        if isinstance(current_unit_id, str):
-            return normalize_text(current_unit_id)
+    if isinstance(translation_status, dict) and isinstance(translation_status.get("current_unit_id"), str):
+        return normalize_text(str(translation_status["current_unit_id"]))
     return ""
 
 
@@ -369,11 +253,14 @@ def visible_bot_messages(conversation: dict[str, Any]) -> list[dict[str, Any]]:
     messages = conversation.get("messages")
     if not isinstance(messages, list):
         return []
+
     result: list[dict[str, Any]] = []
     for message in messages:
         if not isinstance(message, dict):
             continue
         if message.get("message_kind") != "bot_reply":
+            continue
+        if message.get("visible_to_user") is False:
             continue
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
@@ -410,12 +297,10 @@ def extract_sections(conversation: dict[str, Any]) -> dict[str, list[str]]:
         "body": [],
     }
     for message in visible_bot_messages(conversation):
-        unit_id = message_unit_id(message)
+        bucket = section_bucket(message_unit_id(message))
         content = strip_heading(str(message.get("content") or ""))
-        if not content:
-            continue
-        bucket = section_bucket(unit_id)
-        buckets.setdefault(bucket, []).append(content)
+        if content:
+            buckets[bucket].append(content)
     return buckets
 
 
@@ -466,827 +351,6 @@ def classify_links(urls: list[str], title: str, abstract_zh: str, semantic_paper
     return links
 
 
-def title_and_abstract_blob(title: str, abstract_zh: str, sections: dict[str, list[str]]) -> str:
-    return "\n".join([title, abstract_zh, *sections.get("introduction", []), *sections.get("method", []), *sections.get("experiments", []), *sections.get("conclusion", [])])
-
-
-def infer_tasks(text: str, raw_tags: list[dict[str, Any]]) -> list[str]:
-    tasks = []
-    for item in raw_tags:
-        if not isinstance(item, dict):
-            continue
-        if item.get("category_code") == "T":
-            label = item.get("tag_label_en") or item.get("tag_label")
-            if isinstance(label, str) and normalize_text(label) not in tasks:
-                tasks.append(normalize_text(label))
-    return unique(tasks + match_any(TASK_KEYWORDS, text))
-
-
-def infer_methods(text: str, raw_tags: list[dict[str, Any]]) -> list[str]:
-    methods = []
-    for item in raw_tags:
-        if not isinstance(item, dict):
-            continue
-        if item.get("category_code") == "S":
-            label = item.get("tag_label_en") or item.get("tag_label")
-            if isinstance(label, str):
-                methods.append(normalize_text(label))
-    return unique(methods + match_any(METHOD_KEYWORDS, text))
-
-
-def infer_modalities(text: str, raw_tags: list[dict[str, Any]]) -> list[str]:
-    result: list[str] = []
-    for item in raw_tags:
-        if not isinstance(item, dict):
-            continue
-        if item.get("category_code") != "M":
-            continue
-        label = normalize_text(str(item.get("tag_label_en") or item.get("tag_label") or ""))
-        lowered = label.lower()
-        if "image" in lowered and "image" not in result:
-            result.append("image")
-        elif "point cloud" in lowered and "point cloud" not in result:
-            result.append("point cloud")
-        elif "multimodal" in lowered and "multimodal" not in result:
-            result.append("multimodal")
-
-    lowered_text = text.lower()
-    if "text-to-3d" in lowered_text or "text prompt" in lowered_text:
-        result.append("text")
-    if any(token in lowered_text for token in ("3d", "mesh", "gaussian", "point cloud", "point clouds")):
-        result.append("3D")
-    if "image" in lowered_text:
-        result.append("image")
-    return unique(result)
-
-
-def infer_representations(text: str) -> list[str]:
-    return match_any(REPRESENTATION_KEYWORDS, text)
-
-
-def infer_themes(tasks: list[str], title: str) -> list[str]:
-    lowered_title = title.lower()
-    themes: list[str] = []
-    if any("generation" in task.lower() or "text-to-3d" in task.lower() or "image-to-3d" in task.lower() for task in tasks):
-        themes.append("3D Generation")
-    if any("segmentation" in task.lower() or "3d understanding" in task.lower() for task in tasks):
-        themes.append("3D Understanding")
-    if any("detection" in task.lower() or "ocr" in task.lower() or "keypoint" in task.lower() for task in tasks):
-        themes.append("Open-World Perception")
-    if any("registration" in task.lower() or "alignment" in task.lower() for task in tasks):
-        themes.append("3D Registration")
-    if any("reconstruction" in task.lower() or "normal estimation" in task.lower() for task in tasks):
-        themes.append("3D Reconstruction")
-    if not themes and "3d generation" in lowered_title:
-        themes.append("3D Generation")
-    if not themes and "registration" in lowered_title:
-        themes.append("3D Registration")
-    if not themes and "normal estimation" in lowered_title:
-        themes.append("3D Reconstruction")
-    if not themes:
-        themes.append("Computer Vision")
-    return unique(themes)
-
-
-def infer_inputs_outputs(title: str, tasks: list[str], modalities: list[str], representations: list[str], text: str) -> tuple[list[str], list[str], list[str]]:
-    lowered = text.lower()
-    inputs: list[str] = []
-    outputs: list[str] = []
-
-    if any(task in {"Text-to-3D", "3D Scene Generation"} for task in tasks):
-        inputs.append("text prompt")
-    if any(task in {"Image-to-3D", "Object Detection", "OCR", "Keypoint Detection", "Novel View Synthesis"} for task in tasks) or "one image" in lowered:
-        inputs.append("image")
-    if "Semantic Segmentation" in tasks or "Open-Vocabulary Segmentation" in tasks:
-        inputs.append("point cloud")
-    if "Open-Vocabulary Segmentation" in tasks:
-        inputs.append("text prompt")
-    if "Registration and Alignment" in tasks:
-        if "image" in modalities:
-            inputs.append("image")
-        if "point cloud" in modalities or "3D" in modalities:
-            inputs.append("point cloud")
-    if "Point Cloud Normal Estimation" in tasks or "Surface Reconstruction" in tasks:
-        inputs.append("point cloud")
-
-    if "Object Detection" in tasks:
-        outputs.append("bounding boxes")
-    if "Keypoint Detection" in tasks:
-        outputs.append("keypoints")
-    if "OCR" in tasks:
-        outputs.append("recognized text")
-    if any(task in {"Text-to-3D", "Image-to-3D", "3D Generation", "3D Scene Generation"} for task in tasks):
-        if "Mesh" in representations:
-            outputs.append("mesh")
-        elif "3D Gaussians" in representations:
-            outputs.append("3D Gaussian")
-        else:
-            outputs.append("3D asset")
-    if "Novel View Synthesis" in tasks:
-        outputs.append("novel views")
-    if "Semantic Segmentation" in tasks or "Open-Vocabulary Segmentation" in tasks:
-        outputs.append("segmentation masks")
-    if "Registration and Alignment" in tasks:
-        outputs.append("camera pose")
-    if "Point Cloud Normal Estimation" in tasks:
-        outputs.append("oriented normals")
-    if "Surface Reconstruction" in tasks:
-        outputs.append("surface reconstruction")
-
-    derived_modalities = list(modalities)
-    if any(value in inputs for value in ("text prompt",)):
-        derived_modalities.append("text")
-    if any(value in inputs for value in ("image",)):
-        derived_modalities.append("image")
-    if any(value in inputs for value in ("point cloud",)) or any(
-        value in outputs for value in ("mesh", "3D Gaussian", "3D asset", "oriented normals", "surface reconstruction")
-    ):
-        derived_modalities.append("3D")
-    return unique(inputs), unique(outputs), unique(derived_modalities)
-
-
-def strip_inline_urls(text: str) -> str:
-    return normalize_text(URL_PATTERN.sub("", text or "")).strip()
-
-
-def normalize_sentence_candidate(text: str) -> str:
-    cleaned = strip_inline_urls(text)
-    cleaned = LEADING_SECTION_PATTERN.sub("", cleaned)
-    cleaned = re.sub(r"^[-*•]+\s*", "", cleaned)
-    cleaned = re.sub(r"\[[0-9,\s]+\]", "", cleaned)
-    cleaned = re.sub(r"^(?:如图\s*\d+[a-zA-Z()（）]*所示[,:：，]?\s*)", "", cleaned)
-    cleaned = re.sub(r"^(?:整体框架如图\s*\d+\s*所示[。,:：，]?\s*)", "", cleaned)
-    if any(token in cleaned for token in ("###", "第 3.", "第3.", "3.2.", "3.3.", "4.1.")):
-        for marker in DISPLAY_SENTENCE_MARKERS:
-            marker_index = cleaned.find(marker)
-            if marker_index <= 0:
-                continue
-            prefix = cleaned[:marker_index]
-            if "###" in prefix or "第" in prefix or "节" in prefix or re.search(r"\d", prefix) or ":" in prefix or "：" in prefix:
-                cleaned = cleaned[marker_index:]
-                break
-    cleaned = re.sub(r"^(?:在此框架下,|为此,|具体而言,|此外,|其中,)\s*", "", cleaned)
-    if cleaned.startswith("给定一个 ") and "我们的方法" in cleaned:
-        cleaned = cleaned[cleaned.find("我们的方法") :]
-    return normalize_text(cleaned)
-
-
-def sentence_fragment_score(text: str) -> int:
-    score = 0
-    if any(token in text for token in ("…", "...")):
-        score += 2
-    if text.startswith(("其中", "此外", "同时", "首先", "然后", "最后")):
-        score += 1
-    if "##" in text:
-        score += 3
-    if text.count("，") + text.count(",") >= 3:
-        score += 2
-    if any(token in text for token in ("损失定义", "形式上", "更多", "参见补充材料", "\\(", "\\[", "λ_", "L_")):
-        score += 2
-    if len(text) < 14:
-        score += 1
-    if len(text) > 88:
-        score += 1
-    return score
-
-
-def sentence_has_any(text: str, keywords: tuple[str, ...]) -> bool:
-    lowered = text.lower()
-    return any(keyword.lower() in lowered for keyword in keywords)
-
-
-def is_result_sentence(text: str) -> bool:
-    return sentence_has_any(text, RESULT_KEYWORDS)
-
-
-def is_method_sentence(text: str) -> bool:
-    return sentence_has_any(text, METHOD_KEYWORDS_ZH + ("framework", "pipeline", "align", "encode", "train"))
-
-
-def is_problem_sentence(text: str) -> bool:
-    return sentence_has_any(text, PROBLEM_KEYWORDS_ZH + ("problem", "challenge", "limited", "brittle"))
-
-
-def is_goal_sentence(text: str) -> bool:
-    return sentence_has_any(text, GOAL_KEYWORDS_ZH + ("to address", "to solve", "aim to", "need to"))
-
-
-def looks_like_section_heading(text: str) -> bool:
-    if not text:
-        return True
-    if text.startswith("#"):
-        return True
-    if re.match(r"^\d+(?:\.\d+)*[.)]?\s*$", text):
-        return True
-    if len(text.split()) <= 6 and not re.search(r"[。！？!?，,:;]", text) and all(
-        token[:1].isupper() for token in text.split() if token and token[0].isalpha()
-    ):
-        return True
-    return False
-
-
-def clean_sentence_candidates(texts: list[str]) -> list[str]:
-    cleaned: list[str] = []
-    for text in texts:
-        candidate = normalize_sentence_candidate(text)
-        if not candidate or looks_like_section_heading(candidate):
-            continue
-        if candidate not in cleaned:
-            cleaned.append(candidate)
-    return cleaned
-
-
-def shorten_text(text: str | None, max_chars: int) -> str | None:
-    if not text:
-        return None
-    cleaned = normalize_sentence_candidate(text)
-    if not cleaned:
-        return None
-    if len(cleaned) <= max_chars:
-        return cleaned
-    return cleaned[: max_chars - 1].rstrip("，,；;：: ") + "…"
-
-
-def merge_unique_texts(*groups: list[str]) -> list[str]:
-    merged: list[str] = []
-    for group in groups:
-        for item in group:
-            cleaned = normalize_text(item)
-            if cleaned and cleaned not in merged:
-                merged.append(cleaned)
-    return merged
-
-
-def summarize_tag_mix(task: str | None, method: str | None, theme: str | None) -> str | None:
-    if task and method:
-        return shorten_text(f"把 {task} 放到 {method} 语境里看的一篇代表工作。", 60)
-    if task and theme:
-        return shorten_text(f"一篇围绕 {theme} 中 {task} 展开的代表性工作。", 60)
-    if task:
-        return shorten_text(f"一篇围绕 {task} 展开的代表性工作。", 60)
-    if method and theme:
-        return shorten_text(f"适合用来理解 {theme} 中 {method} 这条路线。", 60)
-    if method:
-        return shorten_text(f"适合用来快速把握 {method} 这条方法路线。", 60)
-    if theme:
-        return shorten_text(f"适合作为 {theme} 方向的快速入口。", 60)
-    return None
-
-
-def infer_recommended_route(
-    *,
-    pipeline_steps: list[str],
-    innovations: list[str],
-    best_results: list[str],
-    findings: list[str],
-    comparison_context: dict[str, Any],
-) -> str:
-    if len(pipeline_steps) >= 2 and innovations:
-        return "method"
-    if best_results or len(findings) >= 2:
-        return "evaluation"
-    if (
-        ensure_strings(comparison_context.get("explicit_baselines"))
-        or ensure_strings(comparison_context.get("contrast_methods"))
-        or comparison_context.get("comparison_aspects")
-    ):
-        return "comparison"
-    return "overview"
-
-
-def build_reading_digest(
-    *,
-    themes: list[str],
-    tasks: list[str],
-    methods: list[str],
-    modalities: list[str],
-    novelty_type: list[str],
-    storyline: dict[str, str | None],
-    research_problem: dict[str, Any],
-    method_core: dict[str, Any],
-    findings: list[str],
-    best_results: list[str],
-    comparison_context: dict[str, Any],
-    research_value: dict[str, Any],
-    editor_note: dict[str, Any] | None,
-) -> dict[str, Any]:
-    task = tasks[0] if tasks else None
-    method = methods[0] if methods else None
-    theme = themes[0] if themes else None
-    best_for_parts: list[str] = []
-    if tasks:
-        best_for_parts.append("想看 " + " / ".join(tasks[:2]))
-    elif themes:
-        best_for_parts.append("想看 " + themes[0])
-    if methods:
-        best_for_parts.append("并关注 " + " / ".join(methods[:2]))
-    elif novelty_type:
-        best_for_parts.append("并关注 " + " / ".join(novelty_type[:2]))
-    best_for = shorten_text("适合" + "，".join(best_for_parts) + "的读者。", 70) if best_for_parts else None
-
-    why_read_candidates = merge_unique_texts(
-        ensure_strings(editor_note.get("points")) if isinstance(editor_note, dict) else [],
-        ensure_strings(research_value.get("points")) if isinstance(research_value, dict) else [],
-        best_results,
-        findings,
-    )
-    why_read = [
-        item
-        for item in (shorten_text(candidate, 72) for candidate in why_read_candidates)
-        if item and not item.startswith(("任务：", "任务:", "方法：", "方法:"))
-    ][:3]
-
-    storyline_problem = shorten_text(storyline.get("problem"), 70) if storyline.get("problem") and not is_result_sentence(storyline.get("problem") or "") else None
-    storyline_method = shorten_text(storyline.get("method"), 70) if storyline.get("method") and is_method_sentence(storyline.get("method") or "") and not is_result_sentence(storyline.get("method") or "") else None
-    storyline_outcome = shorten_text(storyline.get("outcome"), 70) if storyline.get("outcome") and is_result_sentence(storyline.get("outcome") or "") else None
-    research_problem_summary = shorten_text(research_problem.get("summary"), 70) if research_problem.get("summary") and not is_result_sentence(research_problem.get("summary") or "") and not is_method_sentence(research_problem.get("summary") or "") else None
-    approach_summary = shorten_text(method_core.get("approach_summary"), 70) if method_core.get("approach_summary") and is_method_sentence(method_core.get("approach_summary") or "") and not is_result_sentence(method_core.get("approach_summary") or "") else None
-    best_result = next((shorten_text(item, 70) for item in best_results if is_result_sentence(item)), None)
-    finding_result = next((shorten_text(item, 70) for item in findings if is_result_sentence(item)), None)
-    result_headline = next((shorten_text(item, 88) for item in [*best_results, *findings] if is_result_sentence(item)), None)
-
-    return {
-        "value_statement": (
-            shorten_text((editor_note or {}).get("summary"), 80)
-            or shorten_text(research_value.get("summary"), 80)
-            or summarize_tag_mix(task, method, theme)
-        ),
-        "best_for": best_for,
-        "why_read": why_read,
-        "recommended_route": infer_recommended_route(
-            pipeline_steps=ensure_strings(method_core.get("pipeline_steps")),
-            innovations=ensure_strings(method_core.get("innovations")),
-            best_results=best_results,
-            findings=findings,
-            comparison_context=comparison_context,
-        ),
-        "positioning": {
-            "task": tasks[:2],
-            "modality": modalities[:3],
-            "method": methods[:2],
-            "novelty": novelty_type[:2],
-        },
-        "narrative": {
-            "problem": storyline_problem or research_problem_summary,
-            "method": storyline_method or approach_summary,
-            "result": storyline_outcome or best_result or finding_result,
-        },
-        "result_headline": result_headline,
-    }
-
-
-def infer_editorial_verdict(
-    *,
-    pipeline_steps: list[str],
-    innovations: list[str],
-    best_results: list[str],
-    findings: list[str],
-    comparison_context: dict[str, Any],
-) -> str | None:
-    has_method_signal = len(pipeline_steps) >= 2 and bool(innovations)
-    has_eval_signal = bool(best_results or findings)
-    has_comparison_signal = bool(
-        ensure_strings(comparison_context.get("explicit_baselines"))
-        or ensure_strings(comparison_context.get("contrast_methods"))
-        or comparison_context.get("comparison_aspects")
-    )
-    if has_method_signal and has_eval_signal:
-        return "值得精读"
-    if has_method_signal or has_eval_signal or has_comparison_signal:
-        return "值得浏览"
-    if findings:
-        return "只记结论"
-    return None
-
-
-def build_editorial_review(
-    *,
-    themes: list[str],
-    tasks: list[str],
-    methods: list[str],
-    novelty_type: list[str],
-    method_core: dict[str, Any],
-    findings: list[str],
-    best_results: list[str],
-    limitations: list[str],
-    comparison_context: dict[str, Any],
-    editor_note: dict[str, Any] | None,
-) -> dict[str, Any]:
-    strengths = merge_unique_texts(
-        ensure_strings(method_core.get("innovations")),
-        best_results,
-        findings,
-        ensure_strings((editor_note or {}).get("points")) if isinstance(editor_note, dict) else [],
-    )
-    cautions = [
-        item
-        for item in (shorten_text(candidate, 72) for candidate in limitations[:3])
-        if item
-    ][:3]
-    position_parts: list[str] = []
-    if themes:
-        position_parts.append(themes[0])
-    if tasks:
-        position_parts.append(tasks[0])
-    if methods:
-        position_parts.append(methods[0])
-    elif novelty_type:
-        position_parts.append(novelty_type[0])
-    research_position = None
-    if position_parts:
-        research_position = shorten_text("可作为 " + " / ".join(position_parts) + " 的阅读入口或对比样本。", 80)
-    next_read_target = (
-        str(comparison_context.get("recommended_next_read") or "").strip()
-        or (ensure_strings(comparison_context.get("explicit_baselines"))[:1] or [None])[0]
-    )
-    return {
-        "verdict": infer_editorial_verdict(
-            pipeline_steps=ensure_strings(method_core.get("pipeline_steps")),
-            innovations=ensure_strings(method_core.get("innovations")),
-            best_results=best_results,
-            findings=findings,
-            comparison_context=comparison_context,
-        ),
-        "strengths": [item for item in (shorten_text(candidate, 72) for candidate in strengths) if item][:3],
-        "cautions": cautions,
-        "research_position": research_position,
-        "next_read_hint": shorten_text(f"可继续对比 {next_read_target}。", 72) if next_read_target else None,
-    }
-
-
-def collect_sentences(
-    texts: list[str],
-    *,
-    keywords: tuple[str, ...] = (),
-    max_items: int = 4,
-    max_chars: int | None = None,
-) -> list[str]:
-    values: list[str] = []
-    for text in texts:
-        for sentence in split_sentences(text):
-            cleaned = strip_inline_urls(sentence)
-            if not cleaned:
-                continue
-            if keywords and not any(token in cleaned for token in keywords):
-                continue
-            if max_chars is not None:
-                shortened = shorten_text(cleaned, max_chars)
-                if not shortened:
-                    continue
-                cleaned = shortened
-            if cleaned not in values:
-                values.append(cleaned)
-            if len(values) >= max_items:
-                return values
-    return values
-
-
-def pick_sentence(
-    texts: list[str],
-    *,
-    keywords: tuple[str, ...] = (),
-    fallback: bool = True,
-    max_chars: int = 120,
-) -> str | None:
-    matches = collect_sentences(texts, keywords=keywords, max_items=1, max_chars=max_chars)
-    if matches:
-        return matches[0]
-    if not fallback:
-        return None
-    fallback_matches = collect_sentences(texts, max_items=1, max_chars=max_chars)
-    return fallback_matches[0] if fallback_matches else None
-
-
-def select_semantic_sentences(
-    texts: list[str],
-    *,
-    prefer_keywords: tuple[str, ...] = (),
-    allow: Any = None,
-    deny: Any = None,
-    max_items: int = 4,
-    max_chars: int = 90,
-) -> list[str]:
-    ranked: list[tuple[tuple[int, int, int, int], str]] = []
-    seen: set[str] = set()
-    for source_index, text in enumerate(texts):
-        for sentence_index, sentence in enumerate(split_sentences(text)):
-            cleaned = normalize_sentence_candidate(sentence)
-            if not cleaned or looks_like_section_heading(cleaned):
-                continue
-            if allow and not allow(cleaned):
-                continue
-            if deny and deny(cleaned):
-                continue
-            shortened = shorten_text(cleaned, max_chars)
-            if not shortened or shortened in seen:
-                continue
-            score = (
-                0 if prefer_keywords and sentence_has_any(cleaned, prefer_keywords) else 1,
-                sentence_fragment_score(cleaned),
-                len(shortened),
-                source_index,
-                sentence_index,
-            )
-            ranked.append((score, shortened))
-            seen.add(shortened)
-    ranked.sort(key=lambda item: item[0])
-    return [sentence for _, sentence in ranked[:max_items]]
-
-
-def select_semantic_sentence(
-    texts: list[str],
-    *,
-    prefer_keywords: tuple[str, ...] = (),
-    allow: Any = None,
-    deny: Any = None,
-    max_chars: int = 90,
-) -> str | None:
-    candidates = select_semantic_sentences(
-        texts,
-        prefer_keywords=prefer_keywords,
-        allow=allow,
-        deny=deny,
-        max_items=1,
-        max_chars=max_chars,
-    )
-    return candidates[0] if candidates else None
-
-
-def classify_claim_type(text: str) -> str:
-    lowered = text.lower()
-    if any(token in text for token in ("局限", "限制", "future work", "仍然存在")):
-        return "limitation"
-    if any(token in lowered for token in ("ablation", "experiment", "benchmark", "miou", "iou")) or any(
-        token in text for token in ("实验", "结果", "优于", "提升", "达到", "显著")
-    ):
-        return "experiment"
-    if any(token in lowered for token in ("can", "generalize", "robust")) or any(
-        token in text for token in ("支持", "能够", "泛化", "鲁棒")
-    ):
-        return "capability"
-    return "method"
-
-
-def extract_bullet_like_sentences(texts: list[str], limit: int, *, support: str) -> list[dict[str, Any]]:
-    candidates = collect_sentences(
-        texts,
-        keywords=("我们提出", "本文提出", "我们展示", "结果表明", "实验表明", "显著优于", "达到", "提升"),
-        max_items=limit,
-        max_chars=110,
-    )
-    if not candidates:
-        candidates = collect_sentences(texts, max_items=limit, max_chars=110)
-
-    return [
-        {
-            "claim": sentence,
-            "type": classify_claim_type(sentence),
-            "support": [support],
-            "confidence": "medium",
-        }
-        for sentence in candidates
-    ]
-
-
-def extract_core_contributions(abstract_zh: str, conclusion: str) -> list[str]:
-    sentences = collect_sentences(
-        [abstract_zh, conclusion],
-        keywords=("我们提出", "本文提出", "我们展示", "我们采用", "结果表明", "实验表明", "设计了", "引入了"),
-        max_items=4,
-        max_chars=100,
-    )
-    if not sentences:
-        sentences = collect_sentences([abstract_zh], max_items=3, max_chars=100)
-    return sentences
-
-
-def extract_storyline(abstract_zh: str, introduction: str, method_text: str, conclusion: str) -> dict[str, str | None]:
-    problem = select_semantic_sentence(
-        [introduction, abstract_zh],
-        prefer_keywords=PROBLEM_KEYWORDS_ZH + ("problem", "challenge", "task", "brittle"),
-        allow=lambda text: (is_problem_sentence(text) or "任务" in text or "开放世界" in text) and not is_result_sentence(text) and not text.startswith(("我们提出", "本文提出")),
-        deny=lambda text: is_result_sentence(text),
-        max_chars=70,
-    )
-    method = select_semantic_sentence(
-        [abstract_zh, method_text],
-        prefer_keywords=("我们提出", "本文提出", "设计", "构建", "双分支", "规范空间", "框架", "pipeline", "framework"),
-        allow=lambda text: is_method_sentence(text) and not is_result_sentence(text),
-        deny=lambda text: is_result_sentence(text) or text.startswith("给定一个 "),
-        max_chars=70,
-    )
-    outcome = select_semantic_sentence(
-        [conclusion, abstract_zh],
-        prefer_keywords=RESULT_KEYWORDS,
-        allow=is_result_sentence,
-        max_chars=70,
-    )
-    return {"problem": problem, "method": method, "outcome": outcome}
-
-
-def extract_research_problem(introduction: str, abstract_zh: str) -> dict[str, Any]:
-    summary = select_semantic_sentence(
-        [introduction, abstract_zh],
-        prefer_keywords=PROBLEM_KEYWORDS_ZH + ("problem", "challenge", "task"),
-        allow=lambda text: (is_problem_sentence(text) or "任务" in text or "场景" in text) and not is_result_sentence(text) and not text.startswith(("我们提出", "本文提出")),
-        deny=lambda text: is_result_sentence(text) or is_method_sentence(text),
-        max_chars=100,
-    )
-    gaps = select_semantic_sentences(
-        [introduction, abstract_zh],
-        prefer_keywords=("现有", "已有", "仍然", "难以", "不足", "缺乏", "受限", "brittle", "limited", "challenge"),
-        allow=lambda text: sentence_has_any(text, ("现有", "已有", "仍然", "难以", "不足", "缺乏", "受限", "brittle", "limited", "challenge")) and not is_result_sentence(text),
-        deny=lambda text: is_result_sentence(text) or text.startswith(("我们提出", "本文提出")),
-        max_items=4,
-        max_chars=90,
-    )
-    goal = select_semantic_sentence(
-        [introduction, abstract_zh],
-        prefer_keywords=GOAL_KEYWORDS_ZH + ("实现", "建立", "to address", "to solve", "aim to"),
-        allow=lambda text: is_goal_sentence(text) and "我们提出" not in text and "本文提出" not in text and not is_result_sentence(text) and not is_method_sentence(text),
-        deny=lambda text: is_result_sentence(text) or text.startswith(("心理物理学研究", "心理物理学证据")),
-        max_chars=100,
-    )
-    return {
-        "summary": summary,
-        "gaps": [item for item in gaps if item != summary and item != goal][:4],
-        "goal": goal,
-    }
-
-
-def extract_experiment_setup(experiments: str) -> str | None:
-    for paragraph in paragraph_blocks(experiments):
-        if any(token in paragraph for token in ("dataset", "数据集", "benchmark", "baseline", "实验", "评估")):
-            return shorten_text(paragraph, 180)
-    return shorten_text(first_sentence(experiments), 180)
-
-
-def extract_author_conclusion(conclusion: str) -> str | None:
-    if not conclusion:
-        return None
-    sentences = split_sentences(conclusion)
-    if not sentences:
-        return None
-    return shorten_text(" ".join(sentences[:2]), 180)
-
-
-def extract_limitations(conclusion: str) -> list[str]:
-    return collect_sentences(
-        [conclusion],
-        keywords=("局限", "限制", "未来工作", "仍然", "尚未", "future work", "limitation"),
-        max_items=4,
-        max_chars=100,
-    )
-
-
-def extract_metrics(text: str) -> list[str]:
-    metrics: list[str] = []
-    upper_text = text.upper()
-    for metric in METRIC_KEYWORDS:
-        if metric.upper() in upper_text and metric not in metrics:
-            metrics.append(metric)
-    return metrics
-
-
-def extract_baselines(text: str) -> list[str]:
-    baselines: list[str] = []
-    for sentence in split_sentences(text):
-        if not any(token in sentence for token in ("相比", "优于", "baseline", "compared", "against")):
-            continue
-        for candidate in re.findall(r"\b[A-Z][A-Za-z0-9+._-]{2,}\b", sentence):
-            if candidate not in baselines:
-                baselines.append(candidate)
-    return baselines[:8]
-
-
-def extract_findings(abstract_zh: str, conclusion: str) -> list[str]:
-    findings = collect_sentences(
-        [abstract_zh, conclusion],
-        keywords=("优于", "显著", "达到", "提升", "improve", "state-of-the-art", "outperform"),
-        max_items=4,
-        max_chars=80,
-    )
-    if findings:
-        return findings
-    return collect_sentences([conclusion], max_items=2, max_chars=80)
-
-
-def extract_pipeline_steps(method_text: str, abstract_zh: str) -> list[str]:
-    steps = select_semantic_sentences(
-        paragraph_blocks(method_text),
-        prefer_keywords=("首先", "然后", "最后", "通过", "使用", "采用", "encode", "align", "train"),
-        allow=lambda text: is_method_sentence(text) and not is_result_sentence(text),
-        deny=lambda text: is_result_sentence(text),
-        max_items=4,
-        max_chars=90,
-    )
-    if steps:
-        return steps
-    return select_semantic_sentences(
-        [method_text, abstract_zh],
-        prefer_keywords=("通过", "采用", "构建", "设计", "encode", "align", "train"),
-        allow=lambda text: is_method_sentence(text) and not is_result_sentence(text),
-        deny=lambda text: is_result_sentence(text),
-        max_items=4,
-        max_chars=90,
-    )
-
-
-def extract_method_core(method_text: str, abstract_zh: str, contributions: list[str], findings: list[str]) -> dict[str, Any]:
-    approach_summary = select_semantic_sentence(
-        [abstract_zh, method_text],
-        prefer_keywords=("我们提出", "本文提出", "设计", "构建", "双分支", "规范空间", "框架", "pipeline", "framework"),
-        allow=lambda text: is_method_sentence(text) and not is_result_sentence(text),
-        deny=lambda text: is_result_sentence(text) or text.startswith("给定一个 "),
-        max_chars=88,
-    )
-    innovations = select_semantic_sentences(
-        [abstract_zh, "\n".join(contributions), *paragraph_blocks(method_text)[:12]],
-        prefer_keywords=("创新", "提出", "引入", "设计", "构建", "数据集", "双分支", "canonical", "对齐", "校准"),
-        allow=lambda text: (sentence_has_any(text, ("提出", "引入", "设计", "构建", "创建", "双分支", "数据集", "对齐", "校准")) or is_method_sentence(text)) and not is_result_sentence(text),
-        deny=lambda text: is_result_sentence(text) or sentence_has_any(text, ("损失定义", "形式上", "更多数据集细节", "补充材料")),
-        max_items=4,
-        max_chars=78,
-    )
-    if not innovations:
-        innovations = select_semantic_sentences(
-            ["\n".join(contributions)],
-            prefer_keywords=("提出", "引入", "设计", "构建"),
-            allow=lambda text: is_method_sentence(text) and not is_result_sentence(text),
-            deny=lambda text: is_result_sentence(text),
-            max_items=3,
-            max_chars=90,
-        )
-    differences = collect_sentences(
-        ["\n".join(findings), "\n".join(innovations)],
-        keywords=("优于", "提升", "不同", "区别", "相比", "contrast"),
-        max_items=3,
-        max_chars=90,
-    )
-    return {
-        "approach_summary": approach_summary,
-        "pipeline_steps": extract_pipeline_steps(method_text, abstract_zh),
-        "innovations": innovations[:4],
-        "differences": differences[:3],
-    }
-
-
-def build_research_value(themes: list[str], tasks: list[str], methods: list[str], findings: list[str]) -> dict[str, Any]:
-    theme_label = themes[0] if themes else "相关方向"
-    summary = shorten_text(f"适合作为 {theme_label} 方向的持续阅读入口。", 60)
-    points: list[str] = []
-    if tasks:
-        points.append(f"适合放到 {' / '.join(tasks[:2])} 的问题线上对比阅读。")
-    if methods:
-        points.append(f"可用于理解 {' / '.join(methods[:2])} 这条方法路线。")
-    if findings:
-        points.append(findings[0])
-    return {
-        "summary": summary,
-        "points": [item for item in (shorten_text(point, 80) for point in points) if item][:3],
-    }
-
-
-def build_editor_note(themes: list[str], comparison_baselines: list[str], findings: list[str]) -> dict[str, Any] | None:
-    if not themes and not comparison_baselines and not findings:
-        return None
-    summary = None
-    if themes:
-        summary = shorten_text(f"可作为 {themes[0]} 方向的代表样本。", 120)
-    elif comparison_baselines:
-        summary = shorten_text(f"适合与 {comparison_baselines[0]} 做对比阅读。", 120)
-    elif findings:
-        summary = shorten_text("结果信号明确，值得继续读。", 120)
-    points: list[str] = []
-    if comparison_baselines:
-        points.append(f"可优先与 {comparison_baselines[0]} 对比阅读。")
-    if findings:
-        points.append(findings[0])
-    return {
-        "summary": summary,
-        "points": [item for item in (shorten_text(point, 90) for point in points) if item][:3],
-    }
-
-
-def extract_comparison_aspects(innovations: list[str], findings: list[str]) -> list[dict[str, str]]:
-    aspects: list[dict[str, str]] = []
-    if innovations:
-        aspects.append(
-            {
-                "aspect": "method",
-                "difference": innovations[0],
-            }
-        )
-    if findings:
-        aspects.append(
-            {
-                "aspect": "result",
-                "difference": findings[0],
-            }
-        )
-    return aspects[:3]
-
-
 def infer_figure_role(label: str, caption: str, *, is_table: bool) -> str:
     lowered = f"{label} {caption}".lower()
     if "ablation" in lowered:
@@ -1331,19 +395,482 @@ def normalize_figure_table_items(items: list[dict[str, Any]], *, label_key: str,
     return normalized
 
 
-def infer_novelty_types(text: str) -> list[str]:
-    return unique(match_any(NOVELTY_KEYWORDS, text))[:4]
+def read_extractor_version(config_path: Path) -> str:
+    payload = read_json(config_path, {})
+    if not isinstance(payload, dict):
+        raise ValueError(f"{config_path} must contain a JSON object.")
+    version = payload.get("extractor_version")
+    if not isinstance(version, str) or not version.strip():
+        raise ValueError(f"{config_path} is missing extractor_version.")
+    return normalize_text(version)
 
 
-def relation_hint(match_source: str) -> str | None:
-    return RELATION_HINTS.get(normalize_text(match_source))
+def meta_artifact_is_current(meta_path: Path, extractor_version: str) -> bool:
+    payload = read_json(meta_path, {})
+    if not isinstance(payload, dict):
+        return False
+    version = payload.get("extractor_version")
+    return isinstance(version, str) and normalize_text(version) == normalize_text(extractor_version)
+
+
+def looks_like_sentence_label(value: str) -> bool:
+    text = normalize_text(value)
+    lowered = text.lower()
+    if any(token in text for token in ("。", "！", "？", "；", ";")):
+        return True
+    if lowered.endswith("."):
+        return True
+    if text.startswith(LABEL_SENTENCE_PREFIXES):
+        return True
+    return lowered.startswith(LABEL_SENTENCE_PREFIXES_EN)
+
+
+def build_validation_error(meta_path: Path, errors: list[str]) -> ValueError:
+    preview = "; ".join(errors[:6])
+    if len(errors) > 6:
+        preview += f"; and {len(errors) - 6} more"
+    return ValueError(f"Invalid meta artifact {meta_path}: {preview}")
+
+
+def normalized_optional_string(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        cleaned = normalize_text(value)
+        return cleaned or None
+    return None
+
+
+def validate_string_field(
+    errors: list[str],
+    path: str,
+    value: Any,
+    *,
+    max_chars: int | None = None,
+    required: bool = False,
+) -> str | None:
+    cleaned = normalized_optional_string(value)
+    if cleaned is None:
+        if required:
+            errors.append(f"{path} must be a non-empty string")
+        return None
+    if max_chars is not None and len(cleaned) > max_chars:
+        errors.append(f"{path} exceeds {max_chars} chars")
+    return cleaned
+
+
+def validate_bool_field(errors: list[str], path: str, value: Any) -> bool:
+    if not isinstance(value, bool):
+        errors.append(f"{path} must be a boolean")
+        return False
+    return value
+
+
+def validate_string_list(
+    errors: list[str],
+    path: str,
+    value: Any,
+    *,
+    max_chars: int,
+    max_items: int,
+    label_like: bool = False,
+) -> list[str]:
+    if not isinstance(value, list):
+        errors.append(f"{path} must be a list")
+        return []
+    result: list[str] = []
+    if len(value) > max_items:
+        errors.append(f"{path} exceeds {max_items} items")
+    for index, item in enumerate(value[:max_items]):
+        cleaned = validate_string_field(errors, f"{path}[{index}]", item, max_chars=max_chars, required=True)
+        if not cleaned:
+            continue
+        if label_like and looks_like_sentence_label(cleaned):
+            errors.append(f"{path}[{index}] must be a short label, not a sentence")
+        if cleaned not in result:
+            result.append(cleaned)
+    return result
+
+
+def validate_string_array_without_limit(errors: list[str], path: str, value: Any) -> list[str]:
+    if not isinstance(value, list):
+        errors.append(f"{path} must be a list")
+        return []
+    result: list[str] = []
+    for index, item in enumerate(value):
+        cleaned = validate_string_field(errors, f"{path}[{index}]", item, required=True)
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
+    return result
+
+
+def validate_record(errors: list[str], path: str, value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        errors.append(f"{path} must be an object")
+        return {}
+    return value
+
+
+def validate_choice_field(errors: list[str], path: str, value: Any, choices: set[str]) -> str:
+    cleaned = validate_string_field(errors, path, value, required=True)
+    if not cleaned:
+        return next(iter(choices))
+    if cleaned not in choices:
+        errors.append(f"{path} must be one of {sorted(choices)}")
+    return cleaned
+
+
+def validate_summary_block(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.summary", value)
+    research_value = validate_record(errors, "meta.summary.research_value", block.get("research_value"))
+    return {
+        "one_liner": validate_string_field(errors, "meta.summary.one_liner", block.get("one_liner"), max_chars=110, required=True) or "",
+        "abstract_summary": validate_string_field(errors, "meta.summary.abstract_summary", block.get("abstract_summary"), max_chars=150),
+        "research_value": {
+            "summary": validate_string_field(errors, "meta.summary.research_value.summary", research_value.get("summary"), max_chars=72),
+            "points": validate_string_list(
+                errors,
+                "meta.summary.research_value.points",
+                research_value.get("points"),
+                max_chars=64,
+                max_items=3,
+            ),
+        },
+        "worth_long_term_graph": validate_bool_field(errors, "meta.summary.worth_long_term_graph", block.get("worth_long_term_graph")),
+    }
+
+
+def validate_reading_digest(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.reading_digest", value)
+    positioning = validate_record(errors, "meta.reading_digest.positioning", block.get("positioning"))
+    narrative = validate_record(errors, "meta.reading_digest.narrative", block.get("narrative"))
+    return {
+        "value_statement": validate_string_field(errors, "meta.reading_digest.value_statement", block.get("value_statement"), max_chars=84),
+        "best_for": validate_string_field(errors, "meta.reading_digest.best_for", block.get("best_for"), max_chars=72),
+        "why_read": validate_string_list(
+            errors,
+            "meta.reading_digest.why_read",
+            block.get("why_read"),
+            max_chars=64,
+            max_items=3,
+        ),
+        "recommended_route": validate_choice_field(
+            errors,
+            "meta.reading_digest.recommended_route",
+            block.get("recommended_route"),
+            {"method", "evaluation", "comparison", "overview"},
+        ),
+        "positioning": {
+            "task": validate_string_list(errors, "meta.reading_digest.positioning.task", positioning.get("task"), max_chars=28, max_items=4, label_like=True),
+            "modality": validate_string_list(
+                errors,
+                "meta.reading_digest.positioning.modality",
+                positioning.get("modality"),
+                max_chars=24,
+                max_items=4,
+                label_like=True,
+            ),
+            "method": validate_string_list(errors, "meta.reading_digest.positioning.method", positioning.get("method"), max_chars=28, max_items=4, label_like=True),
+            "novelty": validate_string_list(errors, "meta.reading_digest.positioning.novelty", positioning.get("novelty"), max_chars=24, max_items=4, label_like=True),
+        },
+        "narrative": {
+            "problem": validate_string_field(errors, "meta.reading_digest.narrative.problem", narrative.get("problem"), max_chars=90),
+            "method": validate_string_field(errors, "meta.reading_digest.narrative.method", narrative.get("method"), max_chars=90),
+            "result": validate_string_field(errors, "meta.reading_digest.narrative.result", narrative.get("result"), max_chars=90),
+        },
+        "result_headline": validate_string_field(errors, "meta.reading_digest.result_headline", block.get("result_headline"), max_chars=96),
+    }
+
+
+def validate_storyline(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.storyline", value)
+    return {
+        "problem": validate_string_field(errors, "meta.storyline.problem", block.get("problem"), max_chars=84),
+        "method": validate_string_field(errors, "meta.storyline.method", block.get("method"), max_chars=84),
+        "outcome": validate_string_field(errors, "meta.storyline.outcome", block.get("outcome"), max_chars=84),
+    }
+
+
+def validate_research_problem(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.research_problem", value)
+    return {
+        "summary": validate_string_field(errors, "meta.research_problem.summary", block.get("summary"), max_chars=100),
+        "gaps": validate_string_list(errors, "meta.research_problem.gaps", block.get("gaps"), max_chars=84, max_items=4),
+        "goal": validate_string_field(errors, "meta.research_problem.goal", block.get("goal"), max_chars=100),
+    }
+
+
+def validate_claim_items(errors: list[str], value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        errors.append("meta.key_claims must be a list")
+        return []
+    if len(value) > 5:
+        errors.append("meta.key_claims exceeds 5 items")
+    result: list[dict[str, Any]] = []
+    for index, item in enumerate(value[:5]):
+        record = validate_record(errors, f"meta.key_claims[{index}]", item)
+        support = validate_string_array_without_limit(errors, f"meta.key_claims[{index}].support", record.get("support"))
+        result.append(
+            {
+                "claim": validate_string_field(errors, f"meta.key_claims[{index}].claim", record.get("claim"), max_chars=120, required=True) or "",
+                "type": validate_string_field(errors, f"meta.key_claims[{index}].type", record.get("type"), max_chars=24, required=True) or "method",
+                "support": support,
+                "confidence": validate_string_field(errors, f"meta.key_claims[{index}].confidence", record.get("confidence"), max_chars=16) or "medium",
+            }
+        )
+        if not support:
+            errors.append(f"meta.key_claims[{index}].support must contain grounded evidence")
+    return result
+
+
+def validate_method_core(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.method_core", value)
+    return {
+        "approach_summary": validate_string_field(errors, "meta.method_core.approach_summary", block.get("approach_summary"), max_chars=110),
+        "pipeline_steps": validate_string_list(errors, "meta.method_core.pipeline_steps", block.get("pipeline_steps"), max_chars=105, max_items=4),
+        "innovations": validate_string_list(errors, "meta.method_core.innovations", block.get("innovations"), max_chars=90, max_items=4),
+        "ingredients": validate_string_list(errors, "meta.method_core.ingredients", block.get("ingredients"), max_chars=32, max_items=6, label_like=True),
+        "representation": validate_string_list(
+            errors,
+            "meta.method_core.representation",
+            block.get("representation"),
+            max_chars=32,
+            max_items=6,
+            label_like=True,
+        ),
+        "supervision": validate_string_list(errors, "meta.method_core.supervision", block.get("supervision"), max_chars=48, max_items=4),
+        "differences": validate_string_list(errors, "meta.method_core.differences", block.get("differences"), max_chars=90, max_items=4),
+    }
+
+
+def validate_inputs_outputs(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.inputs_outputs", value)
+    return {
+        "inputs": validate_string_list(errors, "meta.inputs_outputs.inputs", block.get("inputs"), max_chars=28, max_items=6, label_like=True),
+        "outputs": validate_string_list(errors, "meta.inputs_outputs.outputs", block.get("outputs"), max_chars=28, max_items=6, label_like=True),
+        "modalities": validate_string_list(errors, "meta.inputs_outputs.modalities", block.get("modalities"), max_chars=24, max_items=6, label_like=True),
+    }
+
+
+def validate_benchmarks(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.benchmarks_or_eval", value)
+    return {
+        "datasets": validate_string_list(errors, "meta.benchmarks_or_eval.datasets", block.get("datasets"), max_chars=30, max_items=8, label_like=True),
+        "metrics": validate_string_list(errors, "meta.benchmarks_or_eval.metrics", block.get("metrics"), max_chars=20, max_items=8, label_like=True),
+        "baselines": validate_string_list(errors, "meta.benchmarks_or_eval.baselines", block.get("baselines"), max_chars=28, max_items=8, label_like=True),
+        "findings": validate_string_list(errors, "meta.benchmarks_or_eval.findings", block.get("findings"), max_chars=90, max_items=4),
+        "best_results": validate_string_list(errors, "meta.benchmarks_or_eval.best_results", block.get("best_results"), max_chars=90, max_items=4),
+        "experiment_setup_summary": validate_string_field(
+            errors,
+            "meta.benchmarks_or_eval.experiment_setup_summary",
+            block.get("experiment_setup_summary"),
+            max_chars=140,
+        ),
+    }
+
+
+def validate_editor_note(errors: list[str], value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    block = validate_record(errors, "meta.editor_note", value)
+    return {
+        "summary": validate_string_field(errors, "meta.editor_note.summary", block.get("summary"), max_chars=120),
+        "points": validate_string_list(errors, "meta.editor_note.points", block.get("points"), max_chars=90, max_items=3),
+    }
+
+
+def validate_editorial_review(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.editorial_review", value)
+    verdict = validate_string_field(errors, "meta.editorial_review.verdict", block.get("verdict"), max_chars=16)
+    if verdict and verdict not in {"值得精读", "值得浏览", "只记结论"}:
+        errors.append("meta.editorial_review.verdict must be 值得精读, 值得浏览, 只记结论, or null")
+    return {
+        "verdict": verdict,
+        "strengths": validate_string_list(errors, "meta.editorial_review.strengths", block.get("strengths"), max_chars=80, max_items=4),
+        "cautions": validate_string_list(errors, "meta.editorial_review.cautions", block.get("cautions"), max_chars=80, max_items=4),
+        "research_position": validate_string_field(errors, "meta.editorial_review.research_position", block.get("research_position"), max_chars=84),
+        "next_read_hint": validate_string_field(errors, "meta.editorial_review.next_read_hint", block.get("next_read_hint"), max_chars=60),
+    }
+
+
+def validate_research_tags(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.research_tags", value)
+    return {
+        "themes": validate_string_list(errors, "meta.research_tags.themes", block.get("themes"), max_chars=28, max_items=8, label_like=True),
+        "tasks": validate_string_list(errors, "meta.research_tags.tasks", block.get("tasks"), max_chars=28, max_items=8, label_like=True),
+        "methods": validate_string_list(errors, "meta.research_tags.methods", block.get("methods"), max_chars=28, max_items=8, label_like=True),
+        "modalities": validate_string_list(errors, "meta.research_tags.modalities", block.get("modalities"), max_chars=24, max_items=6, label_like=True),
+        "representations": validate_string_list(
+            errors,
+            "meta.research_tags.representations",
+            block.get("representations"),
+            max_chars=28,
+            max_items=6,
+            label_like=True,
+        ),
+    }
+
+
+def validate_topics(errors: list[str], value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        errors.append("meta.topics must be a list")
+        return []
+    result: list[dict[str, str]] = []
+    for index, item in enumerate(value):
+        record = validate_record(errors, f"meta.topics[{index}]", item)
+        slug = validate_string_field(errors, f"meta.topics[{index}].slug", record.get("slug"), required=True) or ""
+        name = validate_string_field(errors, f"meta.topics[{index}].name", record.get("name"), required=True) or ""
+        role = validate_string_field(errors, f"meta.topics[{index}].role", record.get("role"), required=True) or ""
+        result.append({"slug": slug, "name": name, "role": role})
+    return result
+
+
+def validate_retrieval_profile(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.retrieval_profile", value)
+    return {
+        "problem_spaces": validate_string_array_without_limit(errors, "meta.retrieval_profile.problem_spaces", block.get("problem_spaces")),
+        "task_axes": validate_string_array_without_limit(errors, "meta.retrieval_profile.task_axes", block.get("task_axes")),
+        "approach_axes": validate_string_array_without_limit(errors, "meta.retrieval_profile.approach_axes", block.get("approach_axes")),
+        "input_axes": validate_string_array_without_limit(errors, "meta.retrieval_profile.input_axes", block.get("input_axes")),
+        "output_axes": validate_string_array_without_limit(errors, "meta.retrieval_profile.output_axes", block.get("output_axes")),
+        "modality_axes": validate_string_array_without_limit(errors, "meta.retrieval_profile.modality_axes", block.get("modality_axes")),
+        "comparison_axes": validate_string_array_without_limit(errors, "meta.retrieval_profile.comparison_axes", block.get("comparison_axes")),
+    }
+
+
+def validate_comparison_context(errors: list[str], value: Any) -> dict[str, Any]:
+    block = validate_record(errors, "meta.comparison_context", value)
+    aspects_value = block.get("comparison_aspects")
+    aspects: list[dict[str, str]] = []
+    if not isinstance(aspects_value, list):
+        errors.append("meta.comparison_context.comparison_aspects must be a list")
+    else:
+        for index, item in enumerate(aspects_value[:8]):
+            record = validate_record(errors, f"meta.comparison_context.comparison_aspects[{index}]", item)
+            aspects.append(
+                {
+                    "aspect": validate_string_field(
+                        errors,
+                        f"meta.comparison_context.comparison_aspects[{index}].aspect",
+                        record.get("aspect"),
+                        max_chars=28,
+                        required=True,
+                    )
+                    or "",
+                    "difference": validate_string_field(
+                        errors,
+                        f"meta.comparison_context.comparison_aspects[{index}].difference",
+                        record.get("difference"),
+                        max_chars=96,
+                        required=True,
+                    )
+                    or "",
+                }
+            )
+    return {
+        "explicit_baselines": validate_string_list(
+            errors,
+            "meta.comparison_context.explicit_baselines",
+            block.get("explicit_baselines"),
+            max_chars=28,
+            max_items=8,
+            label_like=True,
+        ),
+        "contrast_methods": validate_string_list(
+            errors,
+            "meta.comparison_context.contrast_methods",
+            block.get("contrast_methods"),
+            max_chars=28,
+            max_items=8,
+            label_like=True,
+        ),
+        "comparison_aspects": aspects,
+        "recommended_next_read": validate_string_field(
+            errors,
+            "meta.comparison_context.recommended_next_read",
+            block.get("recommended_next_read"),
+            max_chars=36,
+        ),
+    }
+
+
+def validate_paper_relations(errors: list[str], value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        errors.append("meta.paper_relations must be a list")
+        return []
+    result: list[dict[str, Any]] = []
+    for index, item in enumerate(value):
+        record = validate_record(errors, f"meta.paper_relations[{index}]", item)
+        confidence = record.get("confidence")
+        if confidence is not None and not isinstance(confidence, (int, float)):
+            errors.append(f"meta.paper_relations[{index}].confidence must be a number or null")
+        result.append(
+            {
+                "target_paper_id": validate_string_field(errors, f"meta.paper_relations[{index}].target_paper_id", record.get("target_paper_id"), required=True) or "",
+                "relation_type": validate_string_field(errors, f"meta.paper_relations[{index}].relation_type", record.get("relation_type"), required=True) or "",
+                "description": validate_string_field(errors, f"meta.paper_relations[{index}].description", record.get("description"), required=True) or "",
+                "confidence": float(confidence) if isinstance(confidence, (int, float)) else None,
+            }
+        )
+    return result
+
+
+def validate_meta_payload(meta_path: Path, payload: Any, paper_id: str, extractor_version: str) -> dict[str, Any]:
+    errors: list[str] = []
+    artifact = validate_record(errors, "artifact", payload)
+
+    artifact_paper_id = validate_string_field(errors, "artifact.paper_id", artifact.get("paper_id"), required=True)
+    artifact_version = validate_string_field(errors, "artifact.extractor_version", artifact.get("extractor_version"), required=True)
+    source_conversation_id = validate_string_field(errors, "artifact.source_conversation_id", artifact.get("source_conversation_id"), required=True)
+    source_semantic_updated_at = validate_string_field(errors, "artifact.source_semantic_updated_at", artifact.get("source_semantic_updated_at"))
+    extracted_at = validate_string_field(errors, "artifact.extracted_at", artifact.get("extracted_at"), required=True)
+    meta = validate_record(errors, "artifact.meta", artifact.get("meta"))
+
+    if artifact_paper_id and artifact_paper_id != paper_id:
+        errors.append("artifact.paper_id does not match the raw payload paper_id")
+    if artifact_version and normalize_text(artifact_version) != normalize_text(extractor_version):
+        errors.append("artifact.extractor_version does not match extractor-config.json")
+
+    validated_meta = {
+        "summary": validate_summary_block(errors, meta.get("summary")),
+        "reading_digest": validate_reading_digest(errors, meta.get("reading_digest")),
+        "storyline": validate_storyline(errors, meta.get("storyline")),
+        "research_problem": validate_research_problem(errors, meta.get("research_problem")),
+        "core_contributions": validate_string_list(errors, "meta.core_contributions", meta.get("core_contributions"), max_chars=90, max_items=4),
+        "key_claims": validate_claim_items(errors, meta.get("key_claims")),
+        "method_core": validate_method_core(errors, meta.get("method_core")),
+        "inputs_outputs": validate_inputs_outputs(errors, meta.get("inputs_outputs")),
+        "benchmarks_or_eval": validate_benchmarks(errors, meta.get("benchmarks_or_eval")),
+        "author_conclusion": validate_string_field(errors, "meta.author_conclusion", meta.get("author_conclusion"), max_chars=180),
+        "editor_note": validate_editor_note(errors, meta.get("editor_note")),
+        "editorial_review": validate_editorial_review(errors, meta.get("editorial_review")),
+        "limitations": validate_string_list(errors, "meta.limitations", meta.get("limitations"), max_chars=90, max_items=4),
+        "novelty_type": validate_string_list(errors, "meta.novelty_type", meta.get("novelty_type"), max_chars=24, max_items=4, label_like=True),
+        "research_tags": validate_research_tags(errors, meta.get("research_tags")),
+        "topics": validate_topics(errors, meta.get("topics")),
+        "retrieval_profile": validate_retrieval_profile(errors, meta.get("retrieval_profile")),
+        "comparison_context": validate_comparison_context(errors, meta.get("comparison_context")),
+        "paper_relations": validate_paper_relations(errors, meta.get("paper_relations")),
+    }
+
+    if errors:
+        raise build_validation_error(meta_path, errors)
+
+    return {
+        "paper_id": artifact_paper_id,
+        "extractor_version": artifact_version,
+        "source_conversation_id": source_conversation_id,
+        "source_semantic_updated_at": source_semantic_updated_at,
+        "extracted_at": extracted_at,
+        "meta": validated_meta,
+    }
 
 
 def paper_neighbor_defaults() -> dict[str, list[dict[str, Any]]]:
     return {"task": [], "method": [], "comparison": []}
 
 
-def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticScholarPaper | None) -> dict[str, Any]:
+def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticScholarPaper | None, meta_artifact: dict[str, Any]) -> dict[str, Any]:
     conversation = raw_payload.get("conversation")
     if not isinstance(conversation, dict):
         raise ValueError("Raw payload must include a conversation object.")
@@ -1361,47 +888,7 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
 
     sections = extract_sections(conversation)
     abstract_zh = sections["abstract"][0] if sections["abstract"] else None
-    introduction = "\n\n".join(sections["introduction"])
-    method_text = "\n\n".join(sections["method"])
-    experiments_text = "\n\n".join(sections["experiments"])
-    conclusion_text = "\n\n".join(sections["conclusion"])
-    combined_text = title_and_abstract_blob(title, abstract_zh or "", sections)
-
-    raw_tags = conversation.get("tags") if isinstance(conversation.get("tags"), list) else []
-    tasks = infer_tasks(combined_text, raw_tags)
-    methods = infer_methods(combined_text, raw_tags)
-    representations = infer_representations(combined_text)
-    modalities = infer_modalities(combined_text, raw_tags)
-    inputs, outputs, modalities = infer_inputs_outputs(title, tasks, modalities, representations, combined_text)
-    themes = infer_themes(tasks, title)
-
-    research_problem = extract_research_problem(introduction, abstract_zh or "")
-    contributions = extract_core_contributions(abstract_zh or "", conclusion_text)
-    findings = extract_findings(abstract_zh or "", conclusion_text)
-    method_core_summary = extract_method_core(method_text, abstract_zh or "", contributions, findings)
-    storyline = extract_storyline(abstract_zh or "", introduction, method_text, conclusion_text)
-    summary_one_liner = shorten_text(
-        "；".join(
-            [
-                item
-                for item in (
-                    storyline.get("problem"),
-                    storyline.get("method"),
-                    storyline.get("outcome"),
-                )
-                if item
-            ]
-        )
-        or first_sentence(abstract_zh or "")
-        or first_sentence(conclusion_text or "")
-        or title,
-        120,
-    ) or title
-    claims = extract_bullet_like_sentences([abstract_zh or "", conclusion_text], 3, support="section:Abstract")
-    experiment_setup_summary = extract_experiment_setup(experiments_text)
-    author_conclusion = extract_author_conclusion(conclusion_text)
-    limitations = extract_limitations(conclusion_text)
-    novelty_type = infer_novelty_types(combined_text)
+    meta = meta_artifact["meta"]
 
     figures = conversation.get("figures") if isinstance(conversation.get("figures"), list) else []
     tables = conversation.get("tables") if isinstance(conversation.get("tables"), list) else []
@@ -1429,61 +916,6 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
     if not isinstance(citation_count, int):
         citation_count = semantic_paper.citation_count if semantic_paper else None
 
-    comparison_context = {
-        "explicit_baselines": extract_baselines("\n".join([abstract_zh or "", experiments_text])),
-        "contrast_methods": [],
-        "comparison_aspects": extract_comparison_aspects(method_core_summary["innovations"], findings),
-        "recommended_next_read": None,
-    }
-    if comparison_context["explicit_baselines"]:
-        comparison_context["recommended_next_read"] = comparison_context["explicit_baselines"][0]
-    research_value = build_research_value(themes, tasks, methods, findings)
-    editor_note = build_editor_note(themes, comparison_context["explicit_baselines"], findings)
-    method_core_payload = {
-        "approach_summary": method_core_summary["approach_summary"],
-        "pipeline_steps": method_core_summary["pipeline_steps"],
-        "innovations": method_core_summary["innovations"],
-        "ingredients": methods,
-        "representation": representations,
-        "supervision": [],
-        "differences": method_core_summary["differences"],
-    }
-    benchmarks_payload = {
-        "datasets": [],
-        "metrics": extract_metrics("\n".join([experiments_text, *[item["caption"] for item in figure_table_index["tables"] if isinstance(item, dict)]])),
-        "baselines": comparison_context["explicit_baselines"],
-        "findings": findings,
-        "best_results": findings[:1],
-        "experiment_setup_summary": experiment_setup_summary,
-    }
-    reading_digest = build_reading_digest(
-        themes=themes,
-        tasks=tasks,
-        methods=methods,
-        modalities=modalities,
-        novelty_type=novelty_type,
-        storyline=storyline,
-        research_problem=research_problem,
-        method_core=method_core_payload,
-        findings=findings,
-        best_results=benchmarks_payload["best_results"],
-        comparison_context=comparison_context,
-        research_value=research_value,
-        editor_note=editor_note,
-    )
-    editorial_review = build_editorial_review(
-        themes=themes,
-        tasks=tasks,
-        methods=methods,
-        novelty_type=novelty_type,
-        method_core=method_core_payload,
-        findings=findings,
-        best_results=benchmarks_payload["best_results"],
-        limitations=limitations,
-        comparison_context=comparison_context,
-        editor_note=editor_note,
-    )
-
     return {
         "paper_id": paper_id,
         "source_conversation_ids": source_conversation_ids,
@@ -1495,49 +927,26 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
         "links": links,
         "abstract_raw": semantic_paper.abstract_raw if semantic_paper else None,
         "abstract_zh": abstract_zh,
-        "summary": {
-            "one_liner": summary_one_liner,
-            "abstract_summary": shorten_text(abstract_zh, 220),
-            "research_value": research_value,
-            "worth_long_term_graph": bool(tasks or methods or citation_count),
-        },
-        "reading_digest": reading_digest,
-        "storyline": storyline,
-        "research_problem": research_problem,
-        "core_contributions": contributions,
-        "key_claims": claims,
-        "method_core": method_core_payload,
-        "inputs_outputs": {
-            "inputs": inputs,
-            "outputs": outputs,
-            "modalities": modalities,
-        },
-        "benchmarks_or_eval": benchmarks_payload,
-        "author_conclusion": author_conclusion,
-        "editor_note": editor_note,
-        "editorial_review": editorial_review,
-        "limitations": limitations,
-        "novelty_type": novelty_type,
-        "research_tags": {
-            "themes": themes,
-            "tasks": tasks,
-            "methods": methods,
-            "modalities": modalities,
-            "representations": representations,
-        },
-        "topics": [],
-        "retrieval_profile": {
-            "problem_spaces": [],
-            "task_axes": [],
-            "approach_axes": [],
-            "input_axes": [],
-            "output_axes": [],
-            "modality_axes": [],
-            "comparison_axes": [],
-        },
-        "comparison_context": comparison_context,
+        "summary": meta["summary"],
+        "reading_digest": meta["reading_digest"],
+        "storyline": meta["storyline"],
+        "research_problem": meta["research_problem"],
+        "core_contributions": meta["core_contributions"],
+        "key_claims": meta["key_claims"],
+        "method_core": meta["method_core"],
+        "inputs_outputs": meta["inputs_outputs"],
+        "benchmarks_or_eval": meta["benchmarks_or_eval"],
+        "author_conclusion": meta["author_conclusion"],
+        "editor_note": meta["editor_note"],
+        "editorial_review": meta["editorial_review"],
+        "limitations": meta["limitations"],
+        "novelty_type": meta["novelty_type"],
+        "research_tags": meta["research_tags"],
+        "topics": meta["topics"],
+        "retrieval_profile": meta["retrieval_profile"],
+        "comparison_context": meta["comparison_context"],
         "paper_neighbors": paper_neighbor_defaults(),
-        "paper_relations": [],
+        "paper_relations": meta["paper_relations"],
         "figure_table_index": figure_table_index,
     }
 
@@ -1547,7 +956,6 @@ def merge_existing_enrichment(record: dict[str, Any], existing_record: dict[str,
         return record
 
     merged = dict(record)
-
     existing_authors = ensure_strings(existing_record.get("authors"))
     if not ensure_strings(merged.get("authors")) and existing_authors:
         merged["authors"] = existing_authors
@@ -1568,13 +976,14 @@ def merge_existing_enrichment(record: dict[str, Any], existing_record: dict[str,
             if not merged_links.get(key) and isinstance(existing_links.get(key), str) and str(existing_links.get(key)).strip():
                 merged_links[key] = str(existing_links.get(key)).strip()
         merged["links"] = merged_links
-
     return merged
 
 
 def normalize_raw_file(
     raw_path: Path,
     *,
+    meta_path: Path,
+    extractor_version: str,
     fetcher: Any = fetch_json,
     existing_record: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -1585,14 +994,24 @@ def normalize_raw_file(
     if not isinstance(conversation, dict):
         raise ValueError(f"{raw_path} is missing conversation data.")
 
-    title = normalize_title(str(conversation.get("title") or raw_payload.get("paper_id") or ""))
+    paper_id = normalize_text(str(raw_payload.get("paper_id") or ""))
+    if not paper_id:
+        raise ValueError(f"{raw_path} is missing paper_id.")
+    if not meta_path.exists():
+        raise ValueError(f"Missing meta artifact for {paper_id}: {meta_path}")
+
+    meta_artifact = validate_meta_payload(meta_path, read_json(meta_path, {}), paper_id, extractor_version)
+
+    title = normalize_title(str(conversation.get("title") or paper_id))
     year = conversation.get("year")
     semantic_paper = None
     try:
         semantic_paper = semantic_scholar_title_match(title, year if isinstance(year, int) else None, fetcher=fetcher)
     except Exception:
         semantic_paper = None
-    return merge_existing_enrichment(normalize_record(raw_payload, semantic_paper), existing_record)
+
+    record = normalize_record(raw_payload, semantic_paper, meta_artifact)
+    return merge_existing_enrichment(record, existing_record)
 
 
 def iter_raw_files(raw_dir: Path) -> list[Path]:
@@ -1602,31 +1021,46 @@ def iter_raw_files(raw_dir: Path) -> list[Path]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Normalize translate raw payloads into paper records.")
+    parser = argparse.ArgumentParser(description="Assemble paper records from raw translate payloads and meta artifacts.")
     parser.add_argument("--raw-dir", required=True, help="Directory containing raw JSON payloads.")
+    parser.add_argument("--meta-dir", required=True, help="Directory containing per-paper meta artifacts.")
     parser.add_argument("--papers-dir", required=True, help="Directory to write normalized paper JSON files.")
+    parser.add_argument(
+        "--extractor-config",
+        default=str(DEFAULT_EXTRACTOR_CONFIG),
+        help="Path to extractor-config.json.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     raw_dir = Path(args.raw_dir)
+    meta_dir = Path(args.meta_dir)
     papers_dir = Path(args.papers_dir)
-    papers_dir.mkdir(parents=True, exist_ok=True)
+    extractor_version = read_extractor_version(Path(args.extractor_config))
 
+    papers_dir.mkdir(parents=True, exist_ok=True)
     written = 0
     for raw_path in iter_raw_files(raw_dir):
         raw_payload = read_json(raw_path, {})
         raw_paper_id = normalize_text(str(raw_payload.get("paper_id") or ""))
-        existing_record = read_json(papers_dir / f"{raw_paper_id}.json", {}) if raw_paper_id else None
-        record = normalize_raw_file(raw_path, existing_record=existing_record)
+        if not raw_paper_id:
+            continue
+        existing_record = read_json(papers_dir / f"{raw_paper_id}.json", {})
+        record = normalize_raw_file(
+            raw_path,
+            meta_path=meta_dir / f"{raw_paper_id}.json",
+            extractor_version=extractor_version,
+            existing_record=existing_record,
+        )
         paper_id = normalize_text(str(record.get("paper_id") or raw_paper_id))
         if not paper_id:
             continue
         write_json(papers_dir / f"{paper_id}.json", record)
         written += 1
 
-    print(f"Normalized {written} papers from {raw_dir} into {papers_dir}")
+    print(f"Assembled {written} papers from {raw_dir} using meta artifacts from {meta_dir} into {papers_dir}")
     return 0
 
 

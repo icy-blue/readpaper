@@ -62,7 +62,8 @@ const CLAIM_TYPE_LABELS: Record<string, string> = {
 const DISPLAY_TEXT_PREFIX_RE = /^(#+\s*|\d+(?:\.\d+)*[.)]?\s+)/;
 
 const REBUILD_COMMANDS = [
-  "python3 scripts/normalize_papers.py --raw-dir outputs/raw --papers-dir outputs/papers",
+  "使用 repo 内置 extract-paper-meta skill 为目标论文刷新 outputs/meta/<paper-id>.json",
+  "python3 scripts/normalize_papers.py --raw-dir outputs/raw --meta-dir outputs/meta --papers-dir outputs/papers",
   "python3 scripts/backfill_paper_neighbors.py --papers-dir outputs/papers",
   "python3 scripts/render_markdown_site.py --papers-dir outputs/papers --site-dir outputs/site",
   "npm run build:web",

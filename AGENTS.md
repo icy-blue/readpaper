@@ -6,13 +6,14 @@ This repository builds a local research knowledge forest from papers on `transla
 
 - Treat `translate.icydev.cn` as a read-only source.
 - Keep `outputs/papers/` as the local normalized knowledge base.
-- Treat `outputs/papers/`, `outputs/raw/`, `outputs/fetch/`, and `outputs/site/` as generated artifacts that can be rebuilt locally.
+- Treat `outputs/meta/`, `outputs/papers/`, `outputs/raw/`, `outputs/fetch/`, and `outputs/site/` as generated artifacts that can be rebuilt locally.
 - Default to Chinese for human-facing summaries and labels, but keep paper titles, venue names, method names, dataset names, and URLs in their original form.
 
 ## Repository Map
 
 - `scripts/`: stdlib-only Python entrypoints for fetch, registry rebuild, neighbor backfill, and site rendering.
 - `references/`: schema and rendering contracts. Read these before changing record structure or output shape.
+- `outputs/meta/`: per-paper agent-native meta artifacts used before final paper assembly.
 - `outputs/papers/`: normalized per-paper JSON records kept for local analysis and site generation.
 - `outputs/raw/`: raw staged payloads fetched from the translate service.
 - `outputs/fetch/`: fetch manifests such as `latest-fetch.json`.
@@ -45,12 +46,16 @@ python3 scripts/fetch_translate_papers.py \
 
 - `references/paper-schema.md`
 - `references/analysis-rubric.md`
+- `references/meta-contract.md`
+
+Before running the assembler, ensure the current `extractor-config.json` version has already been used to write `outputs/meta/<paper-id>.json` for each target paper via the repo-local `extract-paper-meta` skill.
 
 Preferred command:
 
 ```bash
 python3 scripts/normalize_papers.py \
   --raw-dir outputs/raw \
+  --meta-dir outputs/meta \
   --papers-dir outputs/papers
 ```
 
@@ -88,7 +93,7 @@ python3 scripts/render_html_dashboard.py \
 ## Commit Guidance
 
 - Usually commit: `scripts/`, `references/`, `agents/`, `SKILL.md`, `AGENTS.md`.
-- Usually do not commit: `outputs/papers/`, `outputs/raw/`, `outputs/fetch/`, `outputs/site/`, `state/paper_registry.json`, caches, editor files, or virtualenvs.
+- Usually do not commit: `outputs/meta/`, `outputs/papers/`, `outputs/raw/`, `outputs/fetch/`, `outputs/site/`, `state/paper_registry.json`, caches, editor files, or virtualenvs.
 - If you change the normalized paper schema or rendering contract, update the relevant file in `references/` in the same change.
 
 ## Verification

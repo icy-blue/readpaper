@@ -27,6 +27,7 @@ web/dist/
 
 # Local pipeline artifacts
 outputs/fetch/
+outputs/meta/
 outputs/papers/*.json
 outputs/raw/
 outputs/site/

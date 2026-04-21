@@ -1,0 +1,4 @@
+interface:
+  display_name: "Extract Paper Meta"
+  short_description: "Agent-native single-paper meta extraction for translate-paper-forest"
+  default_prompt: "Use $extract-paper-meta to extract one paper meta artifact from a translate raw payload."

@@ -17,8 +17,9 @@ Read these references before writing or updating paper records:
 
 1. [references/paper-schema.md](references/paper-schema.md)
 2. [references/analysis-rubric.md](references/analysis-rubric.md)
-3. [references/forest-schema.md](references/forest-schema.md)
-4. [references/output-template.md](references/output-template.md)
+3. [references/meta-contract.md](references/meta-contract.md)
+4. [references/forest-schema.md](references/forest-schema.md)
+5. [references/output-template.md](references/output-template.md)
 
 Use these scripts directly instead of inventing ad hoc workflows:
 
@@ -29,9 +30,14 @@ Use these scripts directly instead of inventing ad hoc workflows:
 - [scripts/render_markdown_site.py](scripts/render_markdown_site.py)
 - [scripts/render_html_dashboard.py](scripts/render_html_dashboard.py)
 
+Use this repo-local skill for single-paper agent-native extraction:
+
+- [skills/extract-paper-meta/SKILL.md](skills/extract-paper-meta/SKILL.md)
+
 Registry and outputs live here:
 
 - [state/paper_registry.json](state/paper_registry.json)
+- `outputs/meta/`
 - `outputs/fetch/`
 - `outputs/raw/`
 - `outputs/papers/`
@@ -64,27 +70,42 @@ If `new_paper_count` is `0`, do not fabricate work. Rebuild the site from existi
 
 For each new paper, read the corresponding raw JSON file in `outputs/raw/`.
 
-### 3. Normalize raw payloads into paper records
+### 3. Extract per-paper meta artifacts
+
+For each target raw payload, call the repo-local `extract-paper-meta` skill.
+
+The skill must:
+
+- read `extractor-config.json`
+- write `outputs/meta/<paper-id>.json`
+- keep `extractor_version` in the artifact aligned with the config
+- follow [references/meta-contract.md](references/meta-contract.md) exactly
+
+If a meta artifact already exists and its `extractor_version` matches `extractor-config.json`, skip re-extraction.
+
+### 4. Normalize raw payloads into paper records
 
 Run:
 
 ```bash
 python scripts/normalize_papers.py \
   --raw-dir outputs/raw \
+  --meta-dir outputs/meta \
   --papers-dir outputs/papers
 ```
 
-This is the only supported paper-record generation entrypoint.
+This is the only supported paper-record assembly entrypoint.
 
 Important rules:
 
 - Follow [references/paper-schema.md](references/paper-schema.md) exactly.
+- Read meta artifacts from `outputs/meta/`; do not re-derive semantic fields inside the assembler.
 - Prefer `translate.icydev.cn` for translated content, section state, and `links.pdf`.
 - Use Semantic Scholar as the preferred enrichment source for `authors`, `abstract_raw`, and `citation_count`.
 - Do not override `conversation.pdf_url` with an external PDF.
 - Leave `topics`, `paper_relations`, and `editor_note` empty unless there is grounded signal.
 
-### 4. Update the dedupe registry
+### 5. Update the dedupe registry
 
 After writing or updating paper records, run:
 
@@ -96,7 +117,7 @@ python scripts/build_registry.py \
 
 This registry is the persistent memory that prevents repeated AI extraction for already-processed papers.
 
-### 5. Backfill per-paper comparison context and neighbors
+### 6. Backfill per-paper comparison context and neighbors
 
 Run:
 
@@ -111,7 +132,7 @@ This upgrades existing paper JSON records to the current schema:
 - add `comparison_context`
 - add `paper_neighbors`
 
-### 6. Rebuild the reading site
+### 7. Rebuild the reading site
 
 Run:
 
@@ -137,7 +158,7 @@ The main reading flow should expose:
 
 Compatibility placeholders may still be written for the old global view pages, but they are no longer first-class outputs.
 
-### 7. Render the static HTML dashboard
+### 8. Render the static HTML dashboard
 
 Run:
 
