@@ -56,7 +56,14 @@ export default function App() {
           </div>
         ) : null}
 
-        {error ? <Alert type="error" message="站点加载失败" description={error} showIcon /> : null}
+        {error ? (
+          <Alert
+            type="error"
+            message="站点加载失败"
+            description={<span style={{ whiteSpace: "pre-wrap" }}>{error}</span>}
+            showIcon
+          />
+        ) : null}
 
         {payload ? (
           <Routes>

@@ -179,6 +179,39 @@ class NormalizePapersTests(unittest.TestCase):
         self.assertIsNone(record["links"]["pdf"])
         self.assertEqual(record["authors"], [])
 
+    def test_normalize_preserves_existing_enrichment_when_fetch_fails(self) -> None:
+        def failing_fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
+            raise URLError("network down")
+
+        existing_record = {
+            "authors": ["Author A", "Author B"],
+            "abstract_raw": "Existing abstract",
+            "citation_count": 12,
+            "links": {
+                "pdf": "https://translate.local/paper.pdf",
+                "doi": "10.1000/demo",
+                "arxiv": "2401.00001",
+                "project": "https://project.local/demo",
+                "code": "https://github.com/demo/repo",
+                "data": "https://huggingface.co/datasets/demo",
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            raw_path = Path(tempdir) / "demo.json"
+            raw_path.write_text(json.dumps(raw_payload(pdf_url=None), ensure_ascii=False), encoding="utf-8")
+
+            record = normalize_raw_file(raw_path, fetcher=failing_fetch, existing_record=existing_record)
+
+        self.assertEqual(record["authors"], ["Author A", "Author B"])
+        self.assertEqual(record["abstract_raw"], "Existing abstract")
+        self.assertEqual(record["citation_count"], 12)
+        self.assertEqual(record["links"]["doi"], "10.1000/demo")
+        self.assertEqual(record["links"]["arxiv"], "2401.00001")
+        self.assertEqual(record["links"]["project"], "https://project.local/demo")
+        self.assertEqual(record["links"]["code"], "https://github.com/demo/repo")
+        self.assertEqual(record["links"]["data"], "https://huggingface.co/datasets/demo")
+
 
 if __name__ == "__main__":
     unittest.main()

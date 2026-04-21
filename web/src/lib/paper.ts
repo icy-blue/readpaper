@@ -8,13 +8,416 @@ import type {
   SitePayload,
 } from "../types";
 
+type JsonRecord = Record<string, unknown>;
+
+const REBUILD_COMMANDS = [
+  "python3 scripts/normalize_papers.py --raw-dir outputs/raw --papers-dir outputs/papers",
+  "python3 scripts/backfill_paper_neighbors.py --papers-dir outputs/papers",
+  "python3 scripts/render_markdown_site.py --papers-dir outputs/papers --site-dir outputs/site",
+  "npm run build:web",
+  "python3 scripts/render_html_dashboard.py --neighbors-json outputs/site/paper-neighbors.json --output outputs/site/index.html",
+];
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function expectRecord(issues: string[], path: string, value: unknown): JsonRecord | null {
+  if (!isRecord(value)) {
+    issues.push(`${path} 必须是对象`);
+    return null;
+  }
+  return value;
+}
+
+function expectString(issues: string[], path: string, value: unknown): void {
+  if (typeof value !== "string") {
+    issues.push(`${path} 必须是字符串`);
+  }
+}
+
+function expectBoolean(issues: string[], path: string, value: unknown): void {
+  if (typeof value !== "boolean") {
+    issues.push(`${path} 必须是布尔值`);
+  }
+}
+
+function expectOptionalString(issues: string[], path: string, value: unknown): void {
+  if (value !== null && value !== undefined && typeof value !== "string") {
+    issues.push(`${path} 必须是字符串或 null`);
+  }
+}
+
+function expectOptionalNumber(issues: string[], path: string, value: unknown): void {
+  if (value !== null && value !== undefined && typeof value !== "number") {
+    issues.push(`${path} 必须是数字或 null`);
+  }
+}
+
+function expectNumberOrStringOrNull(issues: string[], path: string, value: unknown): void {
+  if (value !== null && value !== undefined && typeof value !== "number" && typeof value !== "string") {
+    issues.push(`${path} 必须是数字、字符串或 null`);
+  }
+}
+
+function expectStringArray(issues: string[], path: string, value: unknown): void {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    issues.push(`${path} 必须是字符串数组`);
+  }
+}
+
+function expectObjectArray(issues: string[], path: string, value: unknown): JsonRecord[] | null {
+  if (!Array.isArray(value) || value.some((item) => !isRecord(item))) {
+    issues.push(`${path} 必须是对象数组`);
+    return null;
+  }
+  return value;
+}
+
+function validateFilterItems(issues: string[], path: string, value: unknown): void {
+  const items = expectObjectArray(issues, path, value);
+  items?.forEach((item, index) => {
+    expectString(issues, `${path}[${index}].label`, item.label);
+    expectOptionalNumber(issues, `${path}[${index}].count`, item.count);
+    expectStringArray(issues, `${path}[${index}].paper_ids`, item.paper_ids);
+  });
+}
+
+function validateLinkSet(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  (["pdf", "doi", "arxiv", "project", "code", "data"] as Array<keyof LinkSet>).forEach((key) => {
+    expectOptionalString(issues, `${path}.${key}`, record[key]);
+  });
+}
+
+function validateTranslateStatus(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectOptionalString(issues, `${path}.state`, record.state);
+  expectOptionalNumber(issues, `${path}.completed_unit_count`, record.completed_unit_count);
+  expectOptionalNumber(issues, `${path}.total_unit_count`, record.total_unit_count);
+  expectBoolean(issues, `${path}.is_partial`, record.is_partial);
+  expectOptionalString(issues, `${path}.active_scope`, record.active_scope);
+  expectStringArray(issues, `${path}.coverage_notes`, record.coverage_notes);
+}
+
+function validateSummaryBlock(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectString(issues, `${path}.one_liner`, record.one_liner);
+  expectOptionalString(issues, `${path}.abstract_summary`, record.abstract_summary);
+  expectBoolean(issues, `${path}.worth_long_term_graph`, record.worth_long_term_graph);
+
+  const researchValue = expectRecord(issues, `${path}.research_value`, record.research_value);
+  if (!researchValue) {
+    return;
+  }
+  expectOptionalString(issues, `${path}.research_value.summary`, researchValue.summary);
+  expectStringArray(issues, `${path}.research_value.points`, researchValue.points);
+}
+
+function validateStoryline(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectOptionalString(issues, `${path}.problem`, record.problem);
+  expectOptionalString(issues, `${path}.method`, record.method);
+  expectOptionalString(issues, `${path}.outcome`, record.outcome);
+}
+
+function validateResearchProblem(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectOptionalString(issues, `${path}.summary`, record.summary);
+  expectStringArray(issues, `${path}.gaps`, record.gaps);
+  expectOptionalString(issues, `${path}.goal`, record.goal);
+}
+
+function validateClaimItems(issues: string[], path: string, value: unknown): void {
+  const items = expectObjectArray(issues, path, value);
+  items?.forEach((item, index) => {
+    expectString(issues, `${path}[${index}].claim`, item.claim);
+    expectOptionalString(issues, `${path}[${index}].type`, item.type);
+    expectStringArray(issues, `${path}[${index}].support`, item.support);
+    expectOptionalString(issues, `${path}[${index}].confidence`, item.confidence);
+  });
+}
+
+function validateMethodCore(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectOptionalString(issues, `${path}.approach_summary`, record.approach_summary);
+  expectStringArray(issues, `${path}.pipeline_steps`, record.pipeline_steps);
+  expectStringArray(issues, `${path}.innovations`, record.innovations);
+  expectStringArray(issues, `${path}.ingredients`, record.ingredients);
+  expectStringArray(issues, `${path}.representation`, record.representation);
+  expectStringArray(issues, `${path}.supervision`, record.supervision);
+  expectStringArray(issues, `${path}.differences`, record.differences);
+}
+
+function validateInputsOutputs(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectStringArray(issues, `${path}.inputs`, record.inputs);
+  expectStringArray(issues, `${path}.outputs`, record.outputs);
+  expectStringArray(issues, `${path}.modalities`, record.modalities);
+}
+
+function validateBenchmarks(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectStringArray(issues, `${path}.datasets`, record.datasets);
+  expectStringArray(issues, `${path}.metrics`, record.metrics);
+  expectStringArray(issues, `${path}.baselines`, record.baselines);
+  expectStringArray(issues, `${path}.findings`, record.findings);
+  expectStringArray(issues, `${path}.best_results`, record.best_results);
+  expectOptionalString(issues, `${path}.experiment_setup_summary`, record.experiment_setup_summary);
+}
+
+function validateResearchTags(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectStringArray(issues, `${path}.themes`, record.themes);
+  expectStringArray(issues, `${path}.tasks`, record.tasks);
+  expectStringArray(issues, `${path}.methods`, record.methods);
+  expectStringArray(issues, `${path}.modalities`, record.modalities);
+  expectStringArray(issues, `${path}.representations`, record.representations);
+}
+
+function validateRetrievalProfile(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectStringArray(issues, `${path}.problem_spaces`, record.problem_spaces);
+  expectStringArray(issues, `${path}.task_axes`, record.task_axes);
+  expectStringArray(issues, `${path}.approach_axes`, record.approach_axes);
+  expectStringArray(issues, `${path}.input_axes`, record.input_axes);
+  expectStringArray(issues, `${path}.output_axes`, record.output_axes);
+  expectStringArray(issues, `${path}.modality_axes`, record.modality_axes);
+  expectStringArray(issues, `${path}.comparison_axes`, record.comparison_axes);
+}
+
+function validateComparisonContext(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectStringArray(issues, `${path}.explicit_baselines`, record.explicit_baselines);
+  expectStringArray(issues, `${path}.contrast_methods`, record.contrast_methods);
+  expectOptionalString(issues, `${path}.recommended_next_read`, record.recommended_next_read);
+
+  const aspects = expectObjectArray(issues, `${path}.comparison_aspects`, record.comparison_aspects);
+  aspects?.forEach((item, index) => {
+    expectString(issues, `${path}.comparison_aspects[${index}].aspect`, item.aspect);
+    expectString(issues, `${path}.comparison_aspects[${index}].difference`, item.difference);
+  });
+}
+
+function validateNeighborGroups(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  (["task", "method", "comparison"] as Array<keyof PaperRecord["paper_neighbors"]>).forEach((key) => {
+    const items = expectObjectArray(issues, `${path}.${key}`, record[key]);
+    items?.forEach((item, index) => {
+      expectString(issues, `${path}.${key}[${index}].paper_id`, item.paper_id);
+      expectString(issues, `${path}.${key}[${index}].title`, item.title);
+      expectOptionalNumber(issues, `${path}.${key}[${index}].score`, item.score);
+      expectOptionalString(issues, `${path}.${key}[${index}].score_level`, item.score_level);
+      expectOptionalString(issues, `${path}.${key}[${index}].match_source`, item.match_source);
+      expectOptionalString(issues, `${path}.${key}[${index}].reason`, item.reason);
+      expectOptionalString(issues, `${path}.${key}[${index}].reason_short`, item.reason_short);
+      expectOptionalString(issues, `${path}.${key}[${index}].paper_path`, item.paper_path);
+      expectOptionalString(issues, `${path}.${key}[${index}].route_path`, item.route_path);
+      expectRecord(issues, `${path}.${key}[${index}].shared_signals`, item.shared_signals);
+    });
+  });
+}
+
+function validateFigureTableIndex(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+
+  (["figures", "tables"] as const).forEach((key) => {
+    const items = expectObjectArray(issues, `${path}.${key}`, record[key]);
+    items?.forEach((item, index) => {
+      expectString(issues, `${path}.${key}[${index}].label`, item.label);
+      expectString(issues, `${path}.${key}[${index}].caption`, item.caption);
+      expectString(issues, `${path}.${key}[${index}].role`, item.role);
+      expectOptionalString(issues, `${path}.${key}[${index}].importance`, item.importance);
+    });
+  });
+}
+
+function validateEditorNote(issues: string[], path: string, value: unknown): void {
+  if (value === null || value === undefined) {
+    return;
+  }
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectOptionalString(issues, `${path}.summary`, record.summary);
+  expectStringArray(issues, `${path}.points`, record.points);
+}
+
+function validateTopics(issues: string[], path: string, value: unknown): void {
+  const items = expectObjectArray(issues, path, value);
+  items?.forEach((item, index) => {
+    expectString(issues, `${path}[${index}].slug`, item.slug);
+    expectString(issues, `${path}[${index}].name`, item.name);
+    expectString(issues, `${path}[${index}].role`, item.role);
+  });
+}
+
+function validatePaperRelations(issues: string[], path: string, value: unknown): void {
+  const items = expectObjectArray(issues, path, value);
+  items?.forEach((item, index) => {
+    expectString(issues, `${path}[${index}].target_paper_id`, item.target_paper_id);
+    expectString(issues, `${path}[${index}].relation_type`, item.relation_type);
+    expectString(issues, `${path}[${index}].description`, item.description);
+    expectOptionalNumber(issues, `${path}[${index}].confidence`, item.confidence);
+  });
+}
+
+function validatePaperRecord(issues: string[], path: string, value: unknown): void {
+  const record = expectRecord(issues, path, value);
+  if (!record) {
+    return;
+  }
+  expectString(issues, `${path}.paper_id`, record.paper_id);
+  expectStringArray(issues, `${path}.source_conversation_ids`, record.source_conversation_ids);
+  expectString(issues, `${path}.title`, record.title);
+  expectStringArray(issues, `${path}.authors`, record.authors);
+  expectNumberOrStringOrNull(issues, `${path}.year`, record.year);
+  expectString(issues, `${path}.venue`, record.venue);
+  expectOptionalNumber(issues, `${path}.citation_count`, record.citation_count);
+  expectString(issues, `${path}.translate_created_at`, record.translate_created_at);
+  expectString(issues, `${path}.paper_path`, record.paper_path);
+  expectString(issues, `${path}.route_path`, record.route_path);
+  expectOptionalString(issues, `${path}.abstract_raw`, record.abstract_raw);
+  expectOptionalString(issues, `${path}.abstract_zh`, record.abstract_zh);
+  expectOptionalString(issues, `${path}.author_conclusion`, record.author_conclusion);
+
+  validateLinkSet(issues, `${path}.links`, record.links);
+  validateTranslateStatus(issues, `${path}.translate_status`, record.translate_status);
+  validateSummaryBlock(issues, `${path}.summary`, record.summary);
+  validateStoryline(issues, `${path}.storyline`, record.storyline);
+  validateResearchProblem(issues, `${path}.research_problem`, record.research_problem);
+  expectStringArray(issues, `${path}.core_contributions`, record.core_contributions);
+  validateClaimItems(issues, `${path}.key_claims`, record.key_claims);
+  validateMethodCore(issues, `${path}.method_core`, record.method_core);
+  validateInputsOutputs(issues, `${path}.inputs_outputs`, record.inputs_outputs);
+  validateBenchmarks(issues, `${path}.benchmarks_or_eval`, record.benchmarks_or_eval);
+  validateEditorNote(issues, `${path}.editor_note`, record.editor_note);
+  expectStringArray(issues, `${path}.limitations`, record.limitations);
+  expectStringArray(issues, `${path}.novelty_type`, record.novelty_type);
+  validateResearchTags(issues, `${path}.research_tags`, record.research_tags);
+  validateTopics(issues, `${path}.topics`, record.topics);
+  validateRetrievalProfile(issues, `${path}.retrieval_profile`, record.retrieval_profile);
+  validateComparisonContext(issues, `${path}.comparison_context`, record.comparison_context);
+  validateNeighborGroups(issues, `${path}.paper_neighbors`, record.paper_neighbors);
+  validatePaperRelations(issues, `${path}.paper_relations`, record.paper_relations);
+  validateFigureTableIndex(issues, `${path}.figure_table_index`, record.figure_table_index);
+}
+
+function validationError(issues: string[]): Error {
+  const visibleIssues = issues.slice(0, 8).map((issue) => `- ${issue}`);
+  if (issues.length > visibleIssues.length) {
+    visibleIssues.push(`- 另有 ${issues.length - visibleIssues.length} 处结构错误`);
+  }
+  return new Error(
+    [
+      "检测到站点数据不是当前前端要求的新 schema，已停止渲染。",
+      "",
+      "请重新执行以下流程后刷新页面：",
+      ...REBUILD_COMMANDS.map((command) => `  ${command}`),
+      "",
+      "首批校验失败项：",
+      ...visibleIssues,
+    ].join("\n"),
+  );
+}
+
+export function validatePayload(payload: unknown): SitePayload {
+  const issues: string[] = [];
+  const record = expectRecord(issues, "payload", payload);
+  if (!record) {
+    throw validationError(issues);
+  }
+
+  expectString(issues, "payload.generated_at", record.generated_at);
+  expectOptionalNumber(issues, "payload.paper_count", record.paper_count);
+  expectStringArray(issues, "payload.recent_titles", record.recent_titles);
+
+  const siteMeta = expectRecord(issues, "payload.site_meta", record.site_meta);
+  if (siteMeta) {
+    expectString(issues, "payload.site_meta.title", siteMeta.title);
+    expectString(issues, "payload.site_meta.generated_at", siteMeta.generated_at);
+    expectOptionalNumber(issues, "payload.site_meta.paper_count", siteMeta.paper_count);
+  }
+
+  const navigation = expectRecord(issues, "payload.navigation", record.navigation);
+  if (navigation) {
+    expectString(issues, "payload.navigation.home_route", navigation.home_route);
+    expectString(issues, "payload.navigation.detail_route_template", navigation.detail_route_template);
+    const neighborTabs = expectObjectArray(issues, "payload.navigation.neighbor_tabs", navigation.neighbor_tabs);
+    neighborTabs?.forEach((item, index) => {
+      expectString(issues, `payload.navigation.neighbor_tabs[${index}].key`, item.key);
+      expectString(issues, `payload.navigation.neighbor_tabs[${index}].label`, item.label);
+    });
+    const filterGroups = expectObjectArray(issues, "payload.navigation.filter_groups", navigation.filter_groups);
+    filterGroups?.forEach((item, index) => {
+      expectString(issues, `payload.navigation.filter_groups[${index}].key`, item.key);
+      expectString(issues, `payload.navigation.filter_groups[${index}].label`, item.label);
+    });
+  }
+
+  const filters = expectRecord(issues, "payload.filters", record.filters);
+  if (filters) {
+    validateFilterItems(issues, "payload.filters.themes", filters.themes);
+    validateFilterItems(issues, "payload.filters.tasks", filters.tasks);
+    validateFilterItems(issues, "payload.filters.methods", filters.methods);
+  }
+
+  const papers = expectObjectArray(issues, "payload.papers", record.papers);
+  papers?.forEach((paper, index) => validatePaperRecord(issues, `payload.papers[${index}]`, paper));
+
+  if (issues.length) {
+    throw validationError(issues);
+  }
+  return payload as SitePayload;
+}
+
 export function inlinePayload(): SitePayload | null {
   const node = document.getElementById("paper-neighbors-data");
   const text = node?.textContent?.trim();
   if (!text || text === "__PAPER_NEIGHBORS_DATA__") {
     return null;
   }
-  return JSON.parse(text) as SitePayload;
+  return validatePayload(JSON.parse(text));
 }
 
 export async function loadPayload(): Promise<SitePayload> {
@@ -26,7 +429,7 @@ export async function loadPayload(): Promise<SitePayload> {
   if (!response.ok) {
     throw new Error(`读取 paper-neighbors.json 失败: ${response.status}`);
   }
-  return (await response.json()) as SitePayload;
+  return validatePayload(await response.json());
 }
 
 export function paperRoute(routePath: string | undefined, paperId: string): string {

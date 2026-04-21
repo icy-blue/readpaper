@@ -1141,10 +1141,41 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
     }
 
 
+def merge_existing_enrichment(record: dict[str, Any], existing_record: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(existing_record, dict):
+        return record
+
+    merged = dict(record)
+
+    existing_authors = ensure_strings(existing_record.get("authors"))
+    if not ensure_strings(merged.get("authors")) and existing_authors:
+        merged["authors"] = existing_authors
+
+    existing_abstract_raw = normalize_text(str(existing_record.get("abstract_raw") or ""))
+    if not merged.get("abstract_raw") and existing_abstract_raw:
+        merged["abstract_raw"] = existing_abstract_raw
+
+    existing_citation_count = existing_record.get("citation_count")
+    if merged.get("citation_count") is None and isinstance(existing_citation_count, int):
+        merged["citation_count"] = existing_citation_count
+
+    existing_links = existing_record.get("links")
+    current_links = merged.get("links")
+    if isinstance(existing_links, dict) and isinstance(current_links, dict):
+        merged_links = dict(current_links)
+        for key in ("doi", "arxiv", "project", "code", "data"):
+            if not merged_links.get(key) and isinstance(existing_links.get(key), str) and str(existing_links.get(key)).strip():
+                merged_links[key] = str(existing_links.get(key)).strip()
+        merged["links"] = merged_links
+
+    return merged
+
+
 def normalize_raw_file(
     raw_path: Path,
     *,
     fetcher: Any = fetch_json,
+    existing_record: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     raw_payload = read_json(raw_path, {})
     if not isinstance(raw_payload, dict):
@@ -1160,7 +1191,7 @@ def normalize_raw_file(
         semantic_paper = semantic_scholar_title_match(title, year if isinstance(year, int) else None, fetcher=fetcher)
     except Exception:
         semantic_paper = None
-    return normalize_record(raw_payload, semantic_paper)
+    return merge_existing_enrichment(normalize_record(raw_payload, semantic_paper), existing_record)
 
 
 def iter_raw_files(raw_dir: Path) -> list[Path]:
@@ -1184,8 +1215,11 @@ def main() -> int:
 
     written = 0
     for raw_path in iter_raw_files(raw_dir):
-        record = normalize_raw_file(raw_path)
-        paper_id = normalize_text(str(record.get("paper_id") or ""))
+        raw_payload = read_json(raw_path, {})
+        raw_paper_id = normalize_text(str(raw_payload.get("paper_id") or ""))
+        existing_record = read_json(papers_dir / f"{raw_paper_id}.json", {}) if raw_paper_id else None
+        record = normalize_raw_file(raw_path, existing_record=existing_record)
+        paper_id = normalize_text(str(record.get("paper_id") or raw_paper_id))
         if not paper_id:
             continue
         write_json(papers_dir / f"{paper_id}.json", record)
