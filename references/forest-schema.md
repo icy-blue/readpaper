@@ -46,7 +46,13 @@ The primary derived payload is built from normalized paper JSON records and powe
       "comparison_context": {
         "explicit_baselines": ["baseline a"],
         "contrast_methods": ["method phrase a"],
-        "contrast_notes": ["与 baseline 的关键差异"]
+        "comparison_aspects": [
+          {
+            "aspect": "canonical space",
+            "difference": "显式建模 canonical space 以提升跨姿态一致性"
+          }
+        ],
+        "recommended_next_read": "Find3D"
       },
       "paper_neighbors": {
         "task": [],
@@ -80,6 +86,7 @@ The primary derived payload is built from normalized paper JSON records and powe
 - `fallback contrast` should only fire when the two papers have clearly different `approach_axes`
 - Keep at most 3 neighbors per dimension
 - Allow the same paper to appear in multiple dimensions when the signals justify it
+- Each neighbor should retain `reason` for verbose display, plus `reason_short` and `score_level` for compact cards
 
 ## HTML site outputs
 

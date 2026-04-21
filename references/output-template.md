@@ -31,6 +31,7 @@ Each `papers/<paper-id>.md` should include:
 - title and metadata
 - links block
 - one-line conclusion
+- storyline strip
 - English / Chinese abstract when available
 - research problem
 - core contributions
@@ -74,9 +75,10 @@ Generate a React single-page site from structured data and publish the build art
 The site should include:
 
 - summary cards
+- storyline strip
 - SPA local navigation
 - search and filter controls
 - links between SPA detail routes and Markdown counterparts
 - single-paper detail routes with reading-focused layout
 - author / link metadata
-- abstract, problem, contribution, evaluation, relation, and neighbor sections
+- abstract, problem, contribution, comparison, evaluation, figure index, and neighbor sections

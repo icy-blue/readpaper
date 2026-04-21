@@ -619,48 +619,160 @@ def infer_inputs_outputs(title: str, tasks: list[str], modalities: list[str], re
     return unique(inputs), unique(outputs), unique(derived_modalities)
 
 
-def extract_bullet_like_sentences(texts: list[str], limit: int, *, support: str) -> list[dict[str, Any]]:
-    candidates: list[str] = []
+def strip_inline_urls(text: str) -> str:
+    return normalize_text(URL_PATTERN.sub("", text or "")).strip()
+
+
+def shorten_text(text: str | None, max_chars: int) -> str | None:
+    if not text:
+        return None
+    cleaned = strip_inline_urls(text)
+    if not cleaned:
+        return None
+    if len(cleaned) <= max_chars:
+        return cleaned
+    return cleaned[: max_chars - 1].rstrip("，,；;：: ") + "…"
+
+
+def collect_sentences(
+    texts: list[str],
+    *,
+    keywords: tuple[str, ...] = (),
+    max_items: int = 4,
+    max_chars: int | None = None,
+) -> list[str]:
+    values: list[str] = []
     for text in texts:
         for sentence in split_sentences(text):
-            if any(token in sentence for token in ("我们提出", "本文提出", "我们展示", "结果表明", "实验表明", "显著优于", "达到")):
-                candidates.append(sentence)
-    if not candidates:
-        for text in texts:
-            candidates.extend(split_sentences(text)[:2])
+            cleaned = strip_inline_urls(sentence)
+            if not cleaned:
+                continue
+            if keywords and not any(token in cleaned for token in keywords):
+                continue
+            if max_chars is not None:
+                shortened = shorten_text(cleaned, max_chars)
+                if not shortened:
+                    continue
+                cleaned = shortened
+            if cleaned not in values:
+                values.append(cleaned)
+            if len(values) >= max_items:
+                return values
+    return values
 
-    claims: list[dict[str, Any]] = []
-    for sentence in unique(candidates):
-        claims.append({"claim": sentence, "support": [support], "confidence": "medium"})
-        if len(claims) >= limit:
-            break
-    return claims
+
+def pick_sentence(
+    texts: list[str],
+    *,
+    keywords: tuple[str, ...] = (),
+    fallback: bool = True,
+    max_chars: int = 120,
+) -> str | None:
+    matches = collect_sentences(texts, keywords=keywords, max_items=1, max_chars=max_chars)
+    if matches:
+        return matches[0]
+    if not fallback:
+        return None
+    fallback_matches = collect_sentences(texts, max_items=1, max_chars=max_chars)
+    return fallback_matches[0] if fallback_matches else None
+
+
+def classify_claim_type(text: str) -> str:
+    lowered = text.lower()
+    if any(token in text for token in ("局限", "限制", "future work", "仍然存在")):
+        return "limitation"
+    if any(token in lowered for token in ("ablation", "experiment", "benchmark", "miou", "iou")) or any(
+        token in text for token in ("实验", "结果", "优于", "提升", "达到", "显著")
+    ):
+        return "experiment"
+    if any(token in lowered for token in ("can", "generalize", "robust")) or any(
+        token in text for token in ("支持", "能够", "泛化", "鲁棒")
+    ):
+        return "capability"
+    return "method"
+
+
+def extract_bullet_like_sentences(texts: list[str], limit: int, *, support: str) -> list[dict[str, Any]]:
+    candidates = collect_sentences(
+        texts,
+        keywords=("我们提出", "本文提出", "我们展示", "结果表明", "实验表明", "显著优于", "达到", "提升"),
+        max_items=limit,
+        max_chars=110,
+    )
+    if not candidates:
+        candidates = collect_sentences(texts, max_items=limit, max_chars=110)
+
+    return [
+        {
+            "claim": sentence,
+            "type": classify_claim_type(sentence),
+            "support": [support],
+            "confidence": "medium",
+        }
+        for sentence in candidates
+    ]
 
 
 def extract_core_contributions(abstract_zh: str, conclusion: str) -> list[str]:
-    sentences = []
-    for source in (abstract_zh, conclusion):
-        for sentence in split_sentences(source):
-            if any(token in sentence for token in ("我们提出", "本文提出", "我们展示", "我们采用", "结果表明", "实验表明")):
-                sentences.append(sentence)
+    sentences = collect_sentences(
+        [abstract_zh, conclusion],
+        keywords=("我们提出", "本文提出", "我们展示", "我们采用", "结果表明", "实验表明", "设计了", "引入了"),
+        max_items=4,
+        max_chars=100,
+    )
     if not sentences:
-        sentences = split_sentences(abstract_zh)[:3]
-    return unique(sentences)[:4]
+        sentences = collect_sentences([abstract_zh], max_items=3, max_chars=100)
+    return sentences
 
 
-def extract_research_problem(introduction: str, abstract_zh: str) -> str | None:
-    for source in (introduction, abstract_zh):
-        for sentence in split_sentences(source):
-            if any(token in sentence for token in ("目标", "问题", "挑战", "困难", "task", "problem")):
-                return sentence
-    return first_sentence(introduction or abstract_zh)
+def extract_storyline(abstract_zh: str, introduction: str, method_text: str, conclusion: str) -> dict[str, str | None]:
+    problem = pick_sentence(
+        [introduction, abstract_zh],
+        keywords=("问题", "挑战", "困难", "目标", "仍然", "brittle", "problem", "challenge"),
+        max_chars=60,
+    )
+    method = pick_sentence(
+        [method_text, abstract_zh],
+        keywords=("我们提出", "本文提出", "通过", "采用", "设计", "框架", "pipeline"),
+        max_chars=60,
+    )
+    outcome = pick_sentence(
+        [conclusion, abstract_zh],
+        keywords=("优于", "提升", "达到", "显著", "state-of-the-art", "improve"),
+        max_chars=60,
+    )
+    return {"problem": problem, "method": method, "outcome": outcome}
+
+
+def extract_research_problem(introduction: str, abstract_zh: str) -> dict[str, Any]:
+    summary = pick_sentence(
+        [introduction, abstract_zh],
+        keywords=("问题", "挑战", "困难", "task", "problem", "challenge"),
+        max_chars=100,
+    )
+    gaps = collect_sentences(
+        [introduction, abstract_zh],
+        keywords=("现有", "已有", "仍然", "难以", "不足", "缺乏", "brittle", "limited", "challenge"),
+        max_items=4,
+        max_chars=90,
+    )
+    goal = pick_sentence(
+        [introduction, abstract_zh],
+        keywords=("目标", "旨在", "为了解决", "to address", "we propose", "我们提出"),
+        max_chars=100,
+    )
+    return {
+        "summary": summary,
+        "gaps": [item for item in gaps if item != summary][:4],
+        "goal": goal,
+    }
 
 
 def extract_experiment_setup(experiments: str) -> str | None:
     for paragraph in paragraph_blocks(experiments):
         if any(token in paragraph for token in ("dataset", "数据集", "benchmark", "baseline", "实验", "评估")):
-            return paragraph
-    return first_sentence(experiments)
+            return shorten_text(paragraph, 180)
+    return shorten_text(first_sentence(experiments), 180)
 
 
 def extract_author_conclusion(conclusion: str) -> str | None:
@@ -669,15 +781,16 @@ def extract_author_conclusion(conclusion: str) -> str | None:
     sentences = split_sentences(conclusion)
     if not sentences:
         return None
-    return " ".join(sentences[:2])
+    return shorten_text(" ".join(sentences[:2]), 180)
 
 
 def extract_limitations(conclusion: str) -> list[str]:
-    limitations: list[str] = []
-    for sentence in split_sentences(conclusion):
-        if any(token in sentence for token in ("局限", "限制", "未来工作", "仍然", "尚未")):
-            limitations.append(sentence)
-    return unique(limitations)
+    return collect_sentences(
+        [conclusion],
+        keywords=("局限", "限制", "未来工作", "仍然", "尚未", "future work", "limitation"),
+        max_items=4,
+        max_chars=100,
+    )
 
 
 def extract_metrics(text: str) -> list[str]:
@@ -701,12 +814,151 @@ def extract_baselines(text: str) -> list[str]:
 
 
 def extract_findings(abstract_zh: str, conclusion: str) -> list[str]:
-    findings: list[str] = []
-    for source in (abstract_zh, conclusion):
-        for sentence in split_sentences(source):
-            if any(token in sentence for token in ("优于", "显著", "达到", "提升", "improve", "state-of-the-art")):
-                findings.append(sentence)
-    return unique(findings)[:4]
+    findings = collect_sentences(
+        [abstract_zh, conclusion],
+        keywords=("优于", "显著", "达到", "提升", "improve", "state-of-the-art", "outperform"),
+        max_items=4,
+        max_chars=80,
+    )
+    if findings:
+        return findings
+    return collect_sentences([conclusion], max_items=2, max_chars=80)
+
+
+def extract_pipeline_steps(method_text: str, abstract_zh: str) -> list[str]:
+    steps = collect_sentences(
+        paragraph_blocks(method_text),
+        keywords=("首先", "然后", "最后", "通过", "使用", "采用", "encode", "align", "train"),
+        max_items=4,
+        max_chars=90,
+    )
+    if steps:
+        return steps
+    return collect_sentences([method_text, abstract_zh], max_items=4, max_chars=90)
+
+
+def extract_method_core(method_text: str, abstract_zh: str, contributions: list[str], findings: list[str]) -> dict[str, Any]:
+    approach_summary = pick_sentence(
+        [method_text, abstract_zh],
+        keywords=("我们提出", "本文提出", "通过", "采用", "框架", "pipeline", "framework"),
+        max_chars=100,
+    )
+    innovations = collect_sentences(
+        [method_text, abstract_zh, "\n".join(contributions)],
+        keywords=("创新", "新", "提出", "引入", "设计", "canonical", "对齐", "校准"),
+        max_items=4,
+        max_chars=90,
+    )
+    if not innovations:
+        innovations = contributions[:3]
+    differences = collect_sentences(
+        ["\n".join(findings), "\n".join(innovations)],
+        keywords=("优于", "提升", "不同", "区别", "相比", "contrast"),
+        max_items=3,
+        max_chars=90,
+    )
+    return {
+        "approach_summary": approach_summary,
+        "pipeline_steps": extract_pipeline_steps(method_text, abstract_zh),
+        "innovations": innovations[:4],
+        "differences": differences[:3],
+    }
+
+
+def build_research_value(themes: list[str], tasks: list[str], methods: list[str], findings: list[str]) -> dict[str, Any]:
+    theme_label = themes[0] if themes else "相关方向"
+    summary = shorten_text(f"适合作为 {theme_label} 方向的持续阅读入口。", 60)
+    points: list[str] = []
+    if tasks:
+        points.append(f"任务：{' / '.join(tasks[:2])}")
+    if methods:
+        points.append(f"方法：{' / '.join(methods[:2])}")
+    if findings:
+        points.append(findings[0])
+    return {
+        "summary": summary,
+        "points": [item for item in (shorten_text(point, 80) for point in points) if item][:3],
+    }
+
+
+def build_editor_note(themes: list[str], comparison_baselines: list[str], findings: list[str]) -> dict[str, Any] | None:
+    if not themes and not comparison_baselines and not findings:
+        return None
+    points: list[str] = []
+    if findings:
+        points.append(findings[0])
+    if comparison_baselines:
+        points.append(f"可优先与 {comparison_baselines[0]} 对比阅读。")
+    if themes:
+        points.append(f"适合作为 {themes[0]} 方向的代表样本。")
+    summary = points[0] if points else None
+    return {
+        "summary": shorten_text(summary, 120),
+        "points": [item for item in (shorten_text(point, 90) for point in points[1:]) if item][:3],
+    }
+
+
+def extract_comparison_aspects(innovations: list[str], findings: list[str]) -> list[dict[str, str]]:
+    aspects: list[dict[str, str]] = []
+    if innovations:
+        aspects.append(
+            {
+                "aspect": "method",
+                "difference": innovations[0],
+            }
+        )
+    if findings:
+        aspects.append(
+            {
+                "aspect": "result",
+                "difference": findings[0],
+            }
+        )
+    return aspects[:3]
+
+
+def infer_figure_role(label: str, caption: str, *, is_table: bool) -> str:
+    lowered = f"{label} {caption}".lower()
+    if "ablation" in lowered:
+        return "ablation"
+    if "failure" in lowered:
+        return "failure_case"
+    if any(token in lowered for token in ("framework", "overview", "pipeline", "architecture")):
+        return "method_overview"
+    if any(token in lowered for token in ("qualitative", "visual", "comparison")) and not is_table:
+        return "qualitative_result"
+    if is_table or any(token in lowered for token in ("quantitative", "evaluation", "result", "miou", "iou")):
+        return "quantitative_result"
+    return "method_overview" if not is_table and label.endswith("1") else "qualitative_result"
+
+
+def infer_item_importance(label: str, role: str) -> str:
+    if label.endswith("1") or role in {"method_overview", "quantitative_result"}:
+        return "high"
+    if role in {"ablation", "qualitative_result"}:
+        return "medium"
+    return "low"
+
+
+def normalize_figure_table_items(items: list[dict[str, Any]], *, label_key: str, is_table: bool) -> list[dict[str, str]]:
+    normalized: list[dict[str, str]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        label = normalize_text(str(item.get(label_key) or ""))
+        caption = normalize_text(str(item.get("caption") or ""))
+        if not label and not caption:
+            continue
+        role = infer_figure_role(label, caption, is_table=is_table)
+        normalized.append(
+            {
+                "label": label,
+                "caption": caption,
+                "role": role,
+                "importance": infer_item_importance(label, role),
+            }
+        )
+    return normalized
 
 
 def infer_novelty_types(text: str) -> list[str]:
@@ -753,29 +1005,39 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
     inputs, outputs, modalities = infer_inputs_outputs(title, tasks, modalities, representations, combined_text)
     themes = infer_themes(tasks, title)
 
-    summary_one_liner = first_sentence(abstract_zh or "") or first_sentence(conclusion_text or "") or title
     research_problem = extract_research_problem(introduction, abstract_zh or "")
     contributions = extract_core_contributions(abstract_zh or "", conclusion_text)
+    findings = extract_findings(abstract_zh or "", conclusion_text)
+    method_core_summary = extract_method_core(method_text, abstract_zh or "", contributions, findings)
+    storyline = extract_storyline(abstract_zh or "", introduction, method_text, conclusion_text)
+    summary_one_liner = shorten_text(
+        "；".join(
+            [
+                item
+                for item in (
+                    storyline.get("problem"),
+                    storyline.get("method"),
+                    storyline.get("outcome"),
+                )
+                if item
+            ]
+        )
+        or first_sentence(abstract_zh or "")
+        or first_sentence(conclusion_text or "")
+        or title,
+        120,
+    ) or title
     claims = extract_bullet_like_sentences([abstract_zh or "", conclusion_text], 3, support="section:Abstract")
     experiment_setup_summary = extract_experiment_setup(experiments_text)
     author_conclusion = extract_author_conclusion(conclusion_text)
     limitations = extract_limitations(conclusion_text)
-    findings = extract_findings(abstract_zh or "", conclusion_text)
     novelty_type = infer_novelty_types(combined_text)
 
     figures = conversation.get("figures") if isinstance(conversation.get("figures"), list) else []
     tables = conversation.get("tables") if isinstance(conversation.get("tables"), list) else []
     figure_table_index = {
-        "figures": [
-            {"label": normalize_text(str(item.get("figure_label") or "")), "caption": normalize_text(str(item.get("caption") or ""))}
-            for item in figures
-            if isinstance(item, dict)
-        ],
-        "tables": [
-            {"label": normalize_text(str(item.get("table_label") or "")), "caption": normalize_text(str(item.get("caption") or ""))}
-            for item in tables
-            if isinstance(item, dict)
-        ],
+        "figures": normalize_figure_table_items(figures, label_key="figure_label", is_table=False),
+        "tables": normalize_figure_table_items(tables, label_key="table_label", is_table=True),
     }
 
     links = classify_links(extract_urls(conversation), title, abstract_zh or "", semantic_paper)
@@ -800,8 +1062,11 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
     comparison_context = {
         "explicit_baselines": extract_baselines("\n".join([abstract_zh or "", experiments_text])),
         "contrast_methods": [],
-        "contrast_notes": unique((contributions + findings)[:3]),
+        "comparison_aspects": extract_comparison_aspects(method_core_summary["innovations"], findings),
+        "recommended_next_read": None,
     }
+    if comparison_context["explicit_baselines"]:
+        comparison_context["recommended_next_read"] = comparison_context["explicit_baselines"][0]
 
     return {
         "paper_id": paper_id,
@@ -818,20 +1083,22 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
         "abstract_zh": abstract_zh,
         "summary": {
             "one_liner": summary_one_liner,
-            "abstract_summary": abstract_zh,
-            "research_value": f"适合作为 {themes[0]} 方向的检索节点。" if themes else None,
+            "abstract_summary": shorten_text(abstract_zh, 220),
+            "research_value": build_research_value(themes, tasks, methods, findings),
             "worth_long_term_graph": bool(tasks or methods or citation_count),
         },
+        "storyline": storyline,
         "research_problem": research_problem,
         "core_contributions": contributions,
         "key_claims": claims,
         "method_core": {
-            "approach": first_sentence(method_text) or first_sentence(abstract_zh or ""),
-            "innovation": contributions[0] if contributions else None,
+            "approach_summary": method_core_summary["approach_summary"],
+            "pipeline_steps": method_core_summary["pipeline_steps"],
+            "innovations": method_core_summary["innovations"],
             "ingredients": methods,
             "representation": representations,
             "supervision": [],
-            "differences": findings[:2],
+            "differences": method_core_summary["differences"],
         },
         "inputs_outputs": {
             "inputs": inputs,
@@ -843,10 +1110,11 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
             "metrics": extract_metrics("\n".join([experiments_text, *[item["caption"] for item in figure_table_index["tables"] if isinstance(item, dict)]])),
             "baselines": comparison_context["explicit_baselines"],
             "findings": findings,
+            "best_results": findings[:1],
             "experiment_setup_summary": experiment_setup_summary,
         },
         "author_conclusion": author_conclusion,
-        "editor_note": None,
+        "editor_note": build_editor_note(themes, comparison_context["explicit_baselines"], findings),
         "limitations": limitations,
         "novelty_type": novelty_type,
         "research_tags": {

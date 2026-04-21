@@ -47,6 +47,7 @@ export function markdownHref(path: string | undefined): string | undefined {
 }
 
 export function searchableText(paper: PaperRecord): string {
+  const comparisonAspects = paper.comparison_context.comparison_aspects.flatMap((item) => [item.aspect, item.difference]);
   return [
     paper.title,
     ...paper.authors,
@@ -56,16 +57,24 @@ export function searchableText(paper: PaperRecord): string {
     paper.abstract_zh ?? "",
     paper.summary.one_liner,
     paper.summary.abstract_summary ?? "",
-    paper.summary.research_value ?? "",
-    paper.research_problem ?? "",
+    paper.summary.research_value.summary ?? "",
+    ...paper.summary.research_value.points,
+    paper.storyline.problem ?? "",
+    paper.storyline.method ?? "",
+    paper.storyline.outcome ?? "",
+    paper.research_problem.summary ?? "",
+    ...paper.research_problem.gaps,
+    paper.research_problem.goal ?? "",
     ...paper.core_contributions,
     paper.author_conclusion ?? "",
-    paper.editor_note ?? "",
+    paper.editor_note?.summary ?? "",
+    ...(paper.editor_note?.points ?? []),
     ...paper.research_tags.themes,
     ...paper.research_tags.tasks,
     ...paper.research_tags.methods,
     ...paper.research_tags.representations,
     ...paper.retrieval_profile.problem_spaces,
+    ...comparisonAspects,
   ]
     .join(" ")
     .toLowerCase();
@@ -159,6 +168,19 @@ export function scoreBand(score: number): string {
   return "低相关";
 }
 
+export function scoreLevelLabel(level: string | null | undefined): string {
+  if (level === "high") {
+    return "高相关";
+  }
+  if (level === "medium") {
+    return "中相关";
+  }
+  if (level === "low") {
+    return "低相关";
+  }
+  return "相关";
+}
+
 export function sharedSignalPreview(sharedSignals: NeighborItem["shared_signals"]): string[] {
   return Object.entries(sharedSignals)
     .flatMap(([key, values]) => values.slice(0, 2).map((value) => `${key}: ${value}`))
@@ -184,9 +206,17 @@ export function flattenRetrievalProfile(profile: RetrievalProfile): Array<{ labe
 export function filterFigureTableItems(items: FigureTableIndexItem[], query: string): FigureTableIndexItem[] {
   const keyword = query.trim().toLowerCase();
   if (!keyword) {
-    return items;
+    return [...items].sort((left, right) => {
+      const importanceScore = { high: 0, medium: 1, low: 2 };
+      const leftRank = importanceScore[left.importance as keyof typeof importanceScore] ?? 3;
+      const rightRank = importanceScore[right.importance as keyof typeof importanceScore] ?? 3;
+      if (leftRank !== rightRank) {
+        return leftRank - rightRank;
+      }
+      return left.label.localeCompare(right.label);
+    });
   }
-  return items.filter((item) => `${item.label} ${item.caption}`.toLowerCase().includes(keyword));
+  return items.filter((item) => `${item.label} ${item.caption} ${item.role} ${item.importance}`.toLowerCase().includes(keyword));
 }
 
 export function debugEnabled(): boolean {

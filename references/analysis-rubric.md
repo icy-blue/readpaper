@@ -15,11 +15,14 @@ Extract knowledge for future retrieval, comparison, and idea generation.
 - `abstract_zh`: prefer the translated abstract unit from the conversation.
 - `abstract_raw`: prefer Semantic Scholar abstract; otherwise keep `null`.
 - `research_problem`: write the shortest grounded formulation of the problem.
+- `storyline`: compress the paper into `problem`, `method`, and `outcome` for first-screen scanning.
 - `core_contributions`: keep 2 to 4 concrete items.
 - `key_claims`: keep 2 to 5 falsifiable or comparable claims.
+- `key_claims[].type`: classify each claim as `method`, `experiment`, `capability`, or `limitation` when possible.
 - `author_conclusion`: prefer conclusion-section wording over editor paraphrase.
-- `editor_note`: reserve for your own grounded reading note; leave `null` when unavailable.
+- `editor_note`: reserve for your own grounded reading note; keep it as `summary + points`, or leave it empty when unavailable.
 - `experiment_setup_summary`: summarize datasets / settings / evaluation setup, not the whole result section.
+- `figure_table_index`: add `role` and `importance` so the front end can prioritize what to read first.
 
 ## Similarity and difference rules
 
@@ -39,6 +42,8 @@ Each neighbor should include:
 
 - `match_source`
 - `reason`
+- `reason_short`
+- `score_level`
 - `shared_signals`
 - `relation_hint`
 

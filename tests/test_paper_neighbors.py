@@ -55,21 +55,35 @@ def make_record(
         "summary": {
             "one_liner": "test summary",
             "abstract_summary": "test abstract",
-            "research_value": "test value",
+            "research_value": {
+                "summary": "test value",
+                "points": ["point a"],
+            },
             "worth_long_term_graph": True,
         },
-        "research_problem": "test problem",
+        "storyline": {
+            "problem": "test problem",
+            "method": "test method",
+            "outcome": "test outcome",
+        },
+        "research_problem": {
+            "summary": "test problem",
+            "gaps": ["gap a"],
+            "goal": "test goal",
+        },
         "core_contributions": ["contribution a", "contribution b"],
         "key_claims": [
             {
                 "claim": "test claim",
+                "type": "method",
                 "support": ["section:Abstract"],
                 "confidence": "high",
             }
         ],
         "method_core": {
-            "approach": "test approach",
-            "innovation": "test innovation",
+            "approach_summary": "test approach",
+            "pipeline_steps": ["step 1", "step 2"],
+            "innovations": ["test innovation"],
             "ingredients": ingredients or [],
             "representation": representations or [],
             "supervision": [],
@@ -85,10 +99,14 @@ def make_record(
             "metrics": [],
             "baselines": baselines or [],
             "findings": [],
+            "best_results": [],
             "experiment_setup_summary": None,
         },
         "author_conclusion": None,
-        "editor_note": None,
+        "editor_note": {
+            "summary": "editor summary",
+            "points": ["editor point"],
+        },
         "limitations": [],
         "novelty_type": [],
         "research_tags": {
@@ -173,7 +191,9 @@ class PaperNeighborsTests(unittest.TestCase):
         self.assertEqual(len(comparison), 1)
         self.assertEqual(comparison[0]["paper_id"], "anchor-det")
         self.assertEqual(comparison[0]["match_source"], "fallback_contrast")
-        self.assertEqual(comparison[0]["relation_hint"], "同任务差异路线")
+        self.assertEqual(comparison[0]["relation_hint"], "contrast")
+        self.assertIn("reason_short", comparison[0])
+        self.assertIn(comparison[0]["score_level"], {"high", "medium", "low"})
 
     def test_same_task_with_shared_route_prefers_method_neighbors(self) -> None:
         primary = make_record(
@@ -207,7 +227,7 @@ class PaperNeighborsTests(unittest.TestCase):
         self.assertEqual(len(method), 1)
         self.assertEqual(method[0]["paper_id"], "peer-det")
         self.assertEqual(method[0]["match_source"], "method_overlap")
-        self.assertEqual(method[0]["relation_hint"], "同路线近邻")
+        self.assertEqual(method[0]["relation_hint"], "same-method")
         self.assertEqual(comparison, [])
 
     def test_backfill_generates_retrieval_profile_for_records(self) -> None:
@@ -254,6 +274,7 @@ class PaperNeighborsTests(unittest.TestCase):
         self.assertIn("Object Detection", profile["task_axes"])
         self.assertIn("bounding boxes", profile["output_axes"])
         self.assertIn("Grounding DINO", profile["comparison_axes"])
+        self.assertIsInstance(papers["legacy-det"]["comparison_context"]["comparison_aspects"], list)
 
     def test_backfill_adds_route_paths_when_site_paths_enabled(self) -> None:
         primary = make_record(
@@ -282,6 +303,7 @@ class PaperNeighborsTests(unittest.TestCase):
         self.assertEqual(record["paper_path"], "papers/route-primary.md")
         self.assertEqual(record["route_path"], "#/paper/route-primary")
         self.assertEqual(record["paper_neighbors"]["method"][0]["route_path"], "#/paper/route-peer")
+        self.assertIn("reason_short", record["paper_neighbors"]["method"][0])
 
     def test_build_site_payload_exposes_spa_metadata(self) -> None:
         primary = make_record(
@@ -301,6 +323,7 @@ class PaperNeighborsTests(unittest.TestCase):
         self.assertEqual(payload["navigation"]["home_route"], "#/")
         self.assertEqual(payload["papers"][0]["route_path"], "#/paper/payload-paper")
         self.assertIn("themes", payload["filters"])
+        self.assertIn("storyline", payload["papers"][0])
 
 
 if __name__ == "__main__":

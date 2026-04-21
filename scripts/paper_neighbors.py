@@ -28,11 +28,13 @@ DISPLAY_LABELS = {
     "abstract_raw": "英文摘要",
     "abstract_zh": "中文摘要",
     "research_problem": "研究问题",
+    "storyline": "故事线",
     "core_contributions": "核心贡献",
     "author_conclusion": "作者结论",
     "editor_note": "编者按",
-    "approach": "核心思路",
-    "innovation": "主要创新",
+    "approach_summary": "核心思路",
+    "pipeline_steps": "方法流程",
+    "innovations": "主要创新",
     "ingredients": "关键组成",
     "representation": "表征形式",
     "supervision": "监督与约束",
@@ -44,6 +46,7 @@ DISPLAY_LABELS = {
     "metrics": "评测指标",
     "baselines": "对比方法",
     "findings": "主要发现",
+    "best_results": "高亮结果",
     "experiment_setup_summary": "实验设置摘要",
     "themes": "主题",
     "tasks": "任务",
@@ -58,7 +61,8 @@ DISPLAY_LABELS = {
     "comparison_axes": "对比线索",
     "explicit_baselines": "显式对比方法",
     "contrast_methods": "对比方法线索",
-    "contrast_notes": "对比说明",
+    "comparison_aspects": "对比维度",
+    "recommended_next_read": "推荐下一篇",
     "matched_terms": "命中线索",
     "current_methods": "当前方法",
     "candidate_methods": "对方方法",
@@ -78,11 +82,11 @@ MATCH_SOURCE_LABELS = {
 }
 
 RELATION_HINT_LABELS = {
-    "task_overlap": "同任务代表方法",
-    "method_overlap": "同路线近邻",
-    "baseline_match": "显式对比对象",
-    "contrast_method_match": "路线对比对象",
-    "fallback_contrast": "同任务差异路线",
+    "task_overlap": "same-task",
+    "method_overlap": "same-method",
+    "baseline_match": "contrast",
+    "contrast_method_match": "contrast",
+    "fallback_contrast": "contrast",
 }
 
 SUPPORT_PREFIX_LABELS = {
@@ -137,6 +141,15 @@ def ensure_strings(value: Any) -> list[str]:
             if cleaned not in result:
                 result.append(cleaned)
     return result
+
+
+def shorten_text(value: str | None, max_chars: int) -> str | None:
+    text = normalize_label(value or "")
+    if not text:
+        return None
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1].rstrip("，,；;：: ") + "…"
 
 
 def normalize_label(value: str) -> str:
@@ -256,6 +269,146 @@ def summary_block(record: dict[str, Any]) -> dict[str, Any]:
     return summary if isinstance(summary, dict) else {}
 
 
+def summary_research_value(summary: dict[str, Any]) -> dict[str, Any]:
+    value = summary.get("research_value")
+    if isinstance(value, dict):
+        return {
+            "summary": str(value.get("summary") or "") or None,
+            "points": ensure_strings(value.get("points")),
+        }
+    if isinstance(value, str) and value.strip():
+        return {"summary": value.strip(), "points": []}
+    return {"summary": None, "points": []}
+
+
+def storyline_block(record: dict[str, Any]) -> dict[str, Any]:
+    storyline = record.get("storyline")
+    if isinstance(storyline, dict):
+        return {
+            "problem": str(storyline.get("problem") or "") or None,
+            "method": str(storyline.get("method") or "") or None,
+            "outcome": str(storyline.get("outcome") or "") or None,
+        }
+    return {"problem": None, "method": None, "outcome": None}
+
+
+def research_problem_block(record: dict[str, Any]) -> dict[str, Any]:
+    value = record.get("research_problem")
+    if isinstance(value, dict):
+        return {
+            "summary": str(value.get("summary") or "") or None,
+            "gaps": ensure_strings(value.get("gaps")),
+            "goal": str(value.get("goal") or "") or None,
+        }
+    if isinstance(value, str) and value.strip():
+        return {"summary": value.strip(), "gaps": [], "goal": None}
+    return {"summary": None, "gaps": [], "goal": None}
+
+
+def method_core_block(record: dict[str, Any]) -> dict[str, Any]:
+    method_core = record.get("method_core")
+    if not isinstance(method_core, dict):
+        method_core = {}
+    approach_summary = str(
+        method_core.get("approach_summary")
+        or method_core.get("approach")
+        or ""
+    ) or None
+    innovations = ensure_strings(method_core.get("innovations"))
+    if not innovations:
+        innovations = ensure_strings([method_core.get("innovation")]) if method_core.get("innovation") else []
+    return {
+        "approach_summary": approach_summary,
+        "pipeline_steps": ensure_strings(method_core.get("pipeline_steps")),
+        "innovations": innovations,
+        "ingredients": ensure_strings(method_core.get("ingredients")),
+        "representation": ensure_strings(method_core.get("representation")),
+        "supervision": ensure_strings(method_core.get("supervision")),
+        "differences": ensure_strings(method_core.get("differences")),
+    }
+
+
+def editor_note_block(record: dict[str, Any]) -> dict[str, Any] | None:
+    value = record.get("editor_note")
+    if isinstance(value, dict):
+        payload = {
+            "summary": str(value.get("summary") or "") or None,
+            "points": ensure_strings(value.get("points")),
+        }
+        if payload["summary"] or payload["points"]:
+            return payload
+        return None
+    if isinstance(value, str) and value.strip():
+        return {"summary": value.strip(), "points": []}
+    return None
+
+
+def comparison_context_block(record: dict[str, Any]) -> dict[str, Any]:
+    value = record.get("comparison_context")
+    if not isinstance(value, dict):
+        value = {}
+    aspects = value.get("comparison_aspects")
+    normalized_aspects: list[dict[str, str]] = []
+    if isinstance(aspects, list):
+        for item in aspects:
+            if isinstance(item, dict):
+                aspect = str(item.get("aspect") or "") or None
+                difference = str(item.get("difference") or "") or None
+                if aspect and difference:
+                    normalized_aspects.append({"aspect": aspect, "difference": difference})
+    if not normalized_aspects:
+        for note in ensure_strings(value.get("contrast_notes")):
+            normalized_aspects.append({"aspect": "difference", "difference": note})
+    return {
+        "explicit_baselines": ensure_strings(value.get("explicit_baselines")),
+        "contrast_methods": ensure_strings(value.get("contrast_methods")),
+        "comparison_aspects": normalized_aspects[:4],
+        "recommended_next_read": str(value.get("recommended_next_read") or "") or None,
+    }
+
+
+def figure_item_block(item: dict[str, Any], *, default_role: str) -> dict[str, str] | None:
+    label = str(item.get("label") or "") or None
+    caption = str(item.get("caption") or "") or None
+    if not label and not caption:
+        return None
+    role = str(item.get("role") or default_role)
+    importance = str(item.get("importance") or ("high" if default_role in {"method_overview", "quantitative_result"} else "medium"))
+    return {
+        "label": label or "",
+        "caption": caption or "",
+        "role": role,
+        "importance": importance,
+    }
+
+
+def figure_table_index_block(record: dict[str, Any]) -> dict[str, list[dict[str, str]]]:
+    figure_table_index = record.get("figure_table_index")
+    if not isinstance(figure_table_index, dict):
+        figure_table_index = {}
+    figures: list[dict[str, str]] = []
+    tables: list[dict[str, str]] = []
+    for item in figure_table_index.get("figures", []) if isinstance(figure_table_index.get("figures"), list) else []:
+        if isinstance(item, dict):
+            normalized = figure_item_block(item, default_role="method_overview")
+            if normalized:
+                figures.append(normalized)
+    for item in figure_table_index.get("tables", []) if isinstance(figure_table_index.get("tables"), list) else []:
+        if isinstance(item, dict):
+            normalized = figure_item_block(item, default_role="quantitative_result")
+            if normalized:
+                tables.append(normalized)
+    return {"figures": figures, "tables": tables}
+
+
+def score_level(score: int) -> str:
+    if score >= 160:
+        return "high"
+    if score >= 80:
+        return "medium"
+    return "low"
+
+
 def dedupe_sorted(values: list[str]) -> list[str]:
     unique: list[str] = []
     for value in values:
@@ -299,15 +452,17 @@ def contains_term(text: str, term: str) -> bool:
     return normalized_term in normalized_text
 
 
-def derive_comparison_context(record: dict[str, Any], vocabulary: list[str]) -> dict[str, list[str]]:
+def derive_comparison_context(record: dict[str, Any], vocabulary: list[str]) -> dict[str, Any]:
     eval_block = record.get("benchmarks_or_eval")
-    method_core = record.get("method_core")
+    method_core = method_core_block(record)
+    existing = comparison_context_block(record)
     baselines = ensure_strings(eval_block.get("baselines")) if isinstance(eval_block, dict) else []
-    differences = ensure_strings(method_core.get("differences")) if isinstance(method_core, dict) else []
-    innovation = str(method_core.get("innovation") or "").strip() if isinstance(method_core, dict) else ""
+    differences = ensure_strings(method_core.get("differences"))
+    innovations = ensure_strings(method_core.get("innovations"))
     notes = list(differences)
-    if innovation and innovation not in notes:
-        notes.append(innovation)
+    for innovation in innovations:
+        if innovation not in notes:
+            notes.append(innovation)
 
     text_pool = "\n".join(notes)
     contrast_methods: list[str] = []
@@ -318,9 +473,10 @@ def derive_comparison_context(record: dict[str, Any], vocabulary: list[str]) -> 
             contrast_methods.append(term)
 
     return {
-        "explicit_baselines": baselines,
-        "contrast_methods": contrast_methods,
-        "contrast_notes": notes,
+        "explicit_baselines": merge_string_lists(existing.get("explicit_baselines"), baselines),
+        "contrast_methods": merge_string_lists(existing.get("contrast_methods"), contrast_methods),
+        "comparison_aspects": existing.get("comparison_aspects") or [{"aspect": "difference", "difference": note} for note in notes[:3]],
+        "recommended_next_read": str(existing.get("recommended_next_read") or "") or (baselines[0] if baselines else None),
     }
 
 
@@ -334,7 +490,7 @@ def derive_problem_spaces(record: dict[str, Any]) -> list[str]:
 
 def build_retrieval_profile(
     record: dict[str, Any],
-    comparison_context: dict[str, list[str]],
+    comparison_context: dict[str, Any],
 ) -> dict[str, list[str]]:
     method_core = record.get("method_core") if isinstance(record.get("method_core"), dict) else {}
     inputs_outputs = record.get("inputs_outputs") if isinstance(record.get("inputs_outputs"), dict) else {}
@@ -377,19 +533,29 @@ def build_route_core(record: dict[str, Any]) -> list[str]:
 
 def normalized_record(
     record: dict[str, Any],
-    comparison_context: dict[str, list[str]],
+    comparison_context: dict[str, Any],
     retrieval_profile: dict[str, list[str]],
     paper_neighbors: dict[str, list[dict[str, Any]]],
     *,
     include_site_paths: bool,
 ) -> dict[str, Any]:
-    method_core = record.get("method_core") if isinstance(record.get("method_core"), dict) else {}
+    method_core = method_core_block(record)
     inputs_outputs = record.get("inputs_outputs") if isinstance(record.get("inputs_outputs"), dict) else {}
     eval_block = record.get("benchmarks_or_eval") if isinstance(record.get("benchmarks_or_eval"), dict) else {}
     translate_status = record.get("translate_status") if isinstance(record.get("translate_status"), dict) else {}
-    figure_table_index = record.get("figure_table_index") if isinstance(record.get("figure_table_index"), dict) else {}
+    figure_table_index = figure_table_index_block(record)
     links = record.get("links") if isinstance(record.get("links"), dict) else {}
     summary = summary_block(record)
+    research_value = summary_research_value(summary)
+    research_problem = research_problem_block(record)
+    editor_note = editor_note_block(record)
+    storyline = storyline_block(record)
+    comparison_context_payload = comparison_context_block(
+        {
+            **record,
+            "comparison_context": comparison_context,
+        }
+    )
     translate_status_payload = dict(translate_status)
     note_values = coverage_notes(record)
     if note_values:
@@ -418,14 +584,16 @@ def normalized_record(
         "summary": {
             "one_liner": str(summary.get("one_liner") or ""),
             "abstract_summary": str(summary.get("abstract_summary") or ""),
-            "research_value": str(summary.get("research_value") or "") or None,
+            "research_value": research_value,
             "worth_long_term_graph": bool(summary.get("worth_long_term_graph")),
         },
-        "research_problem": str(record.get("research_problem") or "") or None,
+        "storyline": storyline,
+        "research_problem": research_problem,
         "core_contributions": ensure_strings(record.get("core_contributions")),
         "key_claims": [
             {
                 "claim": str(item.get("claim") or ""),
+                "type": str(item.get("type") or "method"),
                 "support": ensure_strings(item.get("support")),
                 "confidence": str(item.get("confidence") or ""),
             }
@@ -433,8 +601,9 @@ def normalized_record(
             if isinstance(item, dict)
         ],
         "method_core": {
-            "approach": str(method_core.get("approach") or "") or None,
-            "innovation": str(method_core.get("innovation") or "") or None,
+            "approach_summary": str(method_core.get("approach_summary") or "") or None,
+            "pipeline_steps": ensure_strings(method_core.get("pipeline_steps")),
+            "innovations": ensure_strings(method_core.get("innovations")),
             "ingredients": ensure_strings(method_core.get("ingredients")),
             "representation": ensure_strings(method_core.get("representation")),
             "supervision": ensure_strings(method_core.get("supervision")),
@@ -450,10 +619,11 @@ def normalized_record(
             "metrics": ensure_strings(eval_block.get("metrics")),
             "baselines": ensure_strings(eval_block.get("baselines")),
             "findings": ensure_strings(eval_block.get("findings")),
+            "best_results": ensure_strings(eval_block.get("best_results")),
             "experiment_setup_summary": str(eval_block.get("experiment_setup_summary") or "") or None,
         },
         "author_conclusion": str(record.get("author_conclusion") or "") or None,
-        "editor_note": str(record.get("editor_note") or "") or None,
+        "editor_note": editor_note,
         "limitations": paper_limitations(record.get("limitations")),
         "novelty_type": ensure_strings(record.get("novelty_type")),
         "research_tags": {
@@ -473,9 +643,14 @@ def normalized_record(
             "comparison_axes": ensure_strings(retrieval_profile.get("comparison_axes")),
         },
         "comparison_context": {
-            "explicit_baselines": ensure_strings(comparison_context.get("explicit_baselines")),
-            "contrast_methods": ensure_strings(comparison_context.get("contrast_methods")),
-            "contrast_notes": ensure_strings(comparison_context.get("contrast_notes")),
+            "explicit_baselines": ensure_strings(comparison_context_payload.get("explicit_baselines")),
+            "contrast_methods": ensure_strings(comparison_context_payload.get("contrast_methods")),
+            "comparison_aspects": [
+                item
+                for item in comparison_context_payload.get("comparison_aspects", [])
+                if isinstance(item, dict)
+            ],
+            "recommended_next_read": str(comparison_context_payload.get("recommended_next_read") or "") or None,
         },
         "paper_neighbors": {
             "task": paper_neighbors.get("task", []),
@@ -721,6 +896,23 @@ def build_task_neighbors(
                 shared_outputs,
                 shared_modalities,
             ),
+            "reason_short": shorten_text(
+                task_neighbor_reason(
+                    shared_tasks,
+                    shared_problem_spaces,
+                    shared_inputs,
+                    shared_outputs,
+                    shared_modalities,
+                ),
+                50,
+            ),
+            "score_level": score_level(
+                len(shared_tasks) * 100
+                + len(shared_problem_spaces) * 30
+                + len(shared_inputs) * 10
+                + len(shared_outputs) * 10
+                + len(shared_modalities) * 5
+            ),
             "relation_hint": relation_hint("task_overlap"),
             **paper_paths(str(candidate.get("paper_id") or "")),
         }
@@ -774,6 +966,21 @@ def build_method_neighbors(
                 shared_approaches,
                 shared_outputs,
             ),
+            "reason_short": shorten_text(
+                method_neighbor_reason(
+                    shared_tasks,
+                    shared_problem_spaces,
+                    shared_approaches,
+                    shared_outputs,
+                ),
+                50,
+            ),
+            "score_level": score_level(
+                len(shared_tasks) * 100
+                + len(shared_problem_spaces) * 40
+                + len(shared_approaches) * 30
+                + len(shared_outputs) * 10
+            ),
             "relation_hint": relation_hint("method_overlap"),
             **paper_paths(str(candidate.get("paper_id") or "")),
         }
@@ -792,7 +999,7 @@ def build_method_neighbors(
 def build_comparison_neighbors(
     record: dict[str, Any],
     candidates: list[dict[str, Any]],
-    comparison_context: dict[str, list[str]],
+    comparison_context: dict[str, Any],
     profile_lookup: dict[str, dict[str, list[str]]],
     route_lookup: dict[str, list[str]],
 ) -> list[dict[str, Any]]:
@@ -852,6 +1059,28 @@ def build_comparison_neighbors(
                         shared_modalities,
                         route_lookup.get(str(record.get("paper_id") or ""), []),
                         route_lookup.get(candidate_id, []),
+                    ),
+                    "reason_short": shorten_text(
+                        comparison_reason(
+                            matched_terms,
+                            source_label,
+                            shared_tasks,
+                            shared_problem_spaces,
+                            shared_inputs,
+                            shared_outputs,
+                            shared_modalities,
+                            route_lookup.get(str(record.get("paper_id") or ""), []),
+                            route_lookup.get(candidate_id, []),
+                        ),
+                        50,
+                    ),
+                    "score_level": score_level(
+                        len(matched_terms) * 100
+                        + len(shared_tasks) * 40
+                        + len(shared_problem_spaces) * 30
+                        + len(shared_inputs) * 10
+                        + len(shared_outputs) * 10
+                        + len(shared_modalities) * 5
                     ),
                     "relation_hint": relation_hint(source_name),
                     **paper_paths(candidate_id),
@@ -932,6 +1161,24 @@ def build_comparison_neighbors(
                     shared_inputs,
                     shared_outputs,
                     shared_modalities,
+                ),
+                "reason_short": shorten_text(
+                    fallback_comparison_reason(
+                        "同任务 / 同问题空间",
+                        shared_tasks,
+                        shared_problem_spaces,
+                        shared_inputs,
+                        shared_outputs,
+                        shared_modalities,
+                    ),
+                    50,
+                ),
+                "score_level": score_level(
+                    len(shared_tasks) * 100
+                    + len(shared_problem_spaces) * 40
+                    + len(shared_inputs) * 10
+                    + len(shared_outputs) * 10
+                    + len(shared_modalities) * 5
                 ),
                 "relation_hint": relation_hint("fallback_contrast"),
                 **paper_paths(candidate_id),

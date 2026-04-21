@@ -125,6 +125,24 @@ class NormalizePapersTests(unittest.TestCase):
         self.assertEqual(record["abstract_raw"], "Original abstract")
         self.assertEqual(record["citation_count"], 10)
         self.assertEqual(record["authors"], ["Author A"])
+        self.assertIsInstance(record["storyline"], dict)
+        self.assertIn("problem", record["storyline"])
+        self.assertIsInstance(record["research_problem"], dict)
+        self.assertIn("summary", record["research_problem"])
+        self.assertIsInstance(record["summary"]["research_value"], dict)
+        self.assertIn("summary", record["summary"]["research_value"])
+        self.assertIn("type", record["key_claims"][0])
+        self.assertIn(record["key_claims"][0]["type"], {"method", "experiment", "capability", "limitation"})
+        self.assertIn("approach_summary", record["method_core"])
+        self.assertIn("pipeline_steps", record["method_core"])
+        self.assertIn("innovations", record["method_core"])
+        self.assertIn("best_results", record["benchmarks_or_eval"])
+        self.assertLessEqual(len(record["summary"]["one_liner"]), 120)
+        self.assertLessEqual(len(record["method_core"]["approach_summary"] or ""), 100)
+        if record["benchmarks_or_eval"]["findings"]:
+            self.assertLessEqual(len(record["benchmarks_or_eval"]["findings"][0]), 80)
+        self.assertIn("comparison_aspects", record["comparison_context"])
+        self.assertIn("recommended_next_read", record["comparison_context"])
 
     def test_normalize_falls_back_to_semantic_pdf_and_network_errors_do_not_abort(self) -> None:
         def fake_fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
@@ -145,6 +163,8 @@ class NormalizePapersTests(unittest.TestCase):
             record = normalize_raw_file(raw_path, fetcher=fake_fetch)
 
         self.assertEqual(record["links"]["pdf"], "https://s2.local/demo.pdf")
+        self.assertIn("figures", record["figure_table_index"])
+        self.assertIn("tables", record["figure_table_index"])
 
         def failing_fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
             raise URLError("network down")
