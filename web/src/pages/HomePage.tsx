@@ -1,22 +1,29 @@
-import { Button, Drawer, Empty, Flex, Grid, Input, Select, Tag, Typography, type InputRef } from "antd";
-import { FileSearchOutlined, LinkOutlined, ReadOutlined } from "@ant-design/icons";
+import { Button, Drawer, Empty, Flex, Grid, Input, Modal, Select, Tag, Typography, type InputRef } from "antd";
+import { FileSearchOutlined, FilterOutlined, LinkOutlined, ReadOutlined } from "@ant-design/icons";
 import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PaperDetailWorkspace } from "../components/PaperDetailWorkspace";
 import {
-  cleanDisplayText,
   displayValueLabel,
+  formatLocalDateTime,
+  formatLocalDateTimeDetail,
   matchesTags,
+  matchesTitleQuery,
   paperRoute,
   recommendedRouteLabel,
   routeTagClass,
-  searchableText,
+  selectedFilterSummary,
   verdictTagClass,
 } from "../lib/paper";
-import { TooltipTag, TooltipText } from "../components/OverflowTooltip";
+import { TooltipTag } from "../components/OverflowTooltip";
 import type { PaperCardView, SiteIndexPayload } from "../types";
 
 const { Title, Paragraph, Text } = Typography;
+const SORT_OPTIONS = [
+  { label: "年份从新到旧", value: "year-desc" },
+  { label: "年份从旧到新", value: "year-asc" },
+  { label: "标题 A-Z", value: "title-asc" },
+] as const;
 
 function discoveryTags(paper: PaperCardView): string[] {
   return [...paper.taxonomy.tasks, ...paper.taxonomy.methods, ...paper.taxonomy.themes].slice(0, 3);
@@ -31,33 +38,66 @@ function authorSummary(paper: PaperCardView): string {
 
 function HomeToolbar({
   payload,
-  query,
-  setQuery,
+  titleQuery,
+  setTitleQuery,
   selectedThemes,
-  setSelectedThemes,
   selectedTasks,
-  setSelectedTasks,
   selectedMethods,
-  setSelectedMethods,
+  draftThemes,
+  setDraftThemes,
+  draftTasks,
+  setDraftTasks,
+  draftMethods,
+  setDraftMethods,
+  advancedSearchOpen,
+  openAdvancedSearch,
+  closeAdvancedSearch,
+  applyAdvancedSearch,
+  clearDraftFilters,
   sortBy,
   setSortBy,
   resultsCount,
   searchInputRef,
 }: {
   payload: SiteIndexPayload;
-  query: string;
-  setQuery: (value: string) => void;
+  titleQuery: string;
+  setTitleQuery: (value: string) => void;
   selectedThemes: string[];
-  setSelectedThemes: (value: string[]) => void;
   selectedTasks: string[];
-  setSelectedTasks: (value: string[]) => void;
   selectedMethods: string[];
-  setSelectedMethods: (value: string[]) => void;
+  draftThemes: string[];
+  setDraftThemes: (value: string[]) => void;
+  draftTasks: string[];
+  setDraftTasks: (value: string[]) => void;
+  draftMethods: string[];
+  setDraftMethods: (value: string[]) => void;
+  advancedSearchOpen: boolean;
+  openAdvancedSearch: () => void;
+  closeAdvancedSearch: () => void;
+  applyAdvancedSearch: () => void;
+  clearDraftFilters: () => void;
   sortBy: string;
   setSortBy: (value: string) => void;
   resultsCount: number;
   searchInputRef: RefObject<InputRef | null>;
 }) {
+  const generatedAtLabel = formatLocalDateTime(payload.site_meta.generated_at);
+  const generatedAtDetail = formatLocalDateTimeDetail(payload.site_meta.generated_at);
+  const sortLabel = SORT_OPTIONS.find((item) => item.value === sortBy)?.label || SORT_OPTIONS[0].label;
+  const filterSummaries = [
+    selectedThemes.length ? selectedFilterSummary("主题", selectedThemes.length) : "",
+    selectedTasks.length ? selectedFilterSummary("任务", selectedTasks.length) : "",
+    selectedMethods.length ? selectedFilterSummary("方法", selectedMethods.length) : "",
+  ].filter(Boolean);
+  const appliedFilterCount = selectedThemes.length + selectedTasks.length + selectedMethods.length;
+  const contextItems = [
+    `当前 ${resultsCount} 篇`,
+    `总库 ${payload.site_meta.paper_count} 篇`,
+    `排序 ${sortLabel}`,
+    `更新于 ${generatedAtLabel}`,
+    ...filterSummaries,
+  ];
+
   return (
     <div className="console-toolbar">
       <div className="console-toolbar-main">
@@ -66,28 +106,19 @@ function HomeToolbar({
           <Title level={2} className="console-title">
             研究发现台
           </Title>
-          <Paragraph className="console-support-copy">
-            左侧快速扫读，右侧按需展开 Summary / Method / Metadata / Related。
-          </Paragraph>
+          <Paragraph className="console-support-copy">面向筛选、切换与深读的双栏工作台。</Paragraph>
         </div>
 
-        <div className="console-toolbar-stats">
-          <div className="console-stat-tile">
-            <Text className="console-stat-label">当前结果</Text>
-            <Text className="console-stat-value">{resultsCount}</Text>
-          </div>
-          <div className="console-stat-tile">
-            <Text className="console-stat-label">论文总数</Text>
-            <Text className="console-stat-value">{payload.site_meta.paper_count}</Text>
-          </div>
-          <div className="console-stat-tile">
-            <Text className="console-stat-label">精选条目</Text>
-            <Text className="console-stat-value">{payload.featured.length}</Text>
-          </div>
-          <div className="console-stat-tile">
-            <Text className="console-stat-label">最近生成</Text>
-            <Text className="console-stat-value is-compact">{payload.site_meta.generated_at}</Text>
-          </div>
+        <div className="console-toolbar-context">
+          {contextItems.map((item) => (
+            <Text
+              key={item}
+              className={`console-context-chip${filterSummaries.includes(item) ? " is-filter" : ""}`}
+              title={item.startsWith("更新于 ") ? generatedAtDetail || payload.site_meta.generated_at : undefined}
+            >
+              {item}
+            </Text>
+          ))}
         </div>
       </div>
 
@@ -97,62 +128,105 @@ function HomeToolbar({
           allowClear
           size="large"
           prefix={<FileSearchOutlined />}
-          placeholder="搜索标题、作者、story、editorial、taxonomy"
-          value={query}
-          onChange={(event) => startTransition(() => setQuery(event.target.value))}
-          className="search-input"
+          placeholder="搜索论文标题…"
+          value={titleQuery}
+          onChange={(event) => startTransition(() => setTitleQuery(event.target.value))}
+          className="search-input console-search-control"
         />
-        <Select
-          mode="multiple"
-          allowClear
-          size="large"
-          placeholder="主题"
-          value={selectedThemes}
-          options={payload.filters.themes.map((item) => ({ label: `${displayValueLabel(item.label)} (${item.count})`, value: item.label }))}
-          onChange={(value) => startTransition(() => setSelectedThemes(value))}
-        />
-        <Select
-          mode="multiple"
-          allowClear
-          size="large"
-          placeholder="任务"
-          value={selectedTasks}
-          options={payload.filters.tasks.map((item) => ({ label: `${displayValueLabel(item.label)} (${item.count})`, value: item.label }))}
-          onChange={(value) => startTransition(() => setSelectedTasks(value))}
-        />
-        <Select
-          mode="multiple"
-          allowClear
-          size="large"
-          placeholder="方法"
-          value={selectedMethods}
-          options={payload.filters.methods.map((item) => ({ label: `${displayValueLabel(item.label)} (${item.count})`, value: item.label }))}
-          onChange={(value) => startTransition(() => setSelectedMethods(value))}
-        />
+        <Button
+          icon={<FilterOutlined />}
+          onClick={openAdvancedSearch}
+          className={`console-advanced-trigger${appliedFilterCount ? " is-active" : ""}`}
+        >
+          <span>高级搜索</span>
+          {appliedFilterCount ? <span className="console-advanced-count">{appliedFilterCount}</span> : null}
+        </Button>
         <Select
           size="large"
           value={sortBy}
-          options={[
-            { label: "年份从新到旧", value: "year-desc" },
-            { label: "年份从旧到新", value: "year-asc" },
-            { label: "标题 A-Z", value: "title-asc" },
-          ]}
+          options={SORT_OPTIONS.map((item) => ({ label: item.label, value: item.value }))}
           onChange={(value) => startTransition(() => setSortBy(value))}
+          className="console-sort-control"
         />
       </div>
 
-      <div className="console-toolbar-foot">
-        <div className="console-chip-row">
-          {payload.featured.map((paper) => (
-            <TooltipTag key={paper.id} label={paper.bibliography.title} maxChars={24} className="chip-tag chip-tag-highlight" />
+      {filterSummaries.length ? (
+        <div className="console-active-filter-row">
+          {filterSummaries.map((item) => (
+            <Text key={item} className="console-active-filter-chip">
+              {item}
+            </Text>
           ))}
         </div>
-        <div className="console-chip-row">
-          {payload.recent_titles.slice(0, 4).map((title) => (
-            <TooltipTag key={title} label={cleanDisplayText(title, 24)} maxChars={24} className="chip-tag chip-tag-route-overview" />
-          ))}
+      ) : null}
+
+      <Modal
+        title="高级搜索"
+        open={advancedSearchOpen}
+        onCancel={closeAdvancedSearch}
+        width={880}
+        className="console-advanced-modal"
+        footer={[
+          <Button key="clear" onClick={clearDraftFilters}>
+            清空筛选
+          </Button>,
+          <Button key="cancel" onClick={closeAdvancedSearch}>
+            取消
+          </Button>,
+          <Button key="confirm" type="primary" onClick={applyAdvancedSearch}>
+            确认
+          </Button>,
+        ]}
+        destroyOnHidden={false}
+      >
+        <div className="console-advanced-modal-body">
+          <section className="console-advanced-section">
+            <Text className="console-advanced-section-title">主题</Text>
+            <Select
+              mode="multiple"
+              allowClear
+              size="large"
+              maxTagCount={0}
+              maxTagPlaceholder={() => selectedFilterSummary("主题", draftThemes.length)}
+              placeholder="按主题筛选"
+              value={draftThemes}
+              options={payload.filters.themes.map((item) => ({ label: `${displayValueLabel(item.label)} (${item.count})`, value: item.label }))}
+              onChange={(value) => startTransition(() => setDraftThemes(value))}
+              className="console-select-control"
+            />
+          </section>
+          <section className="console-advanced-section">
+            <Text className="console-advanced-section-title">任务</Text>
+            <Select
+              mode="multiple"
+              allowClear
+              size="large"
+              maxTagCount={0}
+              maxTagPlaceholder={() => selectedFilterSummary("任务", draftTasks.length)}
+              placeholder="按任务筛选"
+              value={draftTasks}
+              options={payload.filters.tasks.map((item) => ({ label: `${displayValueLabel(item.label)} (${item.count})`, value: item.label }))}
+              onChange={(value) => startTransition(() => setDraftTasks(value))}
+              className="console-select-control"
+            />
+          </section>
+          <section className="console-advanced-section">
+            <Text className="console-advanced-section-title">方法</Text>
+            <Select
+              mode="multiple"
+              allowClear
+              size="large"
+              maxTagCount={0}
+              maxTagPlaceholder={() => selectedFilterSummary("方法", draftMethods.length)}
+              placeholder="按方法筛选"
+              value={draftMethods}
+              options={payload.filters.methods.map((item) => ({ label: `${displayValueLabel(item.label)} (${item.count})`, value: item.label }))}
+              onChange={(value) => startTransition(() => setDraftMethods(value))}
+              className="console-select-control"
+            />
+          </section>
         </div>
-      </div>
+      </Modal>
     </div>
   );
 }
@@ -162,36 +236,25 @@ function PaperListItem({
   selected,
   featured,
   onSelect,
+  itemRef,
 }: {
   paper: PaperCardView;
   selected: boolean;
   featured: boolean;
   onSelect: () => void;
+  itemRef?: (node: HTMLButtonElement | null) => void;
 }) {
   return (
-    <button type="button" className={`paper-list-item${selected ? " is-selected" : ""}`} onClick={onSelect}>
-      <div className="paper-list-item-header">
-        <div className="paper-list-item-title-block">
-          <Text className="paper-list-item-title">{paper.bibliography.title}</Text>
-          <Flex wrap="wrap" gap={8}>
-            {paper.editorial.verdict ? <Tag className={verdictTagClass(paper.editorial.verdict)}>{paper.editorial.verdict}</Tag> : null}
-            <Tag className={routeTagClass(paper.editorial.reading_route)}>{recommendedRouteLabel(paper.editorial.reading_route)}</Tag>
-            {featured || paper.editorial.graph_worthy ? <Tag className="chip-tag chip-tag-worth">精选</Tag> : null}
-          </Flex>
-        </div>
-      </div>
-
-      <TooltipText
-        text={paper.story.paper_one_liner || paper.editorial.summary || "暂无一句话摘要。"}
-        as="paragraph"
-        rows={2}
-        className="paper-list-item-summary"
-      />
-
+    <button type="button" ref={itemRef} className={`paper-list-item${selected ? " is-selected" : ""}`} onClick={onSelect}>
+      <Flex wrap="wrap" gap={8} className="paper-list-item-decision">
+        {paper.editorial.verdict ? <Tag className={verdictTagClass(paper.editorial.verdict)}>{paper.editorial.verdict}</Tag> : null}
+        <Tag className={routeTagClass(paper.editorial.reading_route)}>{recommendedRouteLabel(paper.editorial.reading_route)}</Tag>
+        {featured || paper.editorial.graph_worthy ? <Tag className="chip-tag chip-tag-worth">精选</Tag> : null}
+      </Flex>
+      <Text className="paper-list-item-title">{paper.bibliography.title}</Text>
       <Paragraph className="paper-list-item-meta">
         {authorSummary(paper)} · {paper.bibliography.venue || "未知 venue"} · {paper.bibliography.year || "未知年份"}
       </Paragraph>
-
       <Flex wrap="wrap" gap={8} className="paper-list-item-tags">
         {discoveryTags(paper).map((tag) => (
           <TooltipTag key={`${paper.id}-${tag}`} label={displayValueLabel(tag)} maxChars={18} className="chip-tag chip-tag-tone-blue" />
@@ -218,19 +281,55 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchInputRef = useRef<InputRef>(null);
+  const paperItemRefs = useRef(new Map<string, HTMLButtonElement>());
   const featuredIds = useMemo(() => new Set(payload.featured.map((paper) => paper.id)), [payload.featured]);
 
-  const [query, setQuery] = useState("");
+  const [titleQuery, setTitleQuery] = useState("");
   const [selectedThemes, setSelectedThemes] = useState<string[]>([]);
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
+  const [draftThemes, setDraftThemes] = useState<string[]>([]);
+  const [draftTasks, setDraftTasks] = useState<string[]>([]);
+  const [draftMethods, setDraftMethods] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("year-desc");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const deferredQuery = useDeferredValue(query);
+  const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
+  const deferredTitleQuery = useDeferredValue(titleQuery);
+
+  function openAdvancedSearch() {
+    setDraftThemes(selectedThemes);
+    setDraftTasks(selectedTasks);
+    setDraftMethods(selectedMethods);
+    setAdvancedSearchOpen(true);
+  }
+
+  function closeAdvancedSearch() {
+    setDraftThemes(selectedThemes);
+    setDraftTasks(selectedTasks);
+    setDraftMethods(selectedMethods);
+    setAdvancedSearchOpen(false);
+  }
+
+  function clearDraftFilters() {
+    startTransition(() => {
+      setDraftThemes([]);
+      setDraftTasks([]);
+      setDraftMethods([]);
+    });
+  }
+
+  function applyAdvancedSearch() {
+    startTransition(() => {
+      setSelectedThemes(draftThemes);
+      setSelectedTasks(draftTasks);
+      setSelectedMethods(draftMethods);
+    });
+    setAdvancedSearchOpen(false);
+  }
 
   const filteredPapers = useMemo(() => {
     let papers = payload.papers.filter((paper) => {
-      const searchOkay = !deferredQuery.trim() || searchableText(paper).includes(deferredQuery.trim().toLowerCase());
+      const searchOkay = matchesTitleQuery(paper.bibliography.title, deferredTitleQuery);
       return (
         searchOkay &&
         matchesTags(paper.taxonomy.themes, selectedThemes) &&
@@ -249,7 +348,7 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
     });
 
     return papers;
-  }, [deferredQuery, payload.papers, selectedMethods, selectedTasks, selectedThemes, sortBy]);
+  }, [deferredTitleQuery, payload.papers, selectedMethods, selectedTasks, selectedThemes, sortBy]);
 
   const requestedPaperId = searchParams.get("paper") ?? "";
   const selectedPaperId = filteredPapers.some((paper) => paper.id === requestedPaperId) ? requestedPaperId : filteredPapers[0]?.id ?? "";
@@ -292,8 +391,19 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   }, [isTablet]);
 
   useEffect(() => {
+    const item = paperItemRefs.current.get(selectedPaperId);
+    if (!item || isMobile) {
+      return;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      item.scrollIntoView({ block: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isMobile, selectedPaperId]);
+
+  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (!filteredPapers.length || event.metaKey || event.ctrlKey || event.altKey) {
+      if (advancedSearchOpen || !filteredPapers.length || event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
       if (event.key === "/" && !isEditableTarget(event.target)) {
@@ -329,11 +439,11 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filteredPapers, navigate, selectedPaper, selectedPaperId, searchParams]);
+  }, [advancedSearchOpen, filteredPapers, navigate, selectedPaper, selectedPaperId, searchParams]);
 
   const openDetailAction = selectedPaper ? (
     <Button type="primary" icon={<ReadOutlined />} onClick={() => navigate(paperRoute(selectedPaper.source.route_path, selectedPaper.id))}>
-      打开独立详情页
+      在独立页打开
     </Button>
   ) : null;
 
@@ -341,14 +451,22 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
     <div className="page-stack console-page">
       <HomeToolbar
         payload={payload}
-        query={query}
-        setQuery={setQuery}
+        titleQuery={titleQuery}
+        setTitleQuery={setTitleQuery}
         selectedThemes={selectedThemes}
-        setSelectedThemes={setSelectedThemes}
         selectedTasks={selectedTasks}
-        setSelectedTasks={setSelectedTasks}
         selectedMethods={selectedMethods}
-        setSelectedMethods={setSelectedMethods}
+        draftThemes={draftThemes}
+        setDraftThemes={setDraftThemes}
+        draftTasks={draftTasks}
+        setDraftTasks={setDraftTasks}
+        draftMethods={draftMethods}
+        setDraftMethods={setDraftMethods}
+        advancedSearchOpen={advancedSearchOpen}
+        openAdvancedSearch={openAdvancedSearch}
+        closeAdvancedSearch={closeAdvancedSearch}
+        applyAdvancedSearch={applyAdvancedSearch}
+        clearDraftFilters={clearDraftFilters}
         sortBy={sortBy}
         setSortBy={setSortBy}
         resultsCount={filteredPapers.length}
@@ -365,8 +483,8 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
               </Title>
             </div>
             {selectedPaper ? (
-              <Button icon={<LinkOutlined />} onClick={() => navigate(paperRoute(selectedPaper.source.route_path, selectedPaper.id))}>
-                详情页
+              <Button size="small" icon={<LinkOutlined />} onClick={() => navigate(paperRoute(selectedPaper.source.route_path, selectedPaper.id))}>
+                在独立页打开
               </Button>
             ) : null}
           </div>
@@ -380,6 +498,13 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
                   selected={paper.id === selectedPaperId}
                   featured={featuredIds.has(paper.id)}
                   onSelect={() => handleSelectPaper(paper)}
+                  itemRef={(node) => {
+                    if (node) {
+                      paperItemRefs.current.set(paper.id, node);
+                    } else {
+                      paperItemRefs.current.delete(paper.id);
+                    }
+                  }}
                 />
               ))}
             </div>

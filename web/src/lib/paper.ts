@@ -477,6 +477,14 @@ export function searchableText(paper: PaperCardView): string {
     .toLowerCase();
 }
 
+export function matchesTitleQuery(title: string | null | undefined, query: string): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return true;
+  }
+  return (title ?? "").toLowerCase().includes(normalizedQuery);
+}
+
 export function cleanDisplayText(value: string | null | undefined, maxChars?: number): string | null {
   const text = typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "";
   if (!text) {
@@ -644,6 +652,54 @@ export function formatYear(value: number | string | null | undefined): string {
     return value;
   }
   return "未知年份";
+}
+
+function resolvedLocale(): string {
+  if (typeof navigator !== "undefined") {
+    const preferred = navigator.languages?.find((value) => typeof value === "string" && value.trim());
+    if (preferred) {
+      return preferred;
+    }
+    if (typeof navigator.language === "string" && navigator.language.trim()) {
+      return navigator.language;
+    }
+  }
+  return "zh-CN";
+}
+
+export function formatLocalDateTime(value: string | null | undefined): string {
+  if (!value) {
+    return "未知时间";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(resolvedLocale(), {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+export function formatLocalDateTimeDetail(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat(resolvedLocale(), {
+    dateStyle: "full",
+    timeStyle: "long",
+  }).format(date);
+}
+
+export function selectedFilterSummary(label: string, selectedCount: number): string {
+  return selectedCount > 0 ? `${label} · 已选 ${selectedCount}` : label;
 }
 
 export function firstExternalLinks(bibliography: Bibliography): Array<{ key: string; label: string; href: string }> {

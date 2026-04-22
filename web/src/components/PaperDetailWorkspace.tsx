@@ -29,6 +29,17 @@ import { TooltipTag, TooltipText } from "./OverflowTooltip";
 import type { NeighborItem, PaperCanonicalRecord, PaperDetailViewModel, RelationItem, SiteIndexPayload } from "../types";
 
 const { Title, Paragraph, Text } = Typography;
+const RESOURCE_LABELS: Record<string, string> = {
+  pdf: "查看 PDF",
+  arxiv: "查看 arXiv",
+  doi: "查看 DOI",
+  code: "查看 Code",
+  project: "查看 Project",
+  data: "查看 Data",
+  markdown: "查看 Markdown",
+  translate: "查看 Translate 对话",
+};
+const RESOURCE_ORDER = ["pdf", "arxiv", "doi", "code", "project", "data"] as const;
 
 function EmptyState({ description }: { description: string }) {
   return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={description} />;
@@ -94,29 +105,36 @@ function BadgeGroup({ values, tone }: { values: string[]; tone?: string | null }
   );
 }
 
-function ResourceButtons({ paper }: { paper: PaperCanonicalRecord }) {
-  const links = firstExternalLinks(paper.bibliography);
-  const markdownLink = markdownHref(paper.source.paper_path);
-  const translateLink = translateConversationHref(paper.source.conversation_ids);
+function orderedResourceLinks(paper: PaperCanonicalRecord): Array<{ key: string; label: string; href: string }> {
+  const orderMap = new Map(RESOURCE_ORDER.map((key, index) => [key, index]));
+  return [...firstExternalLinks(paper.bibliography)]
+    .sort((left, right) => (orderMap.get(left.key) ?? 99) - (orderMap.get(right.key) ?? 99))
+    .map((item) => ({ ...item, label: RESOURCE_LABELS[item.key] || `查看 ${item.label}` }));
+}
 
+function QuickLookPanel({ paper }: { paper: PaperCanonicalRecord }) {
+  const leadingSignal =
+    paper.editorial.why_read[0] ||
+    paper.editorial.summary ||
+    paper.story.paper_one_liner ||
+    "暂无明确读前判断。";
+  const nextStep = paper.editorial.strengths[0] || paper.story.method || "建议先看 Summary，再进入 Method。";
   return (
-    <Flex wrap="wrap" gap={10}>
-      {translateLink ? (
-        <Button href={translateLink} target="_blank" icon={<LinkOutlined />}>
-          原始 Translate
-        </Button>
-      ) : null}
-      {markdownLink ? (
-        <Button href={markdownLink} target="_blank" icon={<BookOutlined />}>
-          Markdown
-        </Button>
-      ) : null}
-      {links.map((item) => (
-        <Button key={item.key} href={item.href} target="_blank" type={item.key === "pdf" ? "primary" : "default"} icon={<LinkOutlined />}>
-          {item.label}
-        </Button>
-      ))}
-    </Flex>
+    <section className="workspace-quicklook-card">
+      <div className="workspace-quicklook-head">
+        <Text className="section-kicker">Quick Look</Text>
+        <Text className="workspace-section-title">快速判断</Text>
+      </div>
+      <Paragraph className="workspace-quicklook-lead">{leadingSignal}</Paragraph>
+      <KeyValueGrid
+        items={[
+          { label: "Verdict", value: paper.editorial.verdict || "暂无" },
+          { label: "阅读路径", value: recommendedRouteLabel(paper.editorial.reading_route) },
+          { label: "研究定位", value: paper.editorial.research_position || "暂无" },
+          { label: "建议起点", value: nextStep },
+        ]}
+      />
+    </section>
   );
 }
 
@@ -220,7 +238,7 @@ function SummaryTab({ paper }: { paper: PaperCanonicalRecord }) {
   const cautions = paper.editorial.cautions.length ? paper.editorial.cautions : paper.conclusion.limitations;
 
   return (
-    <div className="workspace-tab-grid">
+    <div className="workspace-tab-stack">
       <SectionCard title="读前摘要" kicker="Summary">
         {summaryItems.length ? summaryItems.map((item) => <Paragraph key={item} className="workspace-body-copy">{item}</Paragraph>) : <Paragraph className="workspace-empty-copy">暂无结构化摘要。</Paragraph>}
       </SectionCard>
@@ -231,15 +249,6 @@ function SummaryTab({ paper }: { paper: PaperCanonicalRecord }) {
       </SectionCard>
       <SectionCard title="核心贡献">
         <TextList items={paper.core_contributions} emptyText="暂无核心贡献整理。" ordered />
-      </SectionCard>
-      <SectionCard title="阅读判断" muted>
-        <KeyValueGrid
-          items={[
-            { label: "Verdict", value: paper.editorial.verdict || "暂无" },
-            { label: "阅读路径", value: recommendedRouteLabel(paper.editorial.reading_route) },
-            { label: "研究定位", value: paper.editorial.research_position || "暂无" },
-          ]}
-        />
       </SectionCard>
       <SectionCard title="为什么值得读">
         <TextList items={highlights} emptyText="暂无明确亮点。" />
@@ -253,7 +262,7 @@ function SummaryTab({ paper }: { paper: PaperCanonicalRecord }) {
 
 function MethodTab({ paper }: { paper: PaperCanonicalRecord }) {
   return (
-    <div className="workspace-tab-grid">
+    <div className="workspace-tab-stack">
       <SectionCard title="方法摘要" kicker="Method">
         <Paragraph className="workspace-body-copy">{paper.method.summary || paper.story.method || "暂无方法概述。"}</Paragraph>
       </SectionCard>
@@ -285,7 +294,10 @@ function MethodTab({ paper }: { paper: PaperCanonicalRecord }) {
 }
 
 function MetadataTab({ paper }: { paper: PaperCanonicalRecord }) {
-  const links = firstExternalLinks(paper.bibliography);
+  const links = orderedResourceLinks(paper);
+  const markdownLinkHref = markdownHref(paper.source.paper_path);
+  const translateLinkHref = translateConversationHref(paper.source.conversation_ids);
+  const hasAnyResource = Boolean(links.length || markdownLinkHref || translateLinkHref);
   const taxonomyRows = [
     { label: "主题", value: <BadgeGroup values={paper.taxonomy.themes} /> },
     { label: "任务", value: <BadgeGroup values={paper.taxonomy.tasks} tone="gold" /> },
@@ -295,7 +307,7 @@ function MetadataTab({ paper }: { paper: PaperCanonicalRecord }) {
   ];
 
   return (
-    <div className="workspace-tab-grid">
+    <div className="workspace-tab-stack">
       <SectionCard title="基础元信息" kicker="Metadata">
         <KeyValueGrid
           items={[
@@ -310,13 +322,23 @@ function MetadataTab({ paper }: { paper: PaperCanonicalRecord }) {
         />
       </SectionCard>
       <SectionCard title="资源链接" muted>
-        {links.length ? (
+        {hasAnyResource ? (
           <Flex wrap="wrap" gap={10}>
             {links.map((item) => (
               <Button key={item.key} href={item.href} target="_blank" icon={<LinkOutlined />}>
                 {item.label}
               </Button>
             ))}
+            {markdownLinkHref ? (
+              <Button href={markdownLinkHref} target="_blank" icon={<BookOutlined />}>
+                {RESOURCE_LABELS.markdown}
+              </Button>
+            ) : null}
+            {translateLinkHref ? (
+              <Button href={translateLinkHref} target="_blank" icon={<LinkOutlined />}>
+                {RESOURCE_LABELS.translate}
+              </Button>
+            ) : null}
           </Flex>
         ) : (
           <Paragraph className="workspace-empty-copy">暂无外部资源链接。</Paragraph>
@@ -346,7 +368,7 @@ function RelatedTab({ detail, payload }: { detail: PaperDetailViewModel; payload
   const paper = detail.canonical;
 
   return (
-    <div className="workspace-tab-grid">
+    <div className="workspace-tab-stack">
       <SectionCard title="下一篇线索" kicker="Related">
         <BadgeGroup values={paper.comparison.next_read} tone="processing" />
         {paper.comparison.aspects.length ? (
@@ -481,12 +503,13 @@ export function PaperDetailWorkspace({
   }
 
   const paper = detail.canonical;
+  const primaryPdfLink = orderedResourceLinks(paper).find((item) => item.key === "pdf") ?? null;
   const topTags = [
     paper.bibliography.venue || "未知来源",
     formatYear(paper.bibliography.year),
     paper.bibliography.citation_count !== null ? `引用 ${paper.bibliography.citation_count}` : "",
   ].filter(Boolean);
-  const discoveryTags = [...paper.taxonomy.tasks, ...paper.taxonomy.methods, ...paper.taxonomy.themes].slice(0, 6);
+  const headlineTags = [...new Set([...paper.taxonomy.tasks, ...paper.taxonomy.methods, ...paper.taxonomy.themes])].slice(0, 4);
 
   return (
     <div className={`workspace-shell ${className}`.trim()}>
@@ -509,26 +532,28 @@ export function PaperDetailWorkspace({
               {paper.bibliography.authors.length ? paper.bibliography.authors.join(" / ") : "作者信息暂缺"} · {paper.bibliography.venue || "未知 venue"} ·{" "}
               {formatYear(paper.bibliography.year)}
             </Paragraph>
-            <TooltipText
-              text={paper.story.paper_one_liner || paper.editorial.summary || "暂无首屏判断。"}
-              as="paragraph"
-              rows={3}
-              className="workspace-lead"
-            />
           </div>
-          {discoveryTags.length ? (
-            <Flex wrap="wrap" gap={8}>
-              {discoveryTags.map((tag) => (
+          {headlineTags.length ? (
+            <Flex wrap="wrap" gap={8} className="workspace-headline-tags">
+              {headlineTags.map((tag) => (
                 <TooltipTag key={`${paper.id}-${tag}`} label={displayValueLabel(tag)} maxChars={24} className="chip-tag chip-tag-route-overview" />
               ))}
             </Flex>
           ) : null}
         </div>
         <div className="workspace-header-actions">
-          {headerActions ? <Flex wrap="wrap" gap={10}>{headerActions}</Flex> : null}
-          <ResourceButtons paper={paper} />
+          <Flex wrap="wrap" gap={10}>
+            {headerActions}
+            {primaryPdfLink ? (
+              <Button href={primaryPdfLink.href} target="_blank" icon={<LinkOutlined />}>
+                {primaryPdfLink.label}
+              </Button>
+            ) : null}
+          </Flex>
         </div>
       </div>
+
+      <QuickLookPanel paper={paper} />
 
       {error ? <Alert type="warning" showIcon message="已显示缓存内容，刷新详情时出现问题" description={error} /> : null}
 
