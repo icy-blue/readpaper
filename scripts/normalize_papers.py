@@ -21,10 +21,6 @@ URL_PATTERN = re.compile(r"https?://[^\s)>\]\"']+")
 DOI_PATTERN = re.compile(r"10\.\d{4,9}/[-._;()/:A-Z0-9]+", re.IGNORECASE)
 GITHUB_PATTERN = re.compile(r"https?://(?:www\.)?github\.com/[^\s)>\]\"']+", re.IGNORECASE)
 
-ASSET_ROLES = {"method_overview", "qualitative_result", "quantitative_result", "ablation", "failure_case"}
-ASSET_IMPORTANCE = {"high", "medium", "low"}
-EDITORIAL_VERDICTS = {"值得精读", "值得浏览", "只记结论"}
-READING_ROUTES = {"method", "evaluation", "comparison", "overview"}
 RELATION_TYPES = {
     "compares_to",
     "extends",
@@ -342,9 +338,6 @@ def validate_story(errors: list[str], value: Any) -> dict[str, Any]:
     record = validate_record(errors, "meta.story", value)
     return {
         "paper_one_liner": validate_string_field(errors, "meta.story.paper_one_liner", record.get("paper_one_liner"), max_chars=110),
-        "problem": validate_string_field(errors, "meta.story.problem", record.get("problem"), max_chars=88),
-        "method": validate_string_field(errors, "meta.story.method", record.get("method"), max_chars=88),
-        "result": validate_string_field(errors, "meta.story.result", record.get("result"), max_chars=88),
     }
 
 
@@ -404,28 +397,15 @@ def validate_claims(errors: list[str], value: Any) -> list[dict[str, Any]]:
     return result
 
 
-def validate_conclusion(errors: list[str], value: Any) -> dict[str, Any]:
-    record = validate_record(errors, "meta.conclusion", value)
-    return {
-        "author": validate_string_field(errors, "meta.conclusion.author", record.get("author"), max_chars=180),
-        "limitations": validate_string_list(errors, "meta.conclusion.limitations", record.get("limitations"), max_chars=90, max_items=4),
-    }
+def validate_research_risks(errors: list[str], value: Any) -> list[str]:
+    return validate_string_list(errors, "meta.research_risks", value, max_chars=90, max_items=4)
 
 
 def validate_editorial(errors: list[str], value: Any) -> dict[str, Any]:
     record = validate_record(errors, "meta.editorial", value)
-    verdict = validate_choice(errors, "meta.editorial.verdict", record.get("verdict"), EDITORIAL_VERDICTS)
-    reading_route = validate_choice(errors, "meta.editorial.reading_route", record.get("reading_route"), READING_ROUTES, required=True) or "overview"
     return {
-        "verdict": verdict,
-        "summary": validate_string_field(errors, "meta.editorial.summary", record.get("summary"), max_chars=84),
-        "why_read": validate_string_list(errors, "meta.editorial.why_read", record.get("why_read"), max_chars=64, max_items=3),
-        "strengths": validate_string_list(errors, "meta.editorial.strengths", record.get("strengths"), max_chars=80, max_items=4),
-        "cautions": validate_string_list(errors, "meta.editorial.cautions", record.get("cautions"), max_chars=80, max_items=4),
-        "reading_route": reading_route,
         "research_position": validate_string_field(errors, "meta.editorial.research_position", record.get("research_position"), max_chars=84),
         "graph_worthy": validate_bool_field(errors, "meta.editorial.graph_worthy", record.get("graph_worthy")),
-        "next_read": validate_string_list(errors, "meta.editorial.next_read", record.get("next_read"), max_chars=36, max_items=4, display_safe=False),
     }
 
 
@@ -436,9 +416,6 @@ def validate_taxonomy(errors: list[str], value: Any) -> dict[str, Any]:
         "tasks": validate_string_list(errors, "meta.taxonomy.tasks", record.get("tasks"), max_chars=40, max_items=8, display_safe=False),
         "methods": validate_string_list(errors, "meta.taxonomy.methods", record.get("methods"), max_chars=40, max_items=8, display_safe=False),
         "modalities": validate_string_list(errors, "meta.taxonomy.modalities", record.get("modalities"), max_chars=24, max_items=6, display_safe=False),
-        "representations": validate_string_list(
-            errors, "meta.taxonomy.representations", record.get("representations"), max_chars=40, max_items=8, display_safe=False
-        ),
         "novelty_types": validate_string_list(errors, "meta.taxonomy.novelty_types", record.get("novelty_types"), max_chars=40, max_items=6, display_safe=False),
     }
 
@@ -471,35 +448,15 @@ def validate_comparison(errors: list[str], value: Any) -> dict[str, Any]:
     }
 
 
-def validate_asset_items(errors: list[str], path: str, value: Any) -> list[dict[str, str]]:
-    if not isinstance(value, list):
-        errors.append(f"{path} must be a list")
-        return []
-    result: list[dict[str, str]] = []
-    for index, item in enumerate(value):
-        record = validate_record(errors, f"{path}[{index}]", item)
-        role = validate_machine_string_field(errors, f"{path}[{index}].role", record.get("role"), required=True, max_chars=32) or ""
-        importance = validate_machine_string_field(errors, f"{path}[{index}].importance", record.get("importance"), required=True, max_chars=8) or ""
-        if role not in ASSET_ROLES:
-            errors.append(f"{path}[{index}].role must be one of {sorted(ASSET_ROLES)}")
-        if importance not in ASSET_IMPORTANCE:
-            errors.append(f"{path}[{index}].importance must be one of {sorted(ASSET_IMPORTANCE)}")
-        result.append(
-            {
-                "label": validate_machine_string_field(errors, f"{path}[{index}].label", record.get("label"), required=True, max_chars=24) or "",
-                "caption": validate_string_field(errors, f"{path}[{index}].caption", record.get("caption"), required=True, max_chars=220) or "",
-                "role": role,
-                "importance": importance,
-            }
-        )
-    return result
-
-
-def validate_assets(errors: list[str], value: Any) -> dict[str, Any]:
-    record = validate_record(errors, "meta.assets", value)
+def validate_discovery_axes(errors: list[str], value: Any) -> dict[str, Any]:
+    record = validate_record(errors, "meta.discovery_axes", value)
     return {
-        "figures": validate_asset_items(errors, "meta.assets.figures", record.get("figures")),
-        "tables": validate_asset_items(errors, "meta.assets.tables", record.get("tables")),
+        "problem": validate_string_list(errors, "meta.discovery_axes.problem", record.get("problem"), max_chars=40, max_items=8, display_safe=False),
+        "method": validate_string_list(errors, "meta.discovery_axes.method", record.get("method"), max_chars=40, max_items=8, display_safe=False),
+        "evaluation": validate_string_list(
+            errors, "meta.discovery_axes.evaluation", record.get("evaluation"), max_chars=40, max_items=8, display_safe=False
+        ),
+        "risk": validate_string_list(errors, "meta.discovery_axes.risk", record.get("risk"), max_chars=40, max_items=6, display_safe=False),
     }
 
 
@@ -585,11 +542,11 @@ def validate_meta_payload(meta_path: Path, payload: Any, paper_id: str, extracto
         "method": validate_method(errors, meta.get("method")),
         "evaluation": validate_evaluation(errors, meta.get("evaluation")),
         "claims": validate_claims(errors, meta.get("claims")),
-        "conclusion": validate_conclusion(errors, meta.get("conclusion")),
+        "research_risks": validate_research_risks(errors, meta.get("research_risks")),
         "editorial": validate_editorial(errors, meta.get("editorial")),
         "taxonomy": validate_taxonomy(errors, meta.get("taxonomy")),
         "comparison": validate_comparison(errors, meta.get("comparison")),
-        "assets": validate_assets(errors, meta.get("assets")),
+        "discovery_axes": validate_discovery_axes(errors, meta.get("discovery_axes")),
         "relation_candidates": validate_relation_candidates(errors, meta.get("relation_candidates")),
     }
 
@@ -836,11 +793,11 @@ def normalize_record(
         "method": meta["method"],
         "evaluation": meta["evaluation"],
         "claims": meta["claims"],
-        "conclusion": meta["conclusion"],
+        "research_risks": meta["research_risks"],
         "editorial": meta["editorial"],
         "taxonomy": meta["taxonomy"],
         "comparison": meta["comparison"],
-        "assets": meta["assets"],
+        "discovery_axes": meta["discovery_axes"],
         "relations": [],
     }
     record["relations"] = resolve_relations(

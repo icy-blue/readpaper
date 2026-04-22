@@ -13,14 +13,11 @@ Extract knowledge for:
 2. The paper-specific method mechanism
 3. The strongest evaluation signals
 4. Canonical taxonomy and comparison hooks
-5. A concise editorial reading judgment
+5. A concise research-position judgment plus graph anchors
 
 ## Field Guidance
 
 - `story.paper_one_liner`: one finished judgment sentence for quick scanning; do not splice fragments or emit `...`.
-- `story.problem`: describe the task difficulty or missing variable.
-- `story.method`: describe the paper's own mechanism or route.
-- `story.result`: describe the strongest grounded result or observed gain.
 - `research_problem.summary`: short problem definition, not conclusion text.
 - `research_problem.goal`: intended objective in plain language.
 - `core_contributions`: 2 to 4 concrete additions.
@@ -30,12 +27,13 @@ Extract knowledge for:
 - `evaluation.headline`: one result-first judgment line for readers.
 - `evaluation.key_findings`: concrete experiment takeaways.
 - `claims`: 2 to 5 falsifiable or comparable claims with grounded support.
-- `editorial.summary`: one editorial reading judgment.
-- `editorial.why_read`: 2 to 3 reasons to keep reading.
-- `editorial.reading_route`: `method`, `evaluation`, `comparison`, or `overview`.
+- `research_risks`: concise risk or limitation statements that matter for reproduction, comparison, or route choice.
+- `editorial.research_position`: short route-position judgment for related-work mapping.
 - `editorial.graph_worthy`: a conservative boolean for long-term graph value, not a synonym for `值得精读`.
 - `taxonomy`: canonical English labels only.
 - `comparison.aspects`: short reading-facing comparison hooks.
+- `discovery_axes.problem|method|evaluation`: compact canonical anchors for related-paper discovery.
+- `discovery_axes.risk`: secondary anchor only; do not let it dominate main similarity.
 
 ## Graph-Worthy Rubric
 
@@ -55,7 +53,7 @@ Keep it `false` when any of the following dominates the reading judgment:
 - the paper is too narrow, short-lived, or redundant to serve as a long-term anchor
 - an existing local paper already covers the same anchor role more clearly and this paper adds little new comparison value
 
-`editorial.graph_worthy` is independent from `editorial.verdict`: not every `值得精读` paper is graph-worthy, and a `值得浏览` paper may still be graph-worthy if it is the right comparison anchor.
+`editorial.graph_worthy` is independent from any read-worthiness judgment: a paper may be graph-worthy because it is the right anchor, even if it is not the best first read.
 
 ## Similarity And Relation Rules
 

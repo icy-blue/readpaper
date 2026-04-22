@@ -40,12 +40,7 @@ def make_record(
             "links": {"pdf": f"https://example.com/{paper_id}.pdf", "project": None, "code": None, "data": None},
         },
         "abstracts": {"raw": "raw", "zh": "中文摘要"},
-        "story": {
-            "paper_one_liner": "test summary",
-            "problem": "test problem",
-            "method": "test method",
-            "result": "test result",
-        },
+        "story": {"paper_one_liner": "test summary"},
         "research_problem": {"summary": "summary", "gaps": ["gap"], "goal": "goal"},
         "core_contributions": ["contribution"],
         "method": {
@@ -66,28 +61,22 @@ def make_record(
             "setup_summary": "setup",
         },
         "claims": [{"text": "claim", "type": "method", "support": ["section:Abstract"], "confidence": "high"}],
-        "conclusion": {"author": "author", "limitations": []},
-        "editorial": {
-            "verdict": "值得浏览",
-            "summary": "summary",
-            "why_read": ["why"],
-            "strengths": ["strength"],
-            "cautions": [],
-            "reading_route": "method",
-            "research_position": "position",
-            "graph_worthy": True,
-            "next_read": next_read or [],
-        },
+        "research_risks": ["limited-eval-coverage"],
+        "editorial": {"research_position": "position", "graph_worthy": True},
         "taxonomy": {
             "themes": [theme],
             "tasks": tasks,
             "methods": methods,
             "modalities": modalities,
-            "representations": representations or [],
             "novelty_types": [],
         },
         "comparison": {"aspects": [], "next_read": next_read or []},
-        "assets": {"figures": [], "tables": []},
+        "discovery_axes": {
+            "problem": [tasks[0].lower()] if tasks else [],
+            "method": [methods[0].lower()] if methods else [],
+            "evaluation": [baselines[0].lower()] if baselines else [],
+            "risk": ["limited-eval-coverage"],
+        },
         "relations": [],
     }
 
@@ -118,7 +107,7 @@ class BuildSiteDerivativesTests(unittest.TestCase):
         self.assertIn("primary", detail_payloads)
         self.assertNotIn("neighbors", primary)
 
-    def test_build_site_payload_derives_task_and_method_neighbors(self) -> None:
+    def test_build_site_payload_derives_problem_and_method_neighbors(self) -> None:
         primary = make_record(
             "primary",
             title="Primary Paper",
@@ -140,10 +129,10 @@ class BuildSiteDerivativesTests(unittest.TestCase):
 
         _, detail_payloads = build_site_payload([primary, peer])
         neighbors = detail_payloads["primary"]["neighbors"]
-        self.assertEqual(neighbors["task"][0]["paper_id"], "peer")
+        self.assertEqual(neighbors["problem"][0]["paper_id"], "peer")
         self.assertEqual(neighbors["method"][0]["paper_id"], "peer")
 
-    def test_build_site_payload_uses_explicit_next_read_for_comparison_neighbors(self) -> None:
+    def test_build_site_payload_uses_explicit_next_read_for_evaluation_neighbors(self) -> None:
         primary = make_record(
             "primary",
             title="Primary Paper",
@@ -163,11 +152,11 @@ class BuildSiteDerivativesTests(unittest.TestCase):
         )
 
         _, detail_payloads = build_site_payload([primary, baseline])
-        comparison = detail_payloads["primary"]["neighbors"]["comparison"]
-        self.assertEqual(comparison[0]["paper_id"], "baseline")
-        self.assertEqual(comparison[0]["match_source"], "explicit_target")
+        evaluation = detail_payloads["primary"]["neighbors"]["evaluation"]
+        self.assertEqual(evaluation[0]["paper_id"], "baseline")
+        self.assertEqual(evaluation[0]["match_source"], "explicit_target")
 
-    def test_build_site_payload_preserves_display_typography_for_editorial_lists(self) -> None:
+    def test_build_site_payload_keeps_research_position_in_cards(self) -> None:
         primary = make_record(
             "primary",
             title="Primary Paper",
@@ -176,14 +165,12 @@ class BuildSiteDerivativesTests(unittest.TestCase):
             methods=["Diffusion Model"],
             modalities=["Image", "3D"],
         )
-        primary["editorial"]["why_read"] = ["问题定义清楚,方法机制也比较完整。"]  # type: ignore[index]
-        primary["editorial"]["strengths"] = ["适合作为3D Reconstruction中Point Cloud Normal Estimation路线的代表样本。"]  # type: ignore[index]
+        primary["editorial"]["research_position"] = "适合作为3D Reconstruction中Point Cloud Normal Estimation路线的代表样本。"  # type: ignore[index]
 
         site_payload, _ = build_site_payload([primary])
         card = site_payload["papers"][0]
 
-        self.assertEqual(card["editorial"]["why_read"][0], "问题定义清楚，方法机制也比较完整。")
-        self.assertEqual(card["editorial"]["strengths"][0], "适合作为 3D Reconstruction 中 Point Cloud Normal Estimation 路线的代表样本。")
+        self.assertEqual(card["editorial"]["research_position"], "适合作为 3D Reconstruction 中 Point Cloud Normal Estimation 路线的代表样本。")
 
 
 if __name__ == "__main__":

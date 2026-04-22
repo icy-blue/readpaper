@@ -10,7 +10,6 @@ Write these files under `outputs/site/`:
 - `site-index.json`
 - `index.html`
 - `papers/<paper-id>.json`
-- `assets/*`
 
 ## `index.md`
 
@@ -47,6 +46,6 @@ The site should include:
 
 - homepage search and filters
 - featured reading cards
-- homepage-only detail workspace focused on story / method / evaluation / editorial / comparison
+- homepage-only detail workspace focused on `Overview / Method / Graph`
 - on-demand loading of `papers/<paper-id>.json`
 - no standalone paper page entry

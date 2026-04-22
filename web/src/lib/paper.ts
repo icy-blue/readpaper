@@ -1,7 +1,5 @@
 import type {
   Bibliography,
-  EditorialBlock,
-  FigureTableIndexItem,
   NeighborItem,
   PaperCardView,
   PaperDetailViewModel,
@@ -27,14 +25,6 @@ const DISPLAY_VALUE_LABELS: Record<string, string> = {
   "data curation": "数据构建",
 };
 
-const FIGURE_ROLE_LABELS: Record<string, string> = {
-  method_overview: "方法总览",
-  qualitative_result: "定性结果",
-  quantitative_result: "定量结果",
-  ablation: "消融实验",
-  failure_case: "失败案例",
-};
-
 const COMPARISON_ASPECT_LABELS: Record<string, string> = {
   method: "方法差异",
   result: "结果差异",
@@ -58,11 +48,18 @@ const RELATION_TYPE_LABELS: Record<string, string> = {
 };
 
 const SIGNAL_LABELS: Record<string, string> = {
+  problem: "问题线",
   tasks: "任务",
   themes: "主题",
+  method: "方法谱系",
   methods: "方法",
+  evaluation: "实验轴",
   modalities: "模态",
   representations: "表示",
+  baselines: "基线",
+  datasets: "数据集",
+  metrics: "指标",
+  risk: "风险",
   targets: "线索",
 };
 
@@ -184,9 +181,6 @@ function validateStory(issues: string[], path: string, value: unknown): void {
     return;
   }
   expectOptionalString(issues, `${path}.paper_one_liner`, record.paper_one_liner);
-  expectOptionalString(issues, `${path}.problem`, record.problem);
-  expectOptionalString(issues, `${path}.method`, record.method);
-  expectOptionalString(issues, `${path}.result`, record.result);
 }
 
 function validateEditorial(issues: string[], path: string, value: unknown): void {
@@ -194,15 +188,8 @@ function validateEditorial(issues: string[], path: string, value: unknown): void
   if (!record) {
     return;
   }
-  expectOptionalString(issues, `${path}.verdict`, record.verdict);
-  expectOptionalString(issues, `${path}.summary`, record.summary);
-  expectStringArray(issues, `${path}.why_read`, record.why_read);
-  expectStringArray(issues, `${path}.strengths`, record.strengths);
-  expectStringArray(issues, `${path}.cautions`, record.cautions);
-  expectString(issues, `${path}.reading_route`, record.reading_route);
   expectOptionalString(issues, `${path}.research_position`, record.research_position);
   expectBoolean(issues, `${path}.graph_worthy`, record.graph_worthy);
-  expectStringArray(issues, `${path}.next_read`, record.next_read);
 }
 
 function validateTaxonomy(issues: string[], path: string, value: unknown): void {
@@ -214,7 +201,6 @@ function validateTaxonomy(issues: string[], path: string, value: unknown): void 
   expectStringArray(issues, `${path}.tasks`, record.tasks);
   expectStringArray(issues, `${path}.methods`, record.methods);
   expectStringArray(issues, `${path}.modalities`, record.modalities);
-  expectStringArray(issues, `${path}.representations`, record.representations);
   expectStringArray(issues, `${path}.novelty_types`, record.novelty_types);
 }
 
@@ -223,7 +209,7 @@ function validateNeighborGroups(issues: string[], path: string, value: unknown):
   if (!record) {
     return;
   }
-  (["task", "method", "comparison"] as const).forEach((key) => {
+  (["problem", "method", "evaluation"] as const).forEach((key) => {
     const items = expectObjectArray(issues, `${path}.${key}`, record[key]);
     items?.forEach((item, index) => {
       expectString(issues, `${path}.${key}[${index}].paper_id`, item.paper_id);
@@ -237,20 +223,15 @@ function validateNeighborGroups(issues: string[], path: string, value: unknown):
   });
 }
 
-function validateAssets(issues: string[], path: string, value: unknown): void {
+function validateDiscoveryAxes(issues: string[], path: string, value: unknown): void {
   const record = expectRecord(issues, path, value);
   if (!record) {
     return;
   }
-  (["figures", "tables"] as const).forEach((key) => {
-    const items = expectObjectArray(issues, `${path}.${key}`, record[key]);
-    items?.forEach((item, index) => {
-      expectString(issues, `${path}.${key}[${index}].label`, item.label);
-      expectString(issues, `${path}.${key}[${index}].caption`, item.caption);
-      expectString(issues, `${path}.${key}[${index}].role`, item.role);
-      expectString(issues, `${path}.${key}[${index}].importance`, item.importance);
-    });
-  });
+  expectStringArray(issues, `${path}.problem`, record.problem);
+  expectStringArray(issues, `${path}.method`, record.method);
+  expectStringArray(issues, `${path}.evaluation`, record.evaluation);
+  expectStringArray(issues, `${path}.risk`, record.risk);
 }
 
 function validateRelations(issues: string[], path: string, value: unknown): void {
@@ -331,17 +312,13 @@ function validateCanonical(issues: string[], path: string, value: unknown): void
     expectOptionalString(issues, `${path}.evaluation.setup_summary`, evaluation.setup_summary);
   }
   expectObjectArray(issues, `${path}.claims`, record.claims);
-  const conclusion = expectRecord(issues, `${path}.conclusion`, record.conclusion);
-  if (conclusion) {
-    expectOptionalString(issues, `${path}.conclusion.author`, conclusion.author);
-    expectStringArray(issues, `${path}.conclusion.limitations`, conclusion.limitations);
-  }
+  expectStringArray(issues, `${path}.research_risks`, record.research_risks);
   const comparison = expectRecord(issues, `${path}.comparison`, record.comparison);
   if (comparison) {
     expectObjectArray(issues, `${path}.comparison.aspects`, comparison.aspects);
     expectStringArray(issues, `${path}.comparison.next_read`, comparison.next_read);
   }
-  validateAssets(issues, `${path}.assets`, record.assets);
+  validateDiscoveryAxes(issues, `${path}.discovery_axes`, record.discovery_axes);
   validateRelations(issues, `${path}.relations`, record.relations);
 }
 
@@ -457,11 +434,7 @@ export function searchableText(paper: PaperCardView): string {
     paper.bibliography.venue,
     String(paper.bibliography.year ?? ""),
     paper.story.paper_one_liner ?? "",
-    paper.story.problem ?? "",
-    paper.story.method ?? "",
-    paper.story.result ?? "",
-    paper.editorial.summary ?? "",
-    ...paper.editorial.why_read,
+    paper.editorial.research_position ?? "",
     ...paper.taxonomy.themes,
     ...paper.taxonomy.tasks,
     ...paper.taxonomy.methods,
@@ -496,42 +469,6 @@ export function displayValueLabel(value: string | null | undefined): string {
   return DISPLAY_VALUE_LABELS[content.toLowerCase()] || content;
 }
 
-export function recommendedRouteLabel(value: EditorialBlock["reading_route"]): string {
-  if (value === "method") {
-    return "先看方法";
-  }
-  if (value === "evaluation") {
-    return "先看实验";
-  }
-  if (value === "comparison") {
-    return "先看对比";
-  }
-  return "先看概述";
-}
-
-export function verdictTagClass(value: EditorialBlock["verdict"]): string {
-  if (value === "值得精读") {
-    return "chip-tag chip-tag-verdict-strong";
-  }
-  if (value === "值得浏览") {
-    return "chip-tag chip-tag-verdict-browse";
-  }
-  return "chip-tag chip-tag-verdict-muted";
-}
-
-export function routeTagClass(value: EditorialBlock["reading_route"]): string {
-  if (value === "method") {
-    return "chip-tag chip-tag-route-method";
-  }
-  if (value === "evaluation") {
-    return "chip-tag chip-tag-route-evaluation";
-  }
-  if (value === "comparison") {
-    return "chip-tag chip-tag-route-comparison";
-  }
-  return "chip-tag chip-tag-route-overview";
-}
-
 export function scoreLevelTagClass(value: NeighborItem["score_level"]): string {
   if (value === "high") {
     return "chip-tag chip-tag-worth";
@@ -550,16 +487,6 @@ export function scoreLevelLabel(level: string | null | undefined): string {
     return "中相关";
   }
   return "低相关";
-}
-
-export function importanceTagClass(value: FigureTableIndexItem["importance"]): string {
-  if (value === "high") {
-    return "chip-tag chip-tag-worth";
-  }
-  if (value === "medium") {
-    return "chip-tag chip-tag-tone-blue";
-  }
-  return "chip-tag chip-tag-verdict-muted";
 }
 
 export function chipToneClass(value?: string | null): string {
@@ -586,10 +513,6 @@ export function confidenceTone(confidence: string | null | undefined): "green" |
     return "gold";
   }
   return "default";
-}
-
-export function displayFigureRole(value: string): string {
-  return FIGURE_ROLE_LABELS[value] || value;
 }
 
 export function displayComparisonAspect(value: string): string {
@@ -622,14 +545,6 @@ export function relationConfidenceLabel(value: number | null | undefined): strin
     return null;
   }
   return `可信度 ${value.toFixed(2)}`;
-}
-
-export function filterFigureTableItems(items: FigureTableIndexItem[], query: string): FigureTableIndexItem[] {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) {
-    return items;
-  }
-  return items.filter((item) => `${item.label} ${item.caption} ${item.role}`.toLowerCase().includes(normalized));
 }
 
 export function matchesTags(paperTags: string[], selected: string[]): boolean {

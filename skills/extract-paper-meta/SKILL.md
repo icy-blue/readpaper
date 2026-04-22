@@ -25,7 +25,7 @@ It does not write the final canonical paper record.
    - `problem`
    - `method`
    - `evaluation`
-   - `conclusion`
+   - `conclusion / risk`
 4. Extract `relation_candidates` from explicit evidence first, then add conservative heuristic candidates only when the contract allows them.
 5. Write one v2 meta artifact matching `references/meta-contract.md`.
 6. Save it to `outputs/meta/<paper-id>.json`.
@@ -39,6 +39,7 @@ It does not write the final canonical paper record.
 - Keep paper titles, method names, dataset names, URLs, and formula-like tokens in their original form.
 - Keep taxonomy labels canonical and English.
 - Do not emit old schema blocks such as `summary`, `reading_digest`, `storyline`, `method_core`, `benchmarks_or_eval`, `editorial_review`, or `retrieval_profile`.
+- Do not emit removed v6 fields such as `story.problem`, `story.method`, `story.result`, `editorial.verdict`, `editorial.reading_route`, `editorial.next_read`, `conclusion`, `taxonomy.representations`, or `assets`.
 - Do not copy long paragraphs verbatim into short fields.
 - Do not emit `...` or hard-truncated half-sentences.
 - Do not let baseline descriptions overwrite the paper's own method summary.
@@ -46,6 +47,7 @@ It does not write the final canonical paper record.
 - Only emit `relation_candidates`, never final canonical `relations`.
 - Prefer explicit `compares_to` / `extends` / `uses_method` over heuristic candidates.
 - Heuristic candidates are limited to `compares_to` and `same_problem`.
+- Keep `meta.discovery_axes` as short canonical labels grouped into `problem / method / evaluation / risk`, not sentences and not final graph edges.
 - Treat `meta.editorial.graph_worthy` as a conservative graph-anchor flag, not a generic quality score.
 - Set `meta.editorial.graph_worthy` to `true` only when at least 2 grounded signals are present: representative route anchor, clear comparison anchor, reusable mechanism reference, or durable evidence anchor.
 - Keep `meta.editorial.graph_worthy` `false` for incremental-only papers, incomplete evidence, overly narrow papers, or papers already fully covered by a stronger local anchor.
@@ -54,13 +56,14 @@ It does not write the final canonical paper record.
 
 Before writing the JSON, verify:
 
-- `meta.story` contains only paper-facing story fields
+- `meta.story` 只保留 `paper_one_liner`
 - `meta.method.inputs` and `meta.method.outputs` are the only canonical task I/O fields
 - `meta.evaluation.baselines` contains only explicit baselines named in the paper
-- `meta.editorial.reading_route` is one of `method`, `evaluation`, `comparison`, or `overview`
-- `meta.editorial.graph_worthy` follows the graph-worthy rubric and is not inferred directly from `meta.editorial.verdict`
+- `meta.research_risks` captures concrete reproduction / comparison risks, not泛泛而谈
+- `meta.editorial` 只保留 `research_position` 和 `graph_worthy`
+- `meta.editorial.graph_worthy` follows the graph-worthy rubric and is not inferred from a generic read-worthiness judgment
 - `meta.taxonomy` uses English canonical labels only
-- `meta.comparison.next_read` and `meta.editorial.next_read` are short target names, not sentences
-- `meta.assets` contains figure/table items with grounded `role` and `importance`
+- `meta.comparison.next_read` contains short target names, not sentences
+- `meta.discovery_axes.*` are short canonical labels with clear grouping
 - `meta.relation_candidates` only contains `type`, `target_name`, `description`, `confidence_hint`, and `evidence_mode`
 - `meta.relation_candidates[].evidence_mode` is `explicit` or `heuristic`

@@ -6,7 +6,7 @@ export interface SiteMeta {
 
 export interface NavigationConfig {
   home_route: string;
-  neighbor_tabs: Array<{ key: "task" | "method" | "comparison"; label: string }>;
+  neighbor_tabs: Array<{ key: "problem" | "method" | "evaluation"; label: string }>;
   filter_groups: Array<{ key: "themes" | "tasks" | "methods"; label: string }>;
 }
 
@@ -52,9 +52,6 @@ export interface SourceInfo {
 
 export interface StoryBlock {
   paper_one_liner: string | null;
-  problem: string | null;
-  method: string | null;
-  result: string | null;
 }
 
 export interface ResearchProblem {
@@ -89,21 +86,9 @@ export interface ClaimItem {
   confidence: "high" | "medium" | "low" | string;
 }
 
-export interface ConclusionBlock {
-  author: string | null;
-  limitations: string[];
-}
-
 export interface EditorialBlock {
-  verdict: "值得精读" | "值得浏览" | "只记结论" | string | null;
-  summary: string | null;
-  why_read: string[];
-  strengths: string[];
-  cautions: string[];
-  reading_route: "method" | "evaluation" | "comparison" | "overview" | string;
   research_position: string | null;
   graph_worthy: boolean;
-  next_read: string[];
 }
 
 export interface TaxonomyBlock {
@@ -111,7 +96,6 @@ export interface TaxonomyBlock {
   tasks: string[];
   methods: string[];
   modalities: string[];
-  representations: string[];
   novelty_types: string[];
 }
 
@@ -125,16 +109,11 @@ export interface ComparisonBlock {
   next_read: string[];
 }
 
-export interface FigureTableIndexItem {
-  label: string;
-  caption: string;
-  role: string;
-  importance: "high" | "medium" | "low" | string;
-}
-
-export interface AssetsBlock {
-  figures: FigureTableIndexItem[];
-  tables: FigureTableIndexItem[];
+export interface DiscoveryAxesBlock {
+  problem: string[];
+  method: string[];
+  evaluation: string[];
+  risk: string[];
 }
 
 export interface RelationItem {
@@ -160,11 +139,11 @@ export interface PaperCanonicalRecord {
   method: MethodBlock;
   evaluation: EvaluationBlock;
   claims: ClaimItem[];
-  conclusion: ConclusionBlock;
+  research_risks: string[];
   editorial: EditorialBlock;
   taxonomy: TaxonomyBlock;
   comparison: ComparisonBlock;
-  assets: AssetsBlock;
+  discovery_axes: DiscoveryAxesBlock;
   relations: RelationItem[];
 }
 
@@ -192,9 +171,9 @@ export interface NeighborItem {
 }
 
 export interface NeighborGroups {
-  task: NeighborItem[];
+  problem: NeighborItem[];
   method: NeighborItem[];
-  comparison: NeighborItem[];
+  evaluation: NeighborItem[];
 }
 
 export interface PaperDetailViewModel {

@@ -58,7 +58,7 @@ def raw_payload(*, pdf_url: str | None = "https://translate.local/paper.pdf") ->
     }
 
 
-def meta_artifact(*, version: str = "meta-v5") -> dict[str, object]:
+def meta_artifact(*, version: str = "meta-v7") -> dict[str, object]:
     return {
         "paper_id": "demo-paper",
         "extractor_version": version,
@@ -68,9 +68,6 @@ def meta_artifact(*, version: str = "meta-v5") -> dict[str, object]:
         "meta": {
             "story": {
                 "paper_one_liner": "一篇把单图 3D 生成做得更稳的论文。",
-                "problem": "单图 3D 生成仍容易在稳定性和质量之间失衡。",
-                "method": "通过扩散生成路线稳定单图到 3D 的建模过程。",
-                "result": "在公开基准上拿到更稳的生成质量。",
             },
             "research_problem": {
                 "summary": "现有单图 3D 生成在结果质量和稳定性之间仍有明显张力。",
@@ -106,36 +103,27 @@ def meta_artifact(*, version: str = "meta-v5") -> dict[str, object]:
                     "confidence": "high",
                 }
             ],
-            "conclusion": {
-                "author": "作者认为该方法能更稳定地提升单图 3D 生成质量。",
-                "limitations": ["评测场景还不够广。"],
-            },
+            "research_risks": ["评测场景还不够广。"],
             "editorial": {
-                "verdict": "值得精读",
-                "summary": "更适合作为路线判断样本。",
-                "why_read": ["方法动作清楚。", "结果信号直接。"],
-                "strengths": ["路线清楚。", "结果信号直接。"],
-                "cautions": ["评测覆盖面还不算很宽。"],
-                "reading_route": "method",
                 "research_position": "可作为单图 3D 生成扩散路线的代表样本。",
                 "graph_worthy": True,
-                "next_read": ["BaselineNet"],
             },
             "taxonomy": {
                 "themes": ["3D Generation"],
                 "tasks": ["Image-to-3D"],
                 "methods": ["Diffusion Model"],
                 "modalities": ["Image", "3D"],
-                "representations": ["Mesh"],
                 "novelty_types": ["Representation Modeling"],
             },
             "comparison": {
                 "aspects": [{"aspect": "method", "difference": "更强调生成稳定性而不是只追求峰值质量。"}],
                 "next_read": ["BaselineNet"],
             },
-            "assets": {
-                "figures": [{"label": "Figure 1", "caption": "Method overview.", "role": "method_overview", "importance": "high"}],
-                "tables": [{"label": "Table 1", "caption": "Benchmark comparison.", "role": "quantitative_result", "importance": "high"}],
+            "discovery_axes": {
+                "problem": ["single-image-3d-stability"],
+                "method": ["diffusion-image-to-3d"],
+                "evaluation": ["objaverse-benchmark-line"],
+                "risk": ["limited-eval-coverage"],
             },
             "relation_candidates": [
                 {
@@ -186,7 +174,7 @@ def local_target_record() -> dict[str, object]:
             "links": {"pdf": None, "project": None, "code": None, "data": None},
         },
         "abstracts": {"raw": None, "zh": None},
-        "story": {"paper_one_liner": None, "problem": None, "method": None, "result": None},
+        "story": {"paper_one_liner": None},
         "research_problem": {"summary": None, "gaps": [], "goal": None},
         "core_contributions": [],
         "method": {
@@ -200,28 +188,17 @@ def local_target_record() -> dict[str, object]:
         },
         "evaluation": {"headline": None, "datasets": [], "metrics": [], "baselines": [], "key_findings": [], "setup_summary": None},
         "claims": [],
-        "conclusion": {"author": None, "limitations": []},
-        "editorial": {
-            "verdict": None,
-            "summary": None,
-            "why_read": [],
-            "strengths": [],
-            "cautions": [],
-            "reading_route": "overview",
-            "research_position": None,
-            "graph_worthy": False,
-            "next_read": [],
-        },
+        "research_risks": [],
+        "editorial": {"research_position": None, "graph_worthy": False},
         "taxonomy": {
             "themes": ["3D Generation"],
             "tasks": ["Image-to-3D"],
             "methods": ["Reconstruction"],
             "modalities": ["Image", "3D"],
-            "representations": ["Mesh"],
             "novelty_types": [],
         },
         "comparison": {"aspects": [], "next_read": []},
-        "assets": {"figures": [], "tables": []},
+        "discovery_axes": {"problem": [], "method": [], "evaluation": [], "risk": []},
         "relations": [],
     }
 
@@ -231,39 +208,40 @@ class NormalizePapersTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             config_path = Path(tempdir) / "extractor-config.json"
             meta_path = Path(tempdir) / "demo-paper.json"
-            config_path.write_text(json.dumps({"extractor_version": "meta-v5"}), encoding="utf-8")
+            config_path.write_text(json.dumps({"extractor_version": "meta-v7"}), encoding="utf-8")
             meta_path.write_text(json.dumps(meta_artifact(), ensure_ascii=False), encoding="utf-8")
 
             version = read_extractor_version(config_path)
-            self.assertEqual(version, "meta-v5")
+            self.assertEqual(version, "meta-v7")
             self.assertTrue(meta_artifact_is_current(meta_path, version))
-            self.assertFalse(meta_artifact_is_current(meta_path, "meta-v6"))
+            self.assertFalse(meta_artifact_is_current(meta_path, "meta-v8"))
 
-    def test_validate_meta_payload_accepts_v5_artifact(self) -> None:
+    def test_validate_meta_payload_accepts_v7_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             meta_path = Path(tempdir) / "demo-paper.json"
             payload = meta_artifact()
             meta_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
-            validated = validate_meta_payload(meta_path, payload, "demo-paper", "meta-v5")
+            validated = validate_meta_payload(meta_path, payload, "demo-paper", "meta-v7")
             self.assertEqual(validated["meta"]["story"]["paper_one_liner"], "一篇把单图 3D 生成做得更稳的论文。")
-            self.assertEqual(validated["meta"]["editorial"]["reading_route"], "method")
             self.assertIn("Diffusion Model", validated["meta"]["taxonomy"]["methods"])
+            self.assertEqual(validated["meta"]["research_risks"][0], "评测场景还不够广。")
+            self.assertEqual(validated["meta"]["discovery_axes"]["problem"][0], "single-image-3d-stability")
             self.assertEqual(validated["meta"]["relation_candidates"][0]["target_name"], "BaselineNet")
 
     def test_validate_meta_payload_normalizes_chinese_display_text(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             meta_path = Path(tempdir) / "demo-paper.json"
             payload = meta_artifact()
-            payload["meta"]["story"]["problem"] = "常用的“先检测后匹配”注册方法在跨模态场景中面临困难,原因在于关键点检测不兼容以及特征描述不一致。"  # type: ignore[index]
+            payload["meta"]["research_problem"]["summary"] = "常用的“先检测后匹配”注册方法在跨模态场景中面临困难,原因在于关键点检测不兼容以及特征描述不一致。"  # type: ignore[index]
             payload["meta"]["editorial"]["research_position"] = "适合作为3D Reconstruction中Point Cloud Normal Estimation路线的代表样本。"  # type: ignore[index]
             payload["meta"]["claims"][0]["text"] = "我们通过(PnP)求解器提升2D3D-MATR在KITTI数据集上的效果!"  # type: ignore[index]
             meta_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
-            validated = validate_meta_payload(meta_path, payload, "demo-paper", "meta-v5")
+            validated = validate_meta_payload(meta_path, payload, "demo-paper", "meta-v7")
 
             self.assertEqual(
-                validated["meta"]["story"]["problem"],
+                validated["meta"]["research_problem"]["summary"],
                 "常用的“先检测后匹配”注册方法在跨模态场景中面临困难，原因在于关键点检测不兼容以及特征描述不一致。",
             )
             self.assertEqual(
@@ -293,7 +271,7 @@ class NormalizePapersTests(unittest.TestCase):
             raw_path.write_text(json.dumps(raw_payload(), ensure_ascii=False), encoding="utf-8")
             meta_path.write_text(json.dumps(meta_artifact(), ensure_ascii=False), encoding="utf-8")
 
-            record = normalize_raw_file(raw_path, meta_path=meta_path, extractor_version="meta-v5")
+            record = normalize_raw_file(raw_path, meta_path=meta_path, extractor_version="meta-v7")
 
             self.assertEqual(record["id"], "demo-paper")
             self.assertEqual(record["source"]["conversation_ids"], ["conv-1"])
@@ -303,6 +281,7 @@ class NormalizePapersTests(unittest.TestCase):
             self.assertIsNone(record["abstracts"]["raw"])
             self.assertEqual(record["abstracts"]["zh"], "我们提出 Demo 方法，并在公开基准上显著优于 baseline。代码见 https://github.com/demo/repo。")
             self.assertIn("Image-to-3D", record["taxonomy"]["tasks"])
+            self.assertEqual(record["research_risks"], ["评测场景还不够广。"])
             self.assertNotIn("reading_digest", record)
             self.assertNotIn("paper_neighbors", record)
 
@@ -330,7 +309,7 @@ class NormalizePapersTests(unittest.TestCase):
             record = normalize_raw_file(
                 raw_path,
                 meta_path=meta_path,
-                extractor_version="meta-v5",
+                extractor_version="meta-v7",
                 registry_items=registry_items,
             )
 
@@ -351,7 +330,7 @@ class NormalizePapersTests(unittest.TestCase):
             record = normalize_raw_file(
                 raw_path,
                 meta_path=meta_path,
-                extractor_version="meta-v5",
+                extractor_version="meta-v7",
                 registry_items=[],
             )
 
@@ -372,7 +351,7 @@ class NormalizePapersTests(unittest.TestCase):
             record = normalize_raw_file(
                 raw_path,
                 meta_path=meta_path,
-                extractor_version="meta-v5",
+                extractor_version="meta-v7",
                 registry_items=[],
             )
 
@@ -397,7 +376,7 @@ class NormalizePapersTests(unittest.TestCase):
             ]
             meta_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
-            record = normalize_raw_file(raw_path, meta_path=meta_path, extractor_version="meta-v5")
+            record = normalize_raw_file(raw_path, meta_path=meta_path, extractor_version="meta-v7")
 
             self.assertEqual(record["relations"], [])
 

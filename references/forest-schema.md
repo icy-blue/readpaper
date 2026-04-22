@@ -30,10 +30,7 @@ Each homepage paper card should keep only discovery-facing fields:
 - title / authors / venue / year
 - links
 - `story.paper_one_liner`
-- `editorial.verdict`
-- `editorial.summary`
-- `editorial.why_read`
-- `editorial.reading_route`
+- `editorial.research_position`
 - `editorial.graph_worthy`
 - `taxonomy.themes|tasks|methods|modalities|novelty_types`
 - compatibility `source` fields if the generators still need them, but the published site no longer exposes standalone paper pages
@@ -43,15 +40,15 @@ Each homepage paper card should keep only discovery-facing fields:
 Each `outputs/site/papers/<paper-id>.json` should expose homepage detail data only:
 
 - `canonical`: the full canonical paper record
-- `neighbors`: derived `task` / `method` / `comparison` neighbor groups
+- `neighbors`: derived `problem` / `method` / `evaluation` neighbor groups
 
 No canonical paper file should be mutated to store those neighbors.
 
 ## Neighbor Rules
 
-- `task` neighbors require shared `taxonomy.tasks`
-- `method` neighbors require shared `taxonomy.methods` or `taxonomy.representations`
-- `comparison` neighbors prefer explicit `comparison.next_read`, then explicit baseline-name/title matches, then same-task-different-route contrasts
+- `problem` neighbors prefer shared `discovery_axes.problem`, and may fall back to `taxonomy.tasks`
+- `method` neighbors prefer shared `discovery_axes.method`, then `taxonomy.methods` or `method.representations`
+- `evaluation` neighbors prefer explicit `comparison.next_read`, then shared `discovery_axes.evaluation`, then explicit baseline / dataset / metric matches
 - keep at most 3 neighbors per dimension
 - each neighbor must include `reason`, `reason_short`, `score_level`, and `shared_signals`
 

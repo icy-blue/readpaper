@@ -1,4 +1,4 @@
-import { Button, Drawer, Empty, Flex, Grid, Input, Modal, Popover, Select, Tag, Tooltip, Typography } from "antd";
+import { Button, Drawer, Empty, Flex, Grid, Input, Modal, Popover, Select, Tooltip, Typography } from "antd";
 import {
   CalendarOutlined,
   CheckOutlined,
@@ -17,10 +17,7 @@ import {
   formatLocalDateTimeDetail,
   matchesTags,
   matchesTitleQuery,
-  recommendedRouteLabel,
-  routeTagClass,
   selectedFilterSummary,
-  verdictTagClass,
 } from "../lib/paper";
 import { OverflowCount, TooltipTag } from "../components/OverflowTooltip";
 import type { PaperCardView, SiteIndexPayload } from "../types";
@@ -337,15 +334,16 @@ function PaperListItem({
 
   return (
     <button type="button" ref={itemRef} className={`paper-list-item${selected ? " is-selected" : ""}`} onClick={onSelect}>
-      <Flex wrap="wrap" gap={8} className="paper-list-item-decision">
-        {paper.editorial.verdict ? <Tag className={verdictTagClass(paper.editorial.verdict)}>{paper.editorial.verdict}</Tag> : null}
-        <Tag className={routeTagClass(paper.editorial.reading_route)}>{recommendedRouteLabel(paper.editorial.reading_route)}</Tag>
-        {paper.bibliography.citation_count !== null ? <Tag className="chip-tag chip-tag-citation">{`引用 ${paper.bibliography.citation_count}`}</Tag> : null}
-      </Flex>
       <Text className="paper-list-item-title">{paper.bibliography.title}</Text>
       <Paragraph className="paper-list-item-meta">
         {authorSummary(paper)} · {paper.bibliography.venue || "未知 venue"} · {paper.bibliography.year || "未知年份"}
       </Paragraph>
+      {paper.story.paper_one_liner ? (
+        <Paragraph className="workspace-body-copy">{paper.story.paper_one_liner}</Paragraph>
+      ) : null}
+      {paper.editorial.research_position ? (
+        <Paragraph className="workspace-support-copy">{paper.editorial.research_position}</Paragraph>
+      ) : null}
       <div className="paper-list-item-tags">
         {visibleTagLabels.map((tagLabel) => (
           <TooltipTag key={`${paper.id}-${tagLabel}`} label={tagLabel} maxChars={18} className="chip-tag chip-tag-tone-blue" />

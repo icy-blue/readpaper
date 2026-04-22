@@ -43,10 +43,7 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
     "zh": "中文摘要……"
   },
   "story": {
-    "paper_one_liner": "把规范空间直接引入开放世界 3D part segmentation 的代表工作。",
-    "problem": "现有开放世界 3D part segmentation 缺少稳定的规范空间建模。",
-    "method": "通过 canonical spatial modeling 与双分支训练目标学习可迁移的规范空间。",
-    "result": "在多组 promptable segmentation 设定下结果更稳且更强。"
+    "paper_one_liner": "把规范空间直接引入开放世界 3D part segmentation 的代表工作。"
   },
   "research_problem": {
     "summary": "开放世界 promptable 3D segmentation 在任意姿态和跨类别场景下仍不稳定。",
@@ -93,27 +90,16 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
       "confidence": "high"
     }
   ],
-  "conclusion": {
-    "author": "作者认为 canonical space 是开放世界 3D understanding 的关键缺失变量。",
-    "limitations": []
-  },
+  "research_risks": [],
   "editorial": {
-    "verdict": "值得精读",
-    "summary": "适合作为 canonical-space 3D understanding 路线的代表样本。",
-    "why_read": ["方法动机和机制都很明确。", "和 Find3D 的对比线清楚。"],
-    "strengths": ["canonical-space 变量引入得自然。", "实验设置覆盖姿态与 prompt 变化。"],
-    "cautions": ["主要仍聚焦于 segmentation 任务。"],
-    "reading_route": "method",
     "research_position": "可作为开放世界 3D part reasoning 的关键对照样本。",
-    "graph_worthy": true,
-    "next_read": ["Find3D"]
+    "graph_worthy": true
   },
   "taxonomy": {
     "themes": ["3D Understanding"],
     "tasks": ["Semantic Segmentation", "Open-Vocabulary Segmentation"],
     "methods": ["Large Language Model", "Point Transformer", "Canonical Spatial Modeling"],
     "modalities": ["3D", "Text"],
-    "representations": ["Point Cloud", "Canonical Map", "Bounding Box", "Normals"],
     "novelty_types": ["Representation Modeling", "Architecture Design", "Data Curation"]
   },
   "comparison": {
@@ -129,23 +115,11 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
     ],
     "next_read": ["Find3D"]
   },
-  "assets": {
-    "figures": [
-      {
-        "label": "Figure 1",
-        "caption": "Method overview.",
-        "role": "method_overview",
-        "importance": "high"
-      }
-    ],
-    "tables": [
-      {
-        "label": "Table 1",
-        "caption": "Quantitative comparison on promptable segmentation benchmarks.",
-        "role": "quantitative_result",
-        "importance": "high"
-      }
-    ]
+  "discovery_axes": {
+    "problem": ["open-world-3d-part-segmentation"],
+    "method": ["canonical-spatial-modeling"],
+    "evaluation": ["3dcompat-promptable-benchmark-line"],
+    "risk": []
   },
   "relations": [
     {
@@ -177,16 +151,17 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
 - `bibliography.links`: only reader-facing URLs such as PDF / project / code / data.
 - `abstracts.raw`: original-language abstract when locally available from prior enrichment; keep it `null` rather than querying external services during assembly.
 - `abstracts.zh`: translated abstract from the translate conversation.
-- `story`: short reading-facing summary of the paper itself.
+- `story.paper_one_liner`: short reading-facing summary of the paper itself.
 - `research_problem`: grounded formulation of the problem, gaps, and goal.
 - `method.inputs` / `method.outputs`: canonical task I/O facts; do not repeat elsewhere.
 - `evaluation.baselines`: explicit comparison methods named in the paper.
 - `claims`: falsifiable or comparable claims with grounded support references.
-- `editorial`: editor-facing reading judgment for humans.
+- `research_risks`: reproduction, comparison, or generalization risks distilled from the whole paper.
+- `editorial`: lightweight positioning / curation signal for humans.
 - `editorial.graph_worthy`: conservative long-term curation flag for graph anchors; set it only when the paper has durable route or comparison value beyond a one-off strong read.
 - `taxonomy`: canonical English labels only. Translate only in view/render layers.
 - `comparison.aspects`: short comparison hooks for reading and relation building.
-- `assets`: figure/table reading index with stable role and importance labels.
+- `discovery_axes`: stable paper-level anchors for problem / method / evaluation discovery; not final graph edges.
 - `relations`: normalized typed graph edges only; do not store generic neighbors, unresolved names, or retrieval artifacts here.
 - `relations.target_kind`: `local` or `external`.
 - `relations.target_paper_id`: required when `target_kind` is `local`.

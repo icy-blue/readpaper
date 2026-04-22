@@ -105,6 +105,27 @@ def tag_group(record: dict[str, Any], group: str) -> list[str]:
     return ensure_machine_strings(taxonomy.get(group))
 
 
+def discovery_group(record: dict[str, Any], group: str) -> list[str]:
+    discovery_axes = record.get("discovery_axes")
+    if not isinstance(discovery_axes, dict):
+        return []
+    return ensure_machine_strings(discovery_axes.get(group))
+
+
+def method_group(record: dict[str, Any], group: str) -> list[str]:
+    method = record.get("method")
+    if not isinstance(method, dict):
+        return []
+    return ensure_machine_strings(method.get(group))
+
+
+def evaluation_group(record: dict[str, Any], group: str) -> list[str]:
+    evaluation = record.get("evaluation")
+    if not isinstance(evaluation, dict):
+        return []
+    return ensure_machine_strings(evaluation.get(group))
+
+
 def source_block(record: dict[str, Any]) -> dict[str, Any]:
     source = record.get("source")
     if not isinstance(source, dict):
@@ -158,27 +179,16 @@ def card_view(record: dict[str, Any]) -> dict[str, Any]:
         "bibliography": bibliography_block(record),
         "story": {
             "paper_one_liner": normalize_display_text(str(story.get("paper_one_liner") or "")) or None,
-            "problem": normalize_display_text(str(story.get("problem") or "")) or None,
-            "method": normalize_display_text(str(story.get("method") or "")) or None,
-            "result": normalize_display_text(str(story.get("result") or "")) or None,
         },
         "editorial": {
-            "verdict": str(editorial.get("verdict") or "") or None,
-            "summary": normalize_display_text(str(editorial.get("summary") or "")) or None,
-            "why_read": ensure_display_strings(editorial.get("why_read")),
-            "strengths": ensure_display_strings(editorial.get("strengths")),
-            "cautions": ensure_display_strings(editorial.get("cautions")),
-            "reading_route": str(editorial.get("reading_route") or "overview"),
             "research_position": normalize_display_text(str(editorial.get("research_position") or "")) or None,
             "graph_worthy": bool(editorial.get("graph_worthy")),
-            "next_read": ensure_display_strings(editorial.get("next_read")),
         },
         "taxonomy": {
             "themes": tag_group(record, "themes"),
             "tasks": tag_group(record, "tasks"),
             "methods": tag_group(record, "methods"),
             "modalities": tag_group(record, "modalities"),
-            "representations": tag_group(record, "representations"),
             "novelty_types": tag_group(record, "novelty_types"),
         },
     }
@@ -243,55 +253,85 @@ def compute_neighbors_for(record: dict[str, Any], records: list[dict[str, Any]])
     current_methods = set(tag_group(record, "methods"))
     current_themes = set(tag_group(record, "themes"))
     current_modalities = set(tag_group(record, "modalities"))
-    current_representations = set(tag_group(record, "representations"))
-    evaluation = record.get("evaluation") if isinstance(record.get("evaluation"), dict) else {}
+    current_representations = set(method_group(record, "representations"))
+    current_problem_axes = set(discovery_group(record, "problem"))
+    current_method_axes = set(discovery_group(record, "method"))
+    current_evaluation_axes = set(discovery_group(record, "evaluation"))
+    current_risk_axes = set(discovery_group(record, "risk"))
     comparison = record.get("comparison") if isinstance(record.get("comparison"), dict) else {}
-    editorial = record.get("editorial") if isinstance(record.get("editorial"), dict) else {}
 
     named_targets = (
         ensure_machine_strings(comparison.get("next_read"))
-        + ensure_machine_strings(editorial.get("next_read"))
-        + ensure_machine_strings(evaluation.get("baselines"))
+        + evaluation_group(record, "baselines")
     )
 
-    task_neighbors: list[dict[str, Any]] = []
+    problem_neighbors: list[dict[str, Any]] = []
     method_neighbors: list[dict[str, Any]] = []
-    comparison_neighbors: list[dict[str, Any]] = []
+    evaluation_neighbors: list[dict[str, Any]] = []
 
     for candidate in records:
         if str(candidate.get("id") or "") == str(record.get("id") or ""):
             continue
 
+        shared_problem_axes = sorted(current_problem_axes & set(discovery_group(candidate, "problem")))
+        shared_method_axes = sorted(current_method_axes & set(discovery_group(candidate, "method")))
+        shared_evaluation_axes = sorted(current_evaluation_axes & set(discovery_group(candidate, "evaluation")))
+        shared_risks = sorted(current_risk_axes & set(discovery_group(candidate, "risk")))
         shared_tasks = sorted(current_tasks & set(tag_group(candidate, "tasks")))
         shared_methods = sorted(current_methods & set(tag_group(candidate, "methods")))
         shared_themes = sorted(current_themes & set(tag_group(candidate, "themes")))
         shared_modalities = sorted(current_modalities & set(tag_group(candidate, "modalities")))
-        shared_representations = sorted(current_representations & set(tag_group(candidate, "representations")))
+        shared_representations = sorted(current_representations & set(method_group(candidate, "representations")))
+        shared_baselines = sorted(set(evaluation_group(record, "baselines")) & set(evaluation_group(candidate, "baselines")))
+        shared_datasets = sorted(set(evaluation_group(record, "datasets")) & set(evaluation_group(candidate, "datasets")))
+        shared_metrics = sorted(set(evaluation_group(record, "metrics")) & set(evaluation_group(candidate, "metrics")))
 
-        if shared_tasks:
-            score = len(shared_tasks) * 6 + len(shared_themes) * 2 + len(shared_modalities) + len(shared_representations)
-            task_neighbors.append(
+        if shared_problem_axes or shared_tasks:
+            score = len(shared_problem_axes) * 8 + len(shared_tasks) * 5 + len(shared_themes) * 2 + len(shared_modalities) + len(shared_risks)
+            problem_neighbors.append(
                 neighbor_item(
                     candidate,
                     score=score,
-                    match_source="task_overlap",
-                    reason=f"共享任务 {' / '.join(shared_tasks[:2])}，问题空间与输入输出语境接近。",
-                    reason_short=f"同任务：{' / '.join(shared_tasks[:2])}",
-                    shared_signals={"tasks": shared_tasks, "themes": shared_themes, "modalities": shared_modalities},
-                    relation_hint="same-task",
+                    match_source="problem_overlap",
+                    reason=(
+                        f"共享问题线 {' / '.join(shared_problem_axes[:2])}，研究目标和问题空间接近。"
+                        if shared_problem_axes
+                        else f"共享任务 {' / '.join(shared_tasks[:2])}，问题空间与输入输出语境接近。"
+                    ),
+                    reason_short=(
+                        f"同问题：{' / '.join(shared_problem_axes[:2])}"
+                        if shared_problem_axes
+                        else f"同任务：{' / '.join(shared_tasks[:2])}"
+                    ),
+                    shared_signals={
+                        "problem": shared_problem_axes,
+                        "tasks": shared_tasks,
+                        "themes": shared_themes,
+                        "risk": shared_risks,
+                    },
+                    relation_hint="same-problem",
                 )
             )
 
-        if shared_methods or shared_representations:
-            score = len(shared_methods) * 6 + len(shared_representations) * 3 + len(shared_tasks) * 2 + len(shared_themes)
+        if shared_method_axes or shared_methods or shared_representations:
+            score = len(shared_method_axes) * 8 + len(shared_methods) * 6 + len(shared_representations) * 3 + len(shared_tasks) * 2 + len(shared_themes)
             method_neighbors.append(
                 neighbor_item(
                     candidate,
                     score=score,
                     match_source="method_overlap",
-                    reason="技术路线或表示形式重合，适合做方法侧对照。",
-                    reason_short="同方法路线",
+                    reason=(
+                        f"共享方法谱系 {' / '.join(shared_method_axes[:2])}，技术路线或关键机制接近。"
+                        if shared_method_axes
+                        else "技术路线或表示形式重合，适合做方法侧对照。"
+                    ),
+                    reason_short=(
+                        f"同方法谱系：{' / '.join(shared_method_axes[:2])}"
+                        if shared_method_axes
+                        else "同方法路线"
+                    ),
                     shared_signals={
+                        "method": shared_method_axes,
                         "methods": shared_methods,
                         "representations": shared_representations,
                         "tasks": shared_tasks,
@@ -304,25 +344,44 @@ def compute_neighbors_for(record: dict[str, Any], records: list[dict[str, Any]])
         candidate_methods = set(tag_group(candidate, "methods"))
         if matched_targets:
             score = 12 + len(matched_targets) * 2 + len(shared_tasks)
-            comparison_neighbors.append(
+            evaluation_neighbors.append(
                 neighbor_item(
                     candidate,
                     score=score,
                     match_source="explicit_target",
                     reason=f"命中显式下一篇/基线线索：{' / '.join(matched_targets[:2])}。",
                     reason_short=f"显式对照：{' / '.join(matched_targets[:1])}",
-                    shared_signals={"targets": matched_targets, "tasks": shared_tasks},
+                    shared_signals={"targets": matched_targets, "evaluation": shared_evaluation_axes, "tasks": shared_tasks},
+                    relation_hint="contrast",
+                )
+            )
+        elif shared_evaluation_axes or shared_baselines or shared_datasets or shared_metrics:
+            score = len(shared_evaluation_axes) * 7 + len(shared_baselines) * 5 + len(shared_datasets) * 3 + len(shared_metrics) * 2 + len(shared_risks)
+            evaluation_neighbors.append(
+                neighbor_item(
+                    candidate,
+                    score=score,
+                    match_source="evaluation_overlap",
+                    reason="实验对照语境重合，适合做 benchmark、baseline 或 protocol 侧比较。",
+                    reason_short="实验对照接近",
+                    shared_signals={
+                        "evaluation": shared_evaluation_axes,
+                        "baselines": shared_baselines,
+                        "datasets": shared_datasets,
+                        "metrics": shared_metrics,
+                        "risk": shared_risks,
+                    },
                     relation_hint="contrast",
                 )
             )
         elif shared_tasks and current_methods and candidate_methods and current_methods != candidate_methods:
             score = 6 + len(shared_tasks) * 2 + len(shared_modalities)
-            comparison_neighbors.append(
+            evaluation_neighbors.append(
                 neighbor_item(
                     candidate,
                     score=score,
                     match_source="route_contrast",
-                    reason="共享任务但采用不同方法路线，适合做对比阅读。",
+                    reason="共享任务但采用不同方法路线，适合做实验对照阅读。",
                     reason_short="同任务不同路线",
                     shared_signals={"tasks": shared_tasks, "methods": sorted(candidate_methods)},
                     relation_hint="contrast",
@@ -330,9 +389,9 @@ def compute_neighbors_for(record: dict[str, Any], records: list[dict[str, Any]])
             )
 
     return {
-        "task": sort_neighbors(task_neighbors),
+        "problem": sort_neighbors(problem_neighbors),
         "method": sort_neighbors(method_neighbors),
-        "comparison": sort_neighbors(comparison_neighbors),
+        "evaluation": sort_neighbors(evaluation_neighbors),
     }
 
 
@@ -358,7 +417,7 @@ def build_site_payload(records: list[dict[str, Any]]) -> tuple[dict[str, Any], d
     detail_payloads = {
         str(record.get("id") or ""): {
             "canonical": record,
-            "neighbors": neighbors.get(str(record.get("id") or ""), {"task": [], "method": [], "comparison": []}),
+            "neighbors": neighbors.get(str(record.get("id") or ""), {"problem": [], "method": [], "evaluation": []}),
         }
         for record in records
     }
@@ -366,8 +425,10 @@ def build_site_payload(records: list[dict[str, Any]]) -> tuple[dict[str, Any], d
     featured = [
         card
         for card in cards
-        if bool(card.get("editorial", {}).get("graph_worthy")) or card.get("editorial", {}).get("verdict") == "值得精读"
+        if bool(card.get("editorial", {}).get("graph_worthy"))
     ][:3]
+    if not featured:
+        featured = cards[:3]
     recent_titles = [str(card.get("bibliography", {}).get("title") or "") for card in cards[:6]]
 
     site_payload = {
@@ -381,9 +442,9 @@ def build_site_payload(records: list[dict[str, Any]]) -> tuple[dict[str, Any], d
         "navigation": {
             "home_route": "#/",
             "neighbor_tabs": [
-                {"key": "task", "label": "任务近邻"},
-                {"key": "method", "label": "方法近邻"},
-                {"key": "comparison", "label": "对比近邻"},
+                {"key": "problem", "label": "问题线"},
+                {"key": "method", "label": "方法谱系"},
+                {"key": "evaluation", "label": "实验对照"},
             ],
             "filter_groups": [
                 {"key": "themes", "label": "主题"},
