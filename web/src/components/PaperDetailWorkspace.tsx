@@ -564,26 +564,23 @@ export function PaperDetailWorkspace({
   const paper = detail.canonical;
   const primaryPdfLink = orderedResourceLinks(paper).find((item) => item.key === "pdf") ?? null;
   const translateLinkHref = translateConversationHref(paper.source.conversation_ids);
-  const topTags = [
-    paper.bibliography.venue || "未知来源",
-    formatYear(paper.bibliography.year),
-    paper.bibliography.citation_count !== null ? `引用 ${paper.bibliography.citation_count}` : "",
-  ].filter(Boolean);
   const headlineTags = [...new Set([...paper.taxonomy.tasks, ...paper.taxonomy.methods, ...paper.taxonomy.themes])].slice(0, 4);
 
   return (
     <div className={`workspace-shell${layoutMode === "home-compact" ? " is-home-compact" : ""} ${className}`.trim()}>
       <div className="workspace-header">
         <div className="workspace-header-main">
-          <Flex wrap="wrap" gap={8}>
-            {topTags.map((item) => (
-              <Tag key={item} className="chip-tag chip-tag-tone-blue">
-                {item}
-              </Tag>
-            ))}
-            {paper.editorial.verdict ? <Tag className={verdictTagClass(paper.editorial.verdict)}>{paper.editorial.verdict}</Tag> : null}
-            <Tag className={chipToneClass("processing")}>{recommendedRouteLabel(paper.editorial.reading_route)}</Tag>
-          </Flex>
+          {layoutMode !== "home-compact" ? (
+            <Flex wrap="wrap" gap={8}>
+              <Tag className="chip-tag chip-tag-tone-blue">{paper.bibliography.venue || "未知来源"}</Tag>
+              <Tag className="chip-tag chip-tag-tone-blue">{formatYear(paper.bibliography.year)}</Tag>
+              {paper.bibliography.citation_count !== null ? (
+                <Tag className="chip-tag chip-tag-tone-blue">{`引用 ${paper.bibliography.citation_count}`}</Tag>
+              ) : null}
+              {paper.editorial.verdict ? <Tag className={verdictTagClass(paper.editorial.verdict)}>{paper.editorial.verdict}</Tag> : null}
+              <Tag className={chipToneClass("processing")}>{recommendedRouteLabel(paper.editorial.reading_route)}</Tag>
+            </Flex>
+          ) : null}
           <div className="workspace-title-block">
             <Title level={2} className="workspace-title">
               {paper.bibliography.title}

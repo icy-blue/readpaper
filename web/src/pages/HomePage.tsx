@@ -1,12 +1,12 @@
-import { Button, Drawer, Empty, Flex, Grid, Input, Modal, Select, Tag, Typography } from "antd";
+import { Button, Drawer, Empty, Flex, Grid, Input, Modal, Popover, Select, Tag, Tooltip, Typography } from "antd";
 import {
   CalendarOutlined,
+  CheckOutlined,
+  DownOutlined,
   FileSearchOutlined,
   FilterOutlined,
   FontSizeOutlined,
   ReadOutlined,
-  SortAscendingOutlined,
-  SortDescendingOutlined,
 } from "@ant-design/icons";
 import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -29,25 +29,52 @@ import type { PaperCardView, SiteIndexPayload } from "../types";
 
 const { Title, Paragraph, Text } = Typography;
 const HOME_HEADER_SLOT_ID = "home-header-slot";
+type SortField = "year" | "title";
+type SortDirection = "asc" | "desc";
+
 const SORT_FIELD_OPTIONS = [
   { label: "年份", value: "year" },
   { label: "标题", value: "title" },
 ] as const;
-const SORT_DIRECTION_OPTIONS = [
-  { label: "升序", value: "asc" },
-  { label: "降序", value: "desc" },
-] as const;
 
-function sortFieldOf(sortBy: string): "year" | "title" {
+function sortFieldOf(sortBy: string): SortField {
   return sortBy.startsWith("title") ? "title" : "year";
 }
 
-function sortDirectionOf(sortBy: string): "asc" | "desc" {
+function sortDirectionOf(sortBy: string): SortDirection {
   return sortBy.endsWith("asc") ? "asc" : "desc";
 }
 
-function buildSortValue(field: "year" | "title", direction: "asc" | "desc"): string {
+function buildSortValue(field: SortField, direction: SortDirection): string {
   return `${field}-${direction}`;
+}
+
+function sortDirectionOptions(field: SortField) {
+  if (field === "year") {
+    return [
+      { label: "从晚到早", value: "desc" as const },
+      { label: "从早到晚", value: "asc" as const },
+    ];
+  }
+
+  return [
+    { label: "A → Z", value: "asc" as const },
+    { label: "Z → A", value: "desc" as const },
+  ];
+}
+
+function sortButtonLabel(field: SortField, direction: SortDirection): string {
+  if (field === "year") {
+    return `排序：年份 ${direction === "desc" ? "↓" : "↑"}`;
+  }
+  return `排序：标题 ${direction === "asc" ? "A → Z" : "Z → A"}`;
+}
+
+function sortButtonCompactLabel(field: SortField, direction: SortDirection): string {
+  if (field === "year") {
+    return direction === "desc" ? "年↓" : "年↑";
+  }
+  return direction === "asc" ? "A-Z" : "Z-A";
 }
 
 function discoveryTags(paper: PaperCardView): string[] {
@@ -81,7 +108,6 @@ function HomeToolbar({
   clearDraftFilters,
   sortBy,
   setSortBy,
-  resultsCount,
   inHeader,
 }: {
   payload: SiteIndexPayload;
@@ -103,25 +129,76 @@ function HomeToolbar({
   clearDraftFilters: () => void;
   sortBy: string;
   setSortBy: (value: string) => void;
-  resultsCount: number;
   inHeader: boolean;
 }) {
-  const generatedAtLabel = formatLocalDateTime(payload.site_meta.generated_at);
-  const generatedAtDetail = formatLocalDateTimeDetail(payload.site_meta.generated_at);
   const sortField = sortFieldOf(sortBy);
   const sortDirection = sortDirectionOf(sortBy);
-  const filterSummaries = [
-    selectedThemes.length ? selectedFilterSummary("主题", selectedThemes.length) : "",
-    selectedTasks.length ? selectedFilterSummary("任务", selectedTasks.length) : "",
-    selectedMethods.length ? selectedFilterSummary("方法", selectedMethods.length) : "",
-  ].filter(Boolean);
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const appliedFilterCount = selectedThemes.length + selectedTasks.length + selectedMethods.length;
-  const contextItems = [
-    `当前 ${resultsCount} 篇`,
-    `总库 ${payload.site_meta.paper_count} 篇`,
-    `更新于 ${generatedAtLabel}`,
-    ...filterSummaries,
-  ];
+  const activeSortDirectionOptions = sortDirectionOptions(sortField);
+
+  function updateSort(nextSortBy: string) {
+    startTransition(() => setSortBy(nextSortBy));
+    setSortMenuOpen(false);
+  }
+
+  const sortMenu = (
+    <div className="console-sort-menu" role="menu" aria-label="排序选项">
+      <section className="console-sort-menu-group" aria-labelledby="sort-field-title">
+        <Text id="sort-field-title" className="console-sort-menu-title">
+          排序字段
+        </Text>
+        <div className="console-sort-menu-options">
+          {SORT_FIELD_OPTIONS.map((item) => {
+            const isActive = sortField === item.value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                className={`console-sort-menu-option${isActive ? " is-active" : ""}`}
+                onClick={() => updateSort(buildSortValue(item.value, sortDirection))}
+                aria-pressed={isActive}
+              >
+                <span className="console-sort-menu-option-copy">
+                  <span className="console-sort-menu-option-label">{item.label}</span>
+                </span>
+                <span className="console-sort-menu-option-mark" aria-hidden="true">
+                  {isActive ? <CheckOutlined /> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="console-sort-menu-group" aria-labelledby="sort-direction-title">
+        <Text id="sort-direction-title" className="console-sort-menu-title">
+          排序方向
+        </Text>
+        <div className="console-sort-menu-options">
+          {activeSortDirectionOptions.map((item) => {
+            const isActive = sortDirection === item.value;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                className={`console-sort-menu-option${isActive ? " is-active" : ""}`}
+                onClick={() => updateSort(buildSortValue(sortField, item.value))}
+                aria-pressed={isActive}
+              >
+                <span className="console-sort-menu-option-copy">
+                  <span className="console-sort-menu-option-label">{item.label}</span>
+                </span>
+                <span className="console-sort-menu-option-mark" aria-hidden="true">
+                  {isActive ? <CheckOutlined /> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
 
   return (
     <>
@@ -141,51 +218,37 @@ function HomeToolbar({
             onClick={openAdvancedSearch}
             className={`console-advanced-trigger${appliedFilterCount ? " is-active" : ""}`}
           >
-            <span>高级搜索</span>
+            <span>筛选</span>
             {appliedFilterCount ? <span className="console-advanced-count">{appliedFilterCount}</span> : null}
           </Button>
-          <div className="console-sort-controls">
-            <div className="console-sort-toggle-group" role="group" aria-label="排序字段">
-              {SORT_FIELD_OPTIONS.map((item) => (
+          <Popover
+            trigger="click"
+            open={sortMenuOpen}
+            onOpenChange={setSortMenuOpen}
+            placement={inHeader ? "bottomRight" : "bottomLeft"}
+            content={sortMenu}
+            overlayClassName="console-sort-popover"
+          >
+            <Tooltip title={sortButtonLabel(sortField, sortDirection)} trigger={["hover", "focus"]}>
+              <span className="console-sort-trigger-shell">
                 <Button
-                  key={item.value}
-                  icon={item.value === "year" ? <CalendarOutlined /> : <FontSizeOutlined />}
-                  className={`console-sort-toggle${sortField === item.value ? " is-active" : ""}`}
-                  onClick={() => startTransition(() => setSortBy(buildSortValue(item.value, sortDirection)))}
+                  className={`console-sort-trigger${sortMenuOpen ? " is-open" : ""}`}
+                  aria-label={sortButtonLabel(sortField, sortDirection)}
                 >
-                  {item.label}
+                  <span className="console-sort-trigger-main">
+                    {sortField === "year" ? <CalendarOutlined /> : <FontSizeOutlined />}
+                    <span>{sortButtonCompactLabel(sortField, sortDirection)}</span>
+                  </span>
+                  <DownOutlined className={`console-sort-trigger-caret${sortMenuOpen ? " is-open" : ""}`} />
                 </Button>
-              ))}
-            </div>
-            <div className="console-sort-toggle-group" role="group" aria-label="排序方向">
-              {SORT_DIRECTION_OPTIONS.map((item) => (
-                <Button
-                  key={item.value}
-                  icon={item.value === "asc" ? <SortAscendingOutlined /> : <SortDescendingOutlined />}
-                  className={`console-sort-toggle${sortDirection === item.value ? " is-active" : ""}`}
-                  onClick={() => startTransition(() => setSortBy(buildSortValue(sortField, item.value)))}
-                >
-                  {item.label}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="console-toolbar-context">
-          {contextItems.map((item) => (
-            <Text
-              key={item}
-              className={`console-context-chip${filterSummaries.includes(item) ? " is-filter" : ""}`}
-              title={item.startsWith("更新于 ") ? generatedAtDetail || payload.site_meta.generated_at : undefined}
-            >
-              {item}
-            </Text>
-          ))}
+              </span>
+            </Tooltip>
+          </Popover>
         </div>
       </div>
 
       <Modal
-        title="高级搜索"
+        title="筛选"
         open={advancedSearchOpen}
         onCancel={closeAdvancedSearch}
         width={880}
@@ -275,6 +338,7 @@ function PaperListItem({
       <Flex wrap="wrap" gap={8} className="paper-list-item-decision">
         {paper.editorial.verdict ? <Tag className={verdictTagClass(paper.editorial.verdict)}>{paper.editorial.verdict}</Tag> : null}
         <Tag className={routeTagClass(paper.editorial.reading_route)}>{recommendedRouteLabel(paper.editorial.reading_route)}</Tag>
+        {paper.bibliography.citation_count !== null ? <Tag className="chip-tag chip-tag-citation">{`引用 ${paper.bibliography.citation_count}`}</Tag> : null}
       </Flex>
       <Text className="paper-list-item-title">{paper.bibliography.title}</Text>
       <Paragraph className="paper-list-item-meta">
@@ -308,6 +372,15 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
   const deferredTitleQuery = useDeferredValue(titleQuery);
+  const generatedAtLabel = formatLocalDateTime(payload.site_meta.generated_at);
+  const generatedAtDetail = formatLocalDateTimeDetail(payload.site_meta.generated_at);
+  const filterSummaries = [
+    selectedThemes.length ? selectedFilterSummary("主题", selectedThemes.length) : "",
+    selectedTasks.length ? selectedFilterSummary("任务", selectedTasks.length) : "",
+    selectedMethods.length ? selectedFilterSummary("方法", selectedMethods.length) : "",
+  ].filter(Boolean);
+  const panelSubtitle = filterSummaries.length ? filterSummaries.join(" · ") : `更新于 ${generatedAtLabel}`;
+  const panelSubtitleTitle = filterSummaries.length ? panelSubtitle : generatedAtDetail || payload.site_meta.generated_at;
 
   function openAdvancedSearch() {
     setDraftThemes(selectedThemes);
@@ -452,7 +525,6 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
       clearDraftFilters={clearDraftFilters}
       sortBy={sortBy}
       setSortBy={setSortBy}
-      resultsCount={filteredPapers.length}
       inHeader={isDesktop}
     />
   );
@@ -470,6 +542,9 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
               <Title level={4} className="console-panel-title">
                 {filteredPapers.length ? `共 ${filteredPapers.length} 篇论文` : "暂无匹配论文"}
               </Title>
+              <Paragraph className="panel-support-copy console-panel-subtitle" title={panelSubtitleTitle}>
+                {panelSubtitle}
+              </Paragraph>
             </div>
           </div>
 
