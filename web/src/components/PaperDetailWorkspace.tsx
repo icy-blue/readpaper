@@ -111,6 +111,30 @@ function supportTagLabel(value: string): string {
   return content;
 }
 
+function claimSourceLabel(value: string): string {
+  const content = cleanDisplayText(value) ?? value;
+  if (content.toLowerCase().startsWith("section:")) {
+    return `来源：${content.slice("section:".length)}`;
+  }
+  return `来源：${content}`;
+}
+
+function claimConfidenceLabel(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  if (value === "high") {
+    return "可信度高";
+  }
+  if (value === "medium") {
+    return "可信度中";
+  }
+  if (value === "low") {
+    return "可信度低";
+  }
+  return `可信度 ${value}`;
+}
+
 function BadgeGroup({
   values,
   tone,
@@ -200,21 +224,24 @@ function ClaimList({ paper, variant = "card" }: { paper: PaperCanonicalRecord; v
     return <EmptyState description="暂无结构化论断。" />;
   }
   return (
-    <div className="workspace-stack">
+    <div className={`workspace-claim-list${variant === "plain" ? " is-plain" : ""}`}>
       {paper.claims.map((claim, index) => (
-        <div key={`${paper.id}-claim-${index}`} className={`workspace-note-card${variant === "plain" ? " is-plain" : ""}`}>
-          <Flex justify="space-between" align="start" gap={12} wrap="wrap">
-            <Paragraph className="workspace-body-copy claim-copy">{claim.text}</Paragraph>
+        <div key={`${paper.id}-claim-${index}`} className={`workspace-claim-entry${variant === "plain" ? " is-plain" : ""}`}>
+          <Flex wrap="wrap" gap={8} className="workspace-claim-chip-row">
             <Tag className="chip-tag chip-tag-route-overview">{displayClaimType(claim.type)}</Tag>
-          </Flex>
-          <Flex wrap="wrap" gap={8}>
+            {claim.confidence ? (
+              <Tag className={chipToneClass(confidenceTone(claim.confidence))}>{claimConfidenceLabel(claim.confidence)}</Tag>
+            ) : null}
             {claim.support.map((item) => (
               <Tag key={`${paper.id}-${index}-${item}`} className="chip-tag chip-tag-tone-blue">
-                {supportTagLabel(item)}
+                {claimSourceLabel(item)}
               </Tag>
             ))}
-            {claim.confidence ? <Tag className={chipToneClass(confidenceTone(claim.confidence))}>可信度 {claim.confidence}</Tag> : null}
           </Flex>
+
+          <Paragraph className="workspace-body-copy workspace-claim-text">{claim.text}</Paragraph>
+
+          {index < paper.claims.length - 1 ? <div className="workspace-claim-divider" aria-hidden="true" /> : null}
         </div>
       ))}
     </div>
