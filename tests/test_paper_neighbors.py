@@ -28,7 +28,7 @@ def make_record(
         "source": {
             "conversation_ids": [f"conv-{paper_id}"],
             "paper_path": f"papers/{paper_id}.md",
-            "route_path": f"#/paper/{paper_id}",
+            "route_path": f"#/?paper={paper_id}&detail=1",
         },
         "bibliography": {
             "title": title,

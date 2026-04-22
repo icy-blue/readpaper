@@ -369,7 +369,6 @@ export function validatePayload(payload: unknown): SiteIndexPayload {
   const navigation = expectRecord(issues, "payload.navigation", record.navigation);
   if (navigation) {
     expectString(issues, "payload.navigation.home_route", navigation.home_route);
-    expectString(issues, "payload.navigation.detail_route_template", navigation.detail_route_template);
     expectObjectArray(issues, "payload.navigation.neighbor_tabs", navigation.neighbor_tabs);
     expectObjectArray(issues, "payload.navigation.filter_groups", navigation.filter_groups);
   }
@@ -431,20 +430,16 @@ export function loadPaperDetailCached(paperId: string): Promise<PaperDetailViewM
 }
 
 export function paperRoute(routePath: string | undefined, paperId: string): string {
-  if (routePath?.startsWith("#")) {
+  if (routePath?.startsWith("#/?")) {
     return routePath.slice(1);
   }
-  return `/paper/${paperId}`;
-}
-
-export function markdownHref(path: string | undefined): string | undefined {
-  if (!path) {
-    return undefined;
+  if (routePath?.startsWith("#/paper/")) {
+    const legacyPaperId = routePath.slice("#/paper/".length).trim() || paperId;
+    const params = new URLSearchParams({ paper: legacyPaperId, detail: "1" });
+    return `/?${params.toString()}`;
   }
-  if (path.startsWith("#")) {
-    return path;
-  }
-  return path.replace(/^\/+/, "");
+  const params = new URLSearchParams({ paper: paperId, detail: "1" });
+  return `/?${params.toString()}`;
 }
 
 export function translateConversationHref(conversationIds: string[] | undefined): string | undefined {

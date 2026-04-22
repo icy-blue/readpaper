@@ -32,15 +32,16 @@ def ensure_dist(dist_dir: Path) -> None:
         raise FileNotFoundError(f"Frontend build output not found at {index_path}. Run `npm run build:web` first.")
 
 
-def clear_legacy_html(site_dir: Path) -> None:
+def clear_legacy_pages(site_dir: Path) -> None:
     for path in site_dir.glob("*.html"):
         if path.name != "index.html":
             path.unlink()
 
     paper_dir = site_dir / "papers"
     if paper_dir.exists():
-        for path in paper_dir.glob("*.html"):
-            path.unlink()
+        for pattern in ("*.html", "*.md"):
+            for path in paper_dir.glob(pattern):
+                path.unlink()
 
 
 def copy_dist(dist_dir: Path, site_dir: Path) -> None:
@@ -60,7 +61,7 @@ def copy_dist(dist_dir: Path, site_dir: Path) -> None:
 def publish_site(dist_dir: Path, site_dir: Path) -> Path:
     ensure_dist(dist_dir)
     site_dir.mkdir(parents=True, exist_ok=True)
-    clear_legacy_html(site_dir)
+    clear_legacy_pages(site_dir)
     copy_dist(dist_dir, site_dir)
     return site_dir / "index.html"
 

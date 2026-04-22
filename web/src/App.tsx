@@ -1,9 +1,8 @@
 import { Alert, Layout, Spin, Typography } from "antd";
 import { startTransition, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
-import { debugEnabled, loadPayload } from "./lib/paper";
+import { loadPayload } from "./lib/paper";
 import { HomePage } from "./pages/HomePage";
-import { PaperDetailPage } from "./pages/PaperDetailPage";
 import type { SiteIndexPayload } from "./types";
 
 const { Header, Content } = Layout;
@@ -101,7 +100,6 @@ export default function App() {
         {payload ? (
           <Routes>
             <Route path="/" element={<HomePage payload={payload} />} />
-            <Route path="/paper/:paperId" element={<PaperDetailPage payload={payload} debugMode={debugEnabled()} />} />
             <Route path="*" element={<HomePage payload={payload} />} />
           </Routes>
         ) : null}

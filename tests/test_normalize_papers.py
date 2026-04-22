@@ -174,7 +174,7 @@ def local_target_record() -> dict[str, object]:
         "source": {
             "conversation_ids": ["conv-2"],
             "paper_path": "papers/baseline-net-paper.md",
-            "route_path": "#/paper/baseline-net-paper",
+            "route_path": "#/?paper=baseline-net-paper&detail=1",
         },
         "bibliography": {
             "title": "BaselineNet: A Strong Baseline for Image-to-3D",

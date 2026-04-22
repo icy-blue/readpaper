@@ -6,7 +6,6 @@ export interface SiteMeta {
 
 export interface NavigationConfig {
   home_route: string;
-  detail_route_template: string;
   neighbor_tabs: Array<{ key: "task" | "method" | "comparison"; label: string }>;
   filter_groups: Array<{ key: "themes" | "tasks" | "methods"; label: string }>;
 }

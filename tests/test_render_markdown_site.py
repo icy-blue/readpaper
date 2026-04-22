@@ -10,13 +10,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from render_markdown_site import main as render_markdown_site_main, render_paper_page  # noqa: E402
+from render_markdown_site import main as render_markdown_site_main, render_index  # noqa: E402
 
 
 def canonical_record() -> dict[str, object]:
     return {
         "id": "demo-paper",
-        "source": {"conversation_ids": ["conv-demo"], "paper_path": "papers/demo-paper.md", "route_path": "#/paper/demo-paper"},
+        "source": {"conversation_ids": ["conv-demo"], "paper_path": "papers/demo-paper.md", "route_path": "#/?paper=demo-paper&detail=1"},
         "bibliography": {
             "title": "Demo Paper",
             "authors": ["Author A"],
@@ -75,33 +75,25 @@ def canonical_record() -> dict[str, object]:
 
 
 class RenderMarkdownSiteTests(unittest.TestCase):
-    def test_render_paper_page_uses_v2_reading_flow(self) -> None:
-        detail_payload = {
-            "canonical": canonical_record(),
-            "neighbors": {"task": [], "method": [], "comparison": []},
+    def test_render_index_uses_homepage_only_reading_flow(self) -> None:
+        payload = {
+            "generated_at": "2026-04-22T10:00:00+08:00",
+            "paper_count": 1,
+            "papers": [canonical_record()],
+            "filters": {
+                "themes": [{"label": "3D Generation", "count": 1}],
+                "tasks": [{"label": "Image-to-3D", "count": 1}],
+                "methods": [{"label": "Diffusion Model", "count": 1}],
+            },
         }
 
-        rendered = render_paper_page(detail_payload)
-        self.assertIn("## Story", rendered)
-        self.assertIn("## 方法", rendered)
-        self.assertIn("## 实验", rendered)
-        self.assertIn("## 阅读判断", rendered)
-        self.assertIn("## 对比线索", rendered)
+        rendered = render_index(payload)
 
-    def test_render_paper_page_normalizes_display_text(self) -> None:
-        record = canonical_record()
-        record["story"]["problem"] = "常用方法在跨模态场景中面临困难,原因在于关键点检测不兼容。"  # type: ignore[index]
-        record["editorial"]["summary"] = "适合作为3D Reconstruction中Point Cloud Normal Estimation路线的代表样本。"  # type: ignore[index]
-        record["claims"][0]["text"] = "我们通过(PnP)求解器提升2D3D-MATR在KITTI数据集上的效果!"  # type: ignore[index]
-        detail_payload = {"canonical": record, "neighbors": {"task": [], "method": [], "comparison": []}}
+        self.assertIn("只保留主页", rendered)
+        self.assertIn("Demo Paper | CVPR 2025", rendered)
+        self.assertNotIn("index.html#/paper/", rendered)
 
-        rendered = render_paper_page(detail_payload)
-
-        self.assertIn("常用方法在跨模态场景中面临困难，原因在于关键点检测不兼容。", rendered)
-        self.assertIn("适合作为 3D Reconstruction 中 Point Cloud Normal Estimation 路线的代表样本。", rendered)
-        self.assertIn("我们通过（PnP）求解器提升 2D3D-MATR 在 KITTI 数据集上的效果！", rendered)
-
-    def test_render_markdown_site_writes_site_index_and_detail_json(self) -> None:
+    def test_render_markdown_site_writes_site_index_and_detail_json_only(self) -> None:
         record = canonical_record()
 
         with tempfile.TemporaryDirectory() as tempdir:
@@ -110,6 +102,8 @@ class RenderMarkdownSiteTests(unittest.TestCase):
             site_dir = temp_path / "site"
             papers_dir.mkdir(parents=True)
             (papers_dir / "demo-paper.json").write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+            (site_dir / "papers").mkdir(parents=True)
+            (site_dir / "papers" / "legacy-paper.md").write_text("# legacy", encoding="utf-8")
 
             argv = sys.argv
             try:
@@ -131,7 +125,8 @@ class RenderMarkdownSiteTests(unittest.TestCase):
             self.assertIn("featured", index_payload)
             self.assertIn("canonical", detail_payload)
             self.assertIn("neighbors", detail_payload)
-            self.assertTrue((site_dir / "papers" / "demo-paper.md").exists())
+            self.assertFalse((site_dir / "papers" / "demo-paper.md").exists())
+            self.assertFalse((site_dir / "papers" / "legacy-paper.md").exists())
 
 
 if __name__ == "__main__":

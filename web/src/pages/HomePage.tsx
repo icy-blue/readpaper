@@ -6,11 +6,10 @@ import {
   FileSearchOutlined,
   FilterOutlined,
   FontSizeOutlined,
-  ReadOutlined,
 } from "@ant-design/icons";
 import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { PaperDetailWorkspace } from "../components/PaperDetailWorkspace";
 import {
   displayValueLabel,
@@ -18,7 +17,6 @@ import {
   formatLocalDateTimeDetail,
   matchesTags,
   matchesTitleQuery,
-  paperRoute,
   recommendedRouteLabel,
   routeTagClass,
   selectedFilterSummary,
@@ -360,7 +358,6 @@ function PaperListItem({
 
 export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   const screens = Grid.useBreakpoint();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const paperItemRefs = useRef(new Map<string, HTMLButtonElement>());
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
@@ -373,7 +370,6 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   const [draftTasks, setDraftTasks] = useState<string[]>([]);
   const [draftMethods, setDraftMethods] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("year-desc");
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [advancedSearchOpen, setAdvancedSearchOpen] = useState(false);
   const deferredTitleQuery = useDeferredValue(titleQuery);
   const generatedAtLabel = formatLocalDateTime(payload.site_meta.generated_at);
@@ -444,11 +440,11 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   }, [deferredTitleQuery, payload.papers, selectedMethods, selectedTasks, selectedThemes, sortBy]);
 
   const requestedPaperId = searchParams.get("paper") ?? "";
+  const detailRequested = searchParams.get("detail") === "1";
   const selectedPaperId = filteredPapers.some((paper) => paper.id === requestedPaperId) ? requestedPaperId : filteredPapers[0]?.id ?? "";
-  const selectedPaper = filteredPapers.find((paper) => paper.id === selectedPaperId) ?? null;
   const isDesktop = Boolean(screens.xl);
-  const isTablet = Boolean(screens.md && !screens.xl);
   const isMobile = !screens.md;
+  const detailDrawerOpen = !isDesktop && detailRequested && Boolean(selectedPaperId);
 
   useEffect(() => {
     if (!isDesktop) {
@@ -459,38 +455,31 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
     setHeaderSlot(document.getElementById(HOME_HEADER_SLOT_ID));
   }, [isDesktop]);
 
-  function updateSelectedPaper(paperId: string, replace = false) {
+  function updateSelectedPaper(paperId: string, openDetail: boolean, replace = false) {
     const nextParams = new URLSearchParams(searchParams);
     if (paperId) {
       nextParams.set("paper", paperId);
     } else {
       nextParams.delete("paper");
     }
+    if (openDetail) {
+      nextParams.set("detail", "1");
+    } else {
+      nextParams.delete("detail");
+    }
     setSearchParams(nextParams, { replace });
   }
 
   function handleSelectPaper(paper: PaperCardView) {
-    if (isMobile) {
-      navigate(paperRoute(paper.source.route_path, paper.id));
-      return;
-    }
-    updateSelectedPaper(paper.id);
-    if (isTablet) {
-      setDrawerOpen(true);
-    }
+    updateSelectedPaper(paper.id, !isDesktop);
   }
 
   useEffect(() => {
-    if (requestedPaperId !== selectedPaperId) {
-      updateSelectedPaper(selectedPaperId, true);
+    const nextDetailRequested = !isDesktop && detailRequested && Boolean(selectedPaperId);
+    if (requestedPaperId !== selectedPaperId || detailRequested !== nextDetailRequested) {
+      updateSelectedPaper(selectedPaperId, nextDetailRequested, true);
     }
-  }, [requestedPaperId, selectedPaperId]);
-
-  useEffect(() => {
-    if (!isTablet) {
-      setDrawerOpen(false);
-    }
-  }, [isTablet]);
+  }, [detailRequested, isDesktop, requestedPaperId, selectedPaperId]);
 
   useEffect(() => {
     const item = paperItemRefs.current.get(selectedPaperId);
@@ -502,12 +491,6 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [isMobile, selectedPaperId]);
-
-  const openDetailAction = selectedPaper ? (
-    <Button type="primary" icon={<ReadOutlined />} onClick={() => navigate(paperRoute(selectedPaper.source.route_path, selectedPaper.id))}>
-      在独立页打开
-    </Button>
-  ) : null;
   const toolbar = (
     <HomeToolbar
       payload={payload}
@@ -582,7 +565,6 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
             <PaperDetailWorkspace
               paperId={selectedPaperId}
               payload={payload}
-              headerActions={openDetailAction}
               layoutMode="home-compact"
               className="console-workspace"
             />
@@ -594,14 +576,13 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
         placement="right"
         title="论文详情"
         width={screens.lg ? 760 : "100%"}
-        open={drawerOpen && isTablet && Boolean(selectedPaperId)}
-        onClose={() => setDrawerOpen(false)}
+        open={detailDrawerOpen}
+        onClose={() => updateSelectedPaper(selectedPaperId, false)}
         className="console-detail-drawer"
       >
         <PaperDetailWorkspace
           paperId={selectedPaperId}
           payload={payload}
-          headerActions={openDetailAction}
           layoutMode="home-compact"
           className="console-workspace is-drawer"
         />

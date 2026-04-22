@@ -2196,6 +2196,32 @@ a {
   background: transparent;
 }
 
+.workspace-neighbor-card {
+  gap: 12px;
+}
+
+.workspace-neighbor-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.workspace-neighbor-main {
+  min-width: 0;
+}
+
+.workspace-neighbor-main .paper-link {
+  display: block;
+  min-width: 0;
+}
+
+.workspace-neighbor-score {
+  align-self: start;
+  justify-self: end;
+  flex: 0 0 auto;
+}
+
 .workspace-claim-list {
   display: grid;
   gap: 0;
@@ -2274,6 +2300,16 @@ a {
 .detail-page-workspace {
   min-height: calc(100vh - 194px);
   height: calc(100vh - 194px);
+}
+
+@media (max-width: 720px) {
+  .workspace-neighbor-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-neighbor-score {
+    justify-self: start;
+  }
 }
 
 .console-detail-drawer .ant-drawer-body {

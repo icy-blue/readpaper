@@ -762,7 +762,7 @@ def resolve_relations(
 def paper_paths(paper_id: str) -> dict[str, str]:
     return {
         "paper_path": f"papers/{paper_id}.md",
-        "route_path": f"#/paper/{paper_id}",
+        "route_path": f"#/?paper={paper_id}&detail=1",
     }
 
 

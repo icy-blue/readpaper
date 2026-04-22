@@ -6,8 +6,8 @@
 
 - `outputs/papers/<paper-id>.json` 保存长期维护的 canonical paper record
 - `outputs/site/site-index.json` 只承载首页发现、筛选和 featured/card 所需的派生索引
-- `outputs/site/papers/<paper-id>.json` 承载单篇详情页所需的 `canonical + neighbors` view model
-- 站点默认应通过本地 server 或静态托管访问，不再保证 `file://` 双击 `index.html` 后详情页可正常加载
+- `outputs/site/papers/<paper-id>.json` 承载主页详情工作区按需读取的 `canonical + neighbors` view model
+- 站点默认应通过本地 server 或静态托管访问，不再保证 `file://` 双击 `index.html` 后主页详情数据加载正常
 
 ## 目录约定
 
@@ -51,8 +51,8 @@ python3 scripts/render_html_dashboard.py \
 
 - `extract-paper-meta`: 从 `outputs/raw/` 抽取单篇 meta artifact，写入 `outputs/meta/`
 - `normalize_papers.py`: 从 `outputs/raw/` 和 `outputs/meta/` 重新组装 canonical paper records
-- `build_site_derivatives.py`: 从 canonical paper records 派生首页 payload、详情 payload 和近邻信息
-- `render_markdown_site.py`: 生成站点需要的 Markdown 页面，并同步写入 `site-index.json` 与详情 JSON
+- `build_site_derivatives.py`: 从 canonical paper records 派生首页 payload、主页详情 payload 和近邻信息
+- `render_markdown_site.py`: 生成站点主页 Markdown，并同步写入 `site-index.json` 与详情 JSON
 - `npm run build:web`: 重新构建前端静态资源到 `web/dist/`
 - `render_html_dashboard.py`: 把 `web/dist/` 中的前端构建产物发布到 `outputs/site/`，并保留 JSON 数据文件供前端按需加载
 
@@ -101,7 +101,7 @@ python3 scripts/build_registry.py \
 
 ## 本地预览
 
-详情页会按需 `fetch` `outputs/site/papers/*.json`，请通过本地 server 打开站点。例如：
+主页中的详情工作区会按需 `fetch` `outputs/site/papers/*.json`，请通过本地 server 打开站点。例如：
 
 ```bash
 cd outputs/site

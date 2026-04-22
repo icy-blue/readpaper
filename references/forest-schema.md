@@ -6,7 +6,6 @@ The site is built from canonical paper records plus derived site payloads under 
 
 - `outputs/site/site-index.json`
 - `outputs/site/papers/<paper-id>.json`
-- `outputs/site/papers/<paper-id>.md`
 - `outputs/site/index.md`
 - `outputs/site/index.html`
 - `outputs/site/assets/*`
@@ -37,11 +36,11 @@ Each homepage paper card should keep only discovery-facing fields:
 - `editorial.reading_route`
 - `editorial.graph_worthy`
 - `taxonomy.themes|tasks|methods|modalities|novelty_types`
-- local route / markdown path
+- compatibility `source` fields if the generators still need them, but the published site no longer exposes standalone paper pages
 
 ## Detail View Model
 
-Each `outputs/site/papers/<paper-id>.json` should expose:
+Each `outputs/site/papers/<paper-id>.json` should expose homepage detail data only:
 
 - `canonical`: the full canonical paper record
 - `neighbors`: derived `task` / `method` / `comparison` neighbor groups

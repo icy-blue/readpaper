@@ -19,7 +19,7 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
   "source": {
     "conversation_ids": ["1bec2cbb63a7"],
     "paper_path": "papers/cosmo3d-open-world-promptable-3d-semantic-part-segmentat-8764ad09.md",
-    "route_path": "#/paper/cosmo3d-open-world-promptable-3d-semantic-part-segmentat-8764ad09"
+    "route_path": "#/?paper=cosmo3d-open-world-promptable-3d-semantic-part-segmentat-8764ad09&detail=1"
   },
   "bibliography": {
     "title": "CoSMo3D: Open-World Promptable 3D Semantic Part Segmentation through LLM-Guided Canonical Spatial Modeling",
@@ -172,7 +172,7 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
 
 - `id`: canonical paper id, unique within the repo.
 - `source.conversation_ids`: all contributing source conversations for the canonical paper.
-- `source.paper_path` / `source.route_path`: stable local routing info used by site generators.
+- `source.paper_path` / `source.route_path`: compatibility path fields used by site generators and auxiliary tooling. The published site may choose a homepage-only experience instead of exposing standalone paper pages.
 - `bibliography.identifiers`: only persistent scholarly IDs such as DOI / arXiv.
 - `bibliography.links`: only reader-facing URLs such as PDF / project / code / data.
 - `abstracts.raw`: original-language abstract when locally available from prior enrichment; keep it `null` rather than querying external services during assembly.

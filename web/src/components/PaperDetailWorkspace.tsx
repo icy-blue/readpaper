@@ -13,7 +13,6 @@ import {
   firstExternalLinks,
   formatYear,
   loadPaperDetailCached,
-  markdownHref,
   paperRoute,
   recommendedRouteLabel,
   relationConfidenceLabel,
@@ -39,7 +38,6 @@ const RESOURCE_LABELS: Record<string, string> = {
   code: "查看 Code",
   project: "查看 Project",
   data: "查看 Data",
-  markdown: "查看 Markdown",
   translate: "查看翻译",
 };
 const RESOURCE_ORDER = ["pdf", "arxiv", "doi", "code", "project", "data"] as const;
@@ -276,7 +274,7 @@ function RelationsList({ items, variant = "card" }: { items: RelationItem[]; var
                 {targetLabel}
               </a>
             ) : item.target_paper_id ? (
-              <Link to={paperRoute(`#/paper/${item.target_paper_id}`, item.target_paper_id)} className="paper-link small workspace-inline-link">
+              <Link to={paperRoute(undefined, item.target_paper_id)} className="paper-link small workspace-inline-link">
                 {targetLabel}
               </Link>
             ) : (
@@ -297,17 +295,20 @@ function NeighborList({ items, variant = "card" }: { items: NeighborItem[]; vari
   return (
     <div className="workspace-stack">
       {items.map((item) => (
-        <div key={`${item.paper_id}-${item.match_source}`} className={`workspace-note-card${variant === "plain" ? " is-plain" : ""}`}>
-          <Flex justify="space-between" align="start" gap={12} wrap="wrap">
-            <div className="workspace-note-main">
+        <div
+          key={`${item.paper_id}-${item.match_source}`}
+          className={`workspace-note-card workspace-neighbor-card${variant === "plain" ? " is-plain" : ""}`}
+        >
+          <div className="workspace-neighbor-header">
+            <div className="workspace-note-main workspace-neighbor-main">
               <Link to={paperRoute(item.route_path, item.paper_id)} className="paper-link small">
                 {item.title}
               </Link>
               <TooltipText text={item.reason_short || item.reason} as="paragraph" rows={2} className="workspace-body-copy" />
               <Paragraph className="workspace-support-copy">{item.reason}</Paragraph>
             </div>
-            <Tag className={scoreLevelTagClass(item.score_level)}>{scoreLevelLabel(item.score_level)}</Tag>
-          </Flex>
+            <Tag className={`workspace-neighbor-score ${scoreLevelTagClass(item.score_level)}`}>{scoreLevelLabel(item.score_level)}</Tag>
+          </div>
           <Flex wrap="wrap" gap={8}>
             {sharedSignalPreview(item.shared_signals).map((signal) => (
               <TooltipTag key={`${item.paper_id}-${signal}`} label={signal} maxChars={24} className="chip-tag chip-tag-tone-blue" />
@@ -390,9 +391,8 @@ function MethodTab({ paper, variant = "card" }: { paper: PaperCanonicalRecord; v
 
 function MetadataTab({ paper, variant = "card" }: { paper: PaperCanonicalRecord; variant?: SurfaceVariant }) {
   const links = orderedResourceLinks(paper);
-  const markdownLinkHref = markdownHref(paper.source.paper_path);
   const translateLinkHref = translateConversationHref(paper.source.conversation_ids);
-  const hasAnyResource = Boolean(links.length || markdownLinkHref || translateLinkHref);
+  const hasAnyResource = Boolean(links.length || translateLinkHref);
   const taxonomyRows = [
     { label: "主题", value: <BadgeGroup values={paper.taxonomy.themes} getLabel={metadataTagLabel} /> },
     { label: "任务", value: <BadgeGroup values={paper.taxonomy.tasks} tone="gold" getLabel={metadataTagLabel} /> },
@@ -424,11 +424,6 @@ function MetadataTab({ paper, variant = "card" }: { paper: PaperCanonicalRecord;
                 {item.label}
               </Button>
             ))}
-            {markdownLinkHref ? (
-              <Button href={markdownLinkHref} target="_blank" icon={<BookOutlined />}>
-                {RESOURCE_LABELS.markdown}
-              </Button>
-            ) : null}
             {translateLinkHref ? (
               <Button href={translateLinkHref} target="_blank" icon={<LinkOutlined />}>
                 {RESOURCE_LABELS.translate}

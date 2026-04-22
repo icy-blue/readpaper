@@ -380,7 +380,6 @@ def build_site_payload(records: list[dict[str, Any]]) -> tuple[dict[str, Any], d
         },
         "navigation": {
             "home_route": "#/",
-            "detail_route_template": "#/paper/{paper_id}",
             "neighbor_tabs": [
                 {"key": "task", "label": "任务近邻"},
                 {"key": "method", "label": "方法近邻"},

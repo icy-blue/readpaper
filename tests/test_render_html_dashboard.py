@@ -35,7 +35,7 @@ class RenderHtmlDashboardTests(unittest.TestCase):
             self.assertEqual(index_path, site_dir / "index.html")
             self.assertTrue((site_dir / "assets" / "main.js").exists())
             self.assertFalse((site_dir / "papers" / "legacy.html").exists())
-            self.assertTrue((site_dir / "papers" / "keep.md").exists())
+            self.assertFalse((site_dir / "papers" / "keep.md").exists())
             self.assertTrue((site_dir / "papers" / "keep.json").exists())
             self.assertTrue((site_dir / "site-index.json").exists())
 
