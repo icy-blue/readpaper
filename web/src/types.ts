@@ -173,8 +173,8 @@ export interface PaperCardView {
   source: SourceInfo;
   bibliography: Bibliography;
   story: StoryBlock;
-  editorial: Pick<EditorialBlock, "verdict" | "summary" | "why_read" | "reading_route" | "graph_worthy">;
-  taxonomy: Pick<TaxonomyBlock, "themes" | "tasks" | "methods" | "modalities" | "novelty_types">;
+  editorial: EditorialBlock;
+  taxonomy: TaxonomyBlock;
 }
 
 export interface NeighborItem {

@@ -13,7 +13,7 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { ArrowLeftOutlined, CopyOutlined, LinkOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, BookOutlined, CopyOutlined, LinkOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
