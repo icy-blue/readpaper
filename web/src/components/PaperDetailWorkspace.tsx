@@ -40,7 +40,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   project: "查看 Project",
   data: "查看 Data",
   markdown: "查看 Markdown",
-  translate: "查看 Translate 对话",
+  translate: "查看翻译",
 };
 const RESOURCE_ORDER = ["pdf", "arxiv", "doi", "code", "project", "data"] as const;
 
@@ -99,14 +99,34 @@ function TextList({ items, emptyText, ordered = false }: { items: string[]; empt
   );
 }
 
-function BadgeGroup({ values, tone }: { values: string[]; tone?: string | null }) {
+function metadataTagLabel(value: string): string {
+  return cleanDisplayText(value) ?? value;
+}
+
+function supportTagLabel(value: string): string {
+  const content = cleanDisplayText(value) ?? value;
+  if (content.toLowerCase().startsWith("section:")) {
+    return `章节:${content.slice("section:".length)}`;
+  }
+  return content;
+}
+
+function BadgeGroup({
+  values,
+  tone,
+  getLabel = displayValueLabel,
+}: {
+  values: string[];
+  tone?: string | null;
+  getLabel?: (value: string) => string;
+}) {
   if (!values.length) {
     return <Text type="secondary">暂无</Text>;
   }
   return (
     <Flex wrap="wrap" gap={8}>
       {values.map((value) => (
-        <TooltipTag key={value} label={displayValueLabel(value)} className={chipToneClass(tone)} maxChars={24} />
+        <TooltipTag key={value} label={getLabel(value)} className={chipToneClass(tone)} maxChars={24} />
       ))}
     </Flex>
   );
@@ -190,7 +210,7 @@ function ClaimList({ paper, variant = "card" }: { paper: PaperCanonicalRecord; v
           <Flex wrap="wrap" gap={8}>
             {claim.support.map((item) => (
               <Tag key={`${paper.id}-${index}-${item}`} className="chip-tag chip-tag-tone-blue">
-                {item}
+                {supportTagLabel(item)}
               </Tag>
             ))}
             {claim.confidence ? <Tag className={chipToneClass(confidenceTone(claim.confidence))}>可信度 {claim.confidence}</Tag> : null}
@@ -347,11 +367,11 @@ function MetadataTab({ paper, variant = "card" }: { paper: PaperCanonicalRecord;
   const translateLinkHref = translateConversationHref(paper.source.conversation_ids);
   const hasAnyResource = Boolean(links.length || markdownLinkHref || translateLinkHref);
   const taxonomyRows = [
-    { label: "主题", value: <BadgeGroup values={paper.taxonomy.themes} /> },
-    { label: "任务", value: <BadgeGroup values={paper.taxonomy.tasks} tone="gold" /> },
-    { label: "方法", value: <BadgeGroup values={paper.taxonomy.methods} tone="green" /> },
-    { label: "模态", value: <BadgeGroup values={paper.taxonomy.modalities} tone="processing" /> },
-    { label: "创新类型", value: <BadgeGroup values={paper.taxonomy.novelty_types} tone="magenta" /> },
+    { label: "主题", value: <BadgeGroup values={paper.taxonomy.themes} getLabel={metadataTagLabel} /> },
+    { label: "任务", value: <BadgeGroup values={paper.taxonomy.tasks} tone="gold" getLabel={metadataTagLabel} /> },
+    { label: "方法", value: <BadgeGroup values={paper.taxonomy.methods} tone="green" getLabel={metadataTagLabel} /> },
+    { label: "模态", value: <BadgeGroup values={paper.taxonomy.modalities} tone="processing" getLabel={metadataTagLabel} /> },
+    { label: "创新类型", value: <BadgeGroup values={paper.taxonomy.novelty_types} tone="magenta" getLabel={metadataTagLabel} /> },
   ];
 
   return (
@@ -361,7 +381,7 @@ function MetadataTab({ paper, variant = "card" }: { paper: PaperCanonicalRecord;
           items={[
             { label: "标题", value: paper.bibliography.title },
             { label: "作者", value: paper.bibliography.authors.length ? paper.bibliography.authors.join(" / ") : "暂无" },
-            { label: "Venue", value: paper.bibliography.venue || "暂无" },
+            { label: "来源", value: paper.bibliography.venue || "暂无" },
             { label: "年份", value: formatYear(paper.bibliography.year) },
             { label: "引用数", value: paper.bibliography.citation_count ?? "暂无" },
             { label: "DOI", value: paper.bibliography.identifiers.doi || "暂无" },
@@ -392,16 +412,16 @@ function MetadataTab({ paper, variant = "card" }: { paper: PaperCanonicalRecord;
           <Paragraph className="workspace-empty-copy">暂无外部资源链接。</Paragraph>
         )}
       </SectionCard>
-      <SectionCard title="Taxonomy" variant={variant}>
+      <SectionCard title="分类标签" variant={variant}>
         <KeyValueGrid items={taxonomyRows} />
       </SectionCard>
       <SectionCard title="素材索引" muted variant={variant}>
         <KeyValueGrid
           items={[
-            { label: "Figures", value: paper.assets.figures.length || "暂无" },
-            { label: "Tables", value: paper.assets.tables.length || "暂无" },
-            { label: "Claims", value: paper.claims.length || "暂无" },
-            { label: "Relations", value: paper.relations.length || "暂无" },
+            { label: "插图", value: paper.assets.figures.length || "暂无" },
+            { label: "表格", value: paper.assets.tables.length || "暂无" },
+            { label: "论断", value: paper.claims.length || "暂无" },
+            { label: "关联", value: paper.relations.length || "暂无" },
           ]}
         />
       </SectionCard>

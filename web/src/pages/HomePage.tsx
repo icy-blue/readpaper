@@ -204,23 +204,27 @@ function HomeToolbar({
     <>
       <div className={`console-toolbar${inHeader ? " is-header" : " is-inline"}`}>
         <div className="console-toolbar-controls">
-          <Input
-            allowClear
-            size="large"
-            prefix={<FileSearchOutlined />}
-            placeholder="搜索论文标题…"
-            value={titleQuery}
-            onChange={(event) => startTransition(() => setTitleQuery(event.target.value))}
-            className="search-input console-search-control"
-          />
-          <Button
-            icon={<FilterOutlined />}
-            onClick={openAdvancedSearch}
-            className={`console-advanced-trigger${appliedFilterCount ? " is-active" : ""}`}
-          >
-            <span>筛选</span>
-            {appliedFilterCount ? <span className="console-advanced-count">{appliedFilterCount}</span> : null}
-          </Button>
+          <span className="console-toolbar-control-shell">
+            <Input
+              allowClear
+              size="large"
+              prefix={<FileSearchOutlined />}
+              placeholder="搜索论文标题…"
+              value={titleQuery}
+              onChange={(event) => startTransition(() => setTitleQuery(event.target.value))}
+              className="search-input console-search-control"
+            />
+          </span>
+          <span className="console-toolbar-control-shell">
+            <Button
+              icon={<FilterOutlined />}
+              onClick={openAdvancedSearch}
+              className={`console-advanced-trigger${appliedFilterCount ? " is-active" : ""}`}
+            >
+              <span>筛选</span>
+              {appliedFilterCount ? <span className="console-advanced-count">{appliedFilterCount}</span> : null}
+            </Button>
+          </span>
           <Popover
             trigger="click"
             open={sortMenuOpen}
