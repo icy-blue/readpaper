@@ -1013,9 +1013,7 @@ a {
 
 .highlight-panel .section-lead,
 .content-group .long-copy,
-.figure-caption,
-.relation-title,
-.relation-description {
+.figure-caption {
   margin-bottom: 0 !important;
 }
 
@@ -1122,19 +1120,6 @@ a {
 .neighbor-reason-long {
   margin-top: 6px !important;
   margin-bottom: 0 !important;
-}
-
-.relation-title {
-  margin-top: 8px !important;
-}
-
-.relation-link {
-  display: inline-block;
-  margin-top: 8px;
-}
-
-.relation-description {
-  margin-top: 4px !important;
 }
 
 .materials-group {
@@ -2200,6 +2185,10 @@ a {
   gap: 12px;
 }
 
+.workspace-relation-card {
+  gap: 12px;
+}
+
 .workspace-neighbor-header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2214,6 +2203,33 @@ a {
 .workspace-neighbor-main .paper-link {
   display: block;
   min-width: 0;
+}
+
+.workspace-title-chip-row {
+  align-items: center;
+  row-gap: 8px;
+  margin-bottom: 4px;
+}
+
+.workspace-relation-main {
+  display: grid;
+  gap: 8px;
+  padding: 2px 6px 0 12px;
+}
+
+.workspace-relation-link,
+.workspace-relation-target {
+  display: block;
+  min-width: 0;
+}
+
+.workspace-title-chip-row .paper-link,
+.workspace-title-chip-row .workspace-relation-target {
+  margin-right: 4px;
+}
+
+.workspace-relation-description {
+  margin-bottom: 0 !important;
 }
 
 .workspace-neighbor-score {
@@ -2282,10 +2298,6 @@ a {
 
 .workspace-note-main {
   min-width: 0;
-}
-
-.workspace-inline-link {
-  display: inline-block;
 }
 
 .detail-page-shell {

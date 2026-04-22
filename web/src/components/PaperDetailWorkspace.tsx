@@ -225,29 +225,31 @@ function RelationsList({ items, variant = "card" }: { items: RelationItem[]; var
         return (
           <div
             key={`${item.type}-${item.target_paper_id || item.label || "relation"}`}
-            className={`workspace-note-card${variant === "plain" ? " is-plain" : ""}`}
+            className={`workspace-note-card workspace-relation-card${variant === "plain" ? " is-plain" : ""}`}
           >
-            <Flex justify="space-between" align="start" gap={12} wrap="wrap">
-              <Text strong>{displayRelationType(item.type)}</Text>
-              <Flex wrap="wrap" gap={8}>
+            <div className="workspace-note-main workspace-relation-main">
+              <Flex wrap="wrap" gap={8} className="workspace-title-chip-row">
+                {externalHref ? (
+                  <a href={externalHref} target="_blank" rel="noreferrer" className="paper-link small workspace-relation-link">
+                    {targetLabel}
+                  </a>
+                ) : item.target_paper_id ? (
+                  <Link to={paperRoute(undefined, item.target_paper_id)} className="paper-link small workspace-relation-link">
+                    {targetLabel}
+                  </Link>
+                ) : (
+                  <Text strong className="workspace-relation-target">
+                    {targetLabel}
+                  </Text>
+                )}
+                <Tag className="chip-tag chip-tag-route-overview">{displayRelationType(item.type)}</Tag>
                 <Tag className="chip-tag chip-tag-tone-blue">{item.target_kind === "external" ? "外部论文" : "本地论文"}</Tag>
                 {relationConfidenceLabel(item.confidence) ? (
                   <Tag className="chip-tag chip-tag-tone-green">{relationConfidenceLabel(item.confidence)}</Tag>
                 ) : null}
               </Flex>
-            </Flex>
-            {externalHref ? (
-              <a href={externalHref} target="_blank" rel="noreferrer" className="paper-link small workspace-inline-link">
-                {targetLabel}
-              </a>
-            ) : item.target_paper_id ? (
-              <Link to={paperRoute(undefined, item.target_paper_id)} className="paper-link small workspace-inline-link">
-                {targetLabel}
-              </Link>
-            ) : (
-              <Paragraph className="workspace-body-copy">{targetLabel}</Paragraph>
-            )}
-            {item.description ? <Paragraph className="workspace-support-copy">{item.description}</Paragraph> : null}
+              {item.description ? <Paragraph className="workspace-body-copy workspace-relation-description">{item.description}</Paragraph> : null}
+            </div>
           </div>
         );
       })}
@@ -268,19 +270,19 @@ function NeighborList({ items, variant = "card" }: { items: NeighborItem[]; vari
         >
           <div className="workspace-neighbor-header">
             <div className="workspace-note-main workspace-neighbor-main">
-              <Link to={paperRoute(item.route_path, item.paper_id)} className="paper-link small">
-                {item.title}
-              </Link>
+              <Flex wrap="wrap" gap={8} className="workspace-title-chip-row">
+                <Link to={paperRoute(item.route_path, item.paper_id)} className="paper-link small">
+                  {item.title}
+                </Link>
+                {sharedSignalPreview(item.shared_signals).map((signal) => (
+                  <TooltipTag key={`${item.paper_id}-${signal}`} label={signal} maxChars={24} className="chip-tag chip-tag-tone-blue" />
+                ))}
+              </Flex>
               <TooltipText text={item.reason_short || item.reason} as="paragraph" rows={2} className="workspace-body-copy" />
               <Paragraph className="workspace-support-copy">{item.reason}</Paragraph>
             </div>
             <Tag className={`workspace-neighbor-score ${scoreLevelTagClass(item.score_level)}`}>{scoreLevelLabel(item.score_level)}</Tag>
           </div>
-          <Flex wrap="wrap" gap={8}>
-            {sharedSignalPreview(item.shared_signals).map((signal) => (
-              <TooltipTag key={`${item.paper_id}-${signal}`} label={signal} maxChars={24} className="chip-tag chip-tag-tone-blue" />
-            ))}
-          </Flex>
         </div>
       ))}
     </div>
@@ -298,10 +300,6 @@ function OverviewTab({ paper, variant = "card" }: { paper: PaperCanonicalRecord;
 
   return (
     <div className={`workspace-tab-stack${variant === "plain" ? " is-plain" : ""}`}>
-      <SectionCard title="论文入口" kicker="Overview" variant={variant}>
-        <Paragraph className="workspace-body-copy">{paper.story.paper_one_liner || "暂无一句话入口。"}</Paragraph>
-        {paper.editorial.research_position ? <Paragraph className="workspace-support-copy">{paper.editorial.research_position}</Paragraph> : null}
-      </SectionCard>
       <SectionCard title="研究问题" muted variant={variant}>
         <Paragraph className="workspace-body-copy">{paper.research_problem.summary || "暂无研究问题摘要。"}</Paragraph>
         {paper.research_problem.goal ? <Paragraph className="workspace-support-copy">目标：{paper.research_problem.goal}</Paragraph> : null}
