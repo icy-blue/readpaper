@@ -53,8 +53,31 @@ python3 scripts/render_html_dashboard.py \
 - `normalize_papers.py`: 从 `outputs/raw/` 和 `outputs/meta/` 重新组装 canonical paper records
 - `build_site_derivatives.py`: 从 canonical paper records 派生首页 payload、详情 payload 和近邻信息
 - `render_markdown_site.py`: 生成站点需要的 Markdown 页面，并同步写入 `site-index.json` 与详情 JSON
-- `npm run build:web`: 重新构建前端静态资源
-- `render_html_dashboard.py`: 把前端构建产物发布到 `outputs/site/`，并保留 JSON 数据文件供前端按需加载
+- `npm run build:web`: 重新构建前端静态资源到 `web/dist/`
+- `render_html_dashboard.py`: 把 `web/dist/` 中的前端构建产物发布到 `outputs/site/`，并保留 JSON 数据文件供前端按需加载
+
+## 前端改动的最小发布流程
+
+如果你只改了 `web/src/` 下的 React / CSS，而没有修改 `outputs/papers/`、`outputs/site/*.json` 或派生逻辑，则不需要重跑整条数据链。最小步骤是：
+
+```bash
+npm run build:web
+
+python3 scripts/render_html_dashboard.py \
+  --site-index-json outputs/site/site-index.json \
+  --output outputs/site/index.html
+```
+
+这一步非常关键：
+
+- `npm run build:web` 只会更新 `web/dist/`
+- 浏览网页时实际读取的是 `outputs/site/index.html` 与 `outputs/site/assets/*`
+- 所以如果没有执行 `render_html_dashboard.py`，网页会继续使用旧的已发布资源，看起来就像“前端完全没变化”
+
+一个快速自检方法是比对两个 `index.html` 中的资源 hash：
+
+- `web/dist/index.html` 应该引用最新的 `assets/index-*.js` / `assets/index-*.css`
+- `outputs/site/index.html` 如果还是旧 hash，说明发布步骤还没跑
 
 ## 常规工作流
 
@@ -86,6 +109,15 @@ python3 -m http.server 8000
 ```
 
 然后访问 [http://localhost:8000/index.html](http://localhost:8000/index.html)。
+
+如果你是从仓库根目录直接预览前端开发构建产物，也可以临时启动：
+
+```bash
+cd web/dist
+python3 -m http.server 8000
+```
+
+但要注意，这只用于检查构建结果；最终静态站点仍以 `outputs/site/` 为准。
 
 ## 注意事项
 

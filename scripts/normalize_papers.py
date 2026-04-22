@@ -252,6 +252,26 @@ def message_unit_id(message: dict[str, Any]) -> str:
     return ""
 
 
+def message_section_key(message: dict[str, Any]) -> str:
+    unit_id = message_unit_id(message)
+    if unit_id:
+        return unit_id
+
+    section_category = message.get("section_category")
+    if isinstance(section_category, str):
+        normalized = normalize_text(section_category)
+        if normalized and normalized not in {"body"}:
+            return normalized
+
+    content = message.get("content")
+    if isinstance(content, str):
+        first_line = content.splitlines()[0] if content.splitlines() else ""
+        normalized = normalize_text(first_line.lstrip("#").strip())
+        if normalized:
+            return normalized
+    return ""
+
+
 def visible_bot_messages(conversation: dict[str, Any]) -> list[dict[str, Any]]:
     messages = conversation.get("messages")
     if not isinstance(messages, list):
@@ -274,15 +294,15 @@ def visible_bot_messages(conversation: dict[str, Any]) -> list[dict[str, Any]]:
 
 def section_bucket(unit_id: str) -> str:
     lowered = unit_id.lower()
-    if lowered == "abstract":
+    if lowered == "abstract" or "摘要" in lowered:
         return "abstract"
     if "introduction" in lowered or "引言" in lowered:
         return "introduction"
-    if "method" in lowered or "approach" in lowered or "framework" in lowered:
+    if "method" in lowered or "approach" in lowered or "framework" in lowered or "方法" in lowered:
         return "method"
-    if "experiment" in lowered or "evaluation" in lowered or "result" in lowered:
+    if "experiment" in lowered or "evaluation" in lowered or "result" in lowered or "实验" in lowered or "结果" in lowered:
         return "experiments"
-    if "conclusion" in lowered or "discussion" in lowered:
+    if "conclusion" in lowered or "discussion" in lowered or "结论" in lowered or "讨论" in lowered:
         return "conclusion"
     if lowered.startswith("appendix") or re.match(r"^[a-z]\.", lowered):
         return "appendix"
@@ -300,7 +320,7 @@ def extract_sections(conversation: dict[str, Any]) -> dict[str, list[str]]:
         "body": [],
     }
     for message in visible_bot_messages(conversation):
-        bucket = section_bucket(message_unit_id(message))
+        bucket = section_bucket(message_section_key(message))
         content = strip_heading(str(message.get("content") or ""))
         if content:
             buckets[bucket].append(content)

@@ -29,6 +29,7 @@ This repository builds a local research knowledge forest from papers on `transla
 - Do not hand-edit generated files under `outputs/site/` unless you are debugging the renderer.
 - Do not invent paper claims, benchmarks, or metadata that are not grounded in the fetched payload.
 - If a payload is incomplete, keep the record partial instead of filling gaps with guesses.
+- Frontend edits under `web/src/` are not visible in the published site until you both build the SPA into `web/dist/` and republish it into `outputs/site/`.
 
 ## Standard Workflow
 
@@ -83,7 +84,13 @@ python3 scripts/render_markdown_site.py \
   --site-dir outputs/site
 ```
 
-6. Rebuild the HTML dashboard:
+6. Rebuild the frontend bundle:
+
+```bash
+npm run build:web
+```
+
+7. Rebuild the HTML dashboard:
 
 ```bash
 python3 scripts/render_html_dashboard.py \
@@ -93,7 +100,7 @@ python3 scripts/render_html_dashboard.py \
 
 ## Commit Guidance
 
-- Usually commit: `scripts/`, `references/`, `agents/`, `SKILL.md`, `AGENTS.md`.
+- Usually commit: `scripts/`, `references/`, `agents/`, `web/src/`, `web/vite.config.ts`, `SKILL.md`, `AGENTS.md`, `README.md`.
 - Usually do not commit: `outputs/meta/`, `outputs/papers/`, `outputs/raw/`, `outputs/fetch/`, `outputs/site/`, `state/paper_registry.json`, caches, editor files, or virtualenvs.
 - If you change the normalized paper schema or rendering contract, update the relevant file in `references/` in the same change.
 
@@ -101,4 +108,6 @@ python3 scripts/render_html_dashboard.py \
 
 - For script changes, run the smallest affected command from the workflow above.
 - For local-only changes in `outputs/papers/`, at minimum rebuild site derivatives and the site to catch schema drift before relying on generated outputs.
+- For frontend-only changes in `web/src/`, at minimum run `npm run build:web` and then `python3 scripts/render_html_dashboard.py --site-index-json outputs/site/site-index.json --output outputs/site/index.html`.
+- If the page looks unchanged after a frontend edit, compare `web/dist/index.html` and `outputs/site/index.html`; mismatched asset hashes usually mean the publish step was skipped.
 - Keep JSON pretty-printed with UTF-8 and trailing newlines, matching the existing scripts.

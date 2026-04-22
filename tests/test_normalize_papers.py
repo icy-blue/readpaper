@@ -11,6 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from normalize_papers import (  # noqa: E402
+    extract_sections,
     meta_artifact_is_current,
     normalize_raw_file,
     read_extractor_version,
@@ -226,6 +227,36 @@ class NormalizePapersTests(unittest.TestCase):
             self.assertIn("Image-to-3D", record["taxonomy"]["tasks"])
             self.assertNotIn("reading_digest", record)
             self.assertNotIn("paper_neighbors", record)
+
+    def test_extract_sections_falls_back_to_section_category_and_heading(self) -> None:
+        conversation = {
+            "messages": [
+                {
+                    "message_kind": "bot_reply",
+                    "visible_to_user": True,
+                    "section_category": "abstract",
+                    "content": "# 摘要\n\n这是摘要。",
+                },
+                {
+                    "message_kind": "bot_reply",
+                    "visible_to_user": True,
+                    "section_category": "body",
+                    "content": "# 1. 引言\n\n这是引言。",
+                },
+                {
+                    "message_kind": "bot_reply",
+                    "visible_to_user": True,
+                    "section_category": "body",
+                    "content": "# 3. 方法\n\n这是方法。",
+                },
+            ]
+        }
+
+        sections = extract_sections(conversation)
+
+        self.assertEqual(sections["abstract"], ["这是摘要。"])
+        self.assertEqual(sections["introduction"], ["这是引言。"])
+        self.assertEqual(sections["method"], ["这是方法。"])
 
 
 if __name__ == "__main__":
