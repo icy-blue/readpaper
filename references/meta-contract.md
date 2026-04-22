@@ -25,7 +25,7 @@ Prefer missing over guessed. Do not infer unsupported claims from absent section
 ```json
 {
   "paper_id": "demo-paper",
-  "extractor_version": "meta-v5",
+  "extractor_version": "meta-v6",
   "source_conversation_id": "conv-1",
   "source_semantic_updated_at": "2026-04-21T00:00:00+08:00",
   "extracted_at": "2026-04-21T00:00:00+08:00",
@@ -165,6 +165,10 @@ Prefer missing over guessed. Do not infer unsupported claims from absent section
 - `evaluation.datasets`, `metrics`, and `baselines` must be explicit names from experiment text or captions.
 - `taxonomy` should be conservative and canonical. Do not mix Chinese and English labels.
 - `comparison.next_read` and `editorial.next_read` should contain short target names, not sentences.
+- `editorial.graph_worthy` means worth keeping as a long-term anchor in the local knowledge forest, not simply "good paper" or "worth reading".
+- `editorial.graph_worthy` is independent from `editorial.verdict`.
+- Set `editorial.graph_worthy` to `true` only when at least 2 of these are grounded: the paper is a representative route anchor, a clear comparison anchor, a reusable mechanism reference, or a durable evidence anchor.
+- Keep `editorial.graph_worthy` `false` when the evidence is incomplete, the contribution is mostly incremental, the paper is too narrow for future comparison, or the same anchor role is already covered more clearly by another local paper.
 - `relation_candidates` are analysis-layer inputs only; do not emit final canonical relation ids here.
 - `relation_candidates` should prefer explicit typed evidence such as `compares_to`, `extends`, or `uses_method`.
 - Heuristic `relation_candidates` are limited to `compares_to` and `same_problem`.

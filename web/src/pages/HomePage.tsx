@@ -1,6 +1,15 @@
-import { Button, Drawer, Empty, Flex, Grid, Input, Modal, Select, Tag, Typography, type InputRef } from "antd";
-import { FileSearchOutlined, FilterOutlined, LinkOutlined, ReadOutlined } from "@ant-design/icons";
-import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Button, Drawer, Empty, Flex, Grid, Input, Modal, Select, Tag, Typography } from "antd";
+import {
+  CalendarOutlined,
+  FileSearchOutlined,
+  FilterOutlined,
+  FontSizeOutlined,
+  ReadOutlined,
+  SortAscendingOutlined,
+  SortDescendingOutlined,
+} from "@ant-design/icons";
+import { startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PaperDetailWorkspace } from "../components/PaperDetailWorkspace";
 import {
@@ -19,11 +28,27 @@ import { TooltipTag } from "../components/OverflowTooltip";
 import type { PaperCardView, SiteIndexPayload } from "../types";
 
 const { Title, Paragraph, Text } = Typography;
-const SORT_OPTIONS = [
-  { label: "年份从新到旧", value: "year-desc" },
-  { label: "年份从旧到新", value: "year-asc" },
-  { label: "标题 A-Z", value: "title-asc" },
+const HOME_HEADER_SLOT_ID = "home-header-slot";
+const SORT_FIELD_OPTIONS = [
+  { label: "年份", value: "year" },
+  { label: "标题", value: "title" },
 ] as const;
+const SORT_DIRECTION_OPTIONS = [
+  { label: "升序", value: "asc" },
+  { label: "降序", value: "desc" },
+] as const;
+
+function sortFieldOf(sortBy: string): "year" | "title" {
+  return sortBy.startsWith("title") ? "title" : "year";
+}
+
+function sortDirectionOf(sortBy: string): "asc" | "desc" {
+  return sortBy.endsWith("asc") ? "asc" : "desc";
+}
+
+function buildSortValue(field: "year" | "title", direction: "asc" | "desc"): string {
+  return `${field}-${direction}`;
+}
 
 function discoveryTags(paper: PaperCardView): string[] {
   return [...paper.taxonomy.tasks, ...paper.taxonomy.methods, ...paper.taxonomy.themes].slice(0, 3);
@@ -57,7 +82,7 @@ function HomeToolbar({
   sortBy,
   setSortBy,
   resultsCount,
-  searchInputRef,
+  inHeader,
 }: {
   payload: SiteIndexPayload;
   titleQuery: string;
@@ -79,11 +104,12 @@ function HomeToolbar({
   sortBy: string;
   setSortBy: (value: string) => void;
   resultsCount: number;
-  searchInputRef: RefObject<InputRef | null>;
+  inHeader: boolean;
 }) {
   const generatedAtLabel = formatLocalDateTime(payload.site_meta.generated_at);
   const generatedAtDetail = formatLocalDateTimeDetail(payload.site_meta.generated_at);
-  const sortLabel = SORT_OPTIONS.find((item) => item.value === sortBy)?.label || SORT_OPTIONS[0].label;
+  const sortField = sortFieldOf(sortBy);
+  const sortDirection = sortDirectionOf(sortBy);
   const filterSummaries = [
     selectedThemes.length ? selectedFilterSummary("主题", selectedThemes.length) : "",
     selectedTasks.length ? selectedFilterSummary("任务", selectedTasks.length) : "",
@@ -93,22 +119,58 @@ function HomeToolbar({
   const contextItems = [
     `当前 ${resultsCount} 篇`,
     `总库 ${payload.site_meta.paper_count} 篇`,
-    `排序 ${sortLabel}`,
     `更新于 ${generatedAtLabel}`,
     ...filterSummaries,
   ];
 
   return (
-    <div className="console-toolbar">
-      <div className="console-toolbar-main">
-        <div className="console-toolbar-copy">
-          <Text className="section-kicker">Translate Paper Forest</Text>
-          <Title level={2} className="console-title">
-            研究发现台
-          </Title>
-          <Paragraph className="console-support-copy">面向筛选、切换与深读的双栏工作台。</Paragraph>
+    <>
+      <div className={`console-toolbar${inHeader ? " is-header" : " is-inline"}`}>
+        <div className="console-toolbar-controls">
+          <Input
+            allowClear
+            size="large"
+            prefix={<FileSearchOutlined />}
+            placeholder="搜索论文标题…"
+            value={titleQuery}
+            onChange={(event) => startTransition(() => setTitleQuery(event.target.value))}
+            className="search-input console-search-control"
+          />
+          <Button
+            icon={<FilterOutlined />}
+            onClick={openAdvancedSearch}
+            className={`console-advanced-trigger${appliedFilterCount ? " is-active" : ""}`}
+          >
+            <span>高级搜索</span>
+            {appliedFilterCount ? <span className="console-advanced-count">{appliedFilterCount}</span> : null}
+          </Button>
+          <div className="console-sort-controls">
+            <div className="console-sort-toggle-group" role="group" aria-label="排序字段">
+              {SORT_FIELD_OPTIONS.map((item) => (
+                <Button
+                  key={item.value}
+                  icon={item.value === "year" ? <CalendarOutlined /> : <FontSizeOutlined />}
+                  className={`console-sort-toggle${sortField === item.value ? " is-active" : ""}`}
+                  onClick={() => startTransition(() => setSortBy(buildSortValue(item.value, sortDirection)))}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
+            <div className="console-sort-toggle-group" role="group" aria-label="排序方向">
+              {SORT_DIRECTION_OPTIONS.map((item) => (
+                <Button
+                  key={item.value}
+                  icon={item.value === "asc" ? <SortAscendingOutlined /> : <SortDescendingOutlined />}
+                  className={`console-sort-toggle${sortDirection === item.value ? " is-active" : ""}`}
+                  onClick={() => startTransition(() => setSortBy(buildSortValue(sortField, item.value)))}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
-
         <div className="console-toolbar-context">
           {contextItems.map((item) => (
             <Text
@@ -121,44 +183,6 @@ function HomeToolbar({
           ))}
         </div>
       </div>
-
-      <div className="console-toolbar-controls">
-        <Input
-          ref={searchInputRef}
-          allowClear
-          size="large"
-          prefix={<FileSearchOutlined />}
-          placeholder="搜索论文标题…"
-          value={titleQuery}
-          onChange={(event) => startTransition(() => setTitleQuery(event.target.value))}
-          className="search-input console-search-control"
-        />
-        <Button
-          icon={<FilterOutlined />}
-          onClick={openAdvancedSearch}
-          className={`console-advanced-trigger${appliedFilterCount ? " is-active" : ""}`}
-        >
-          <span>高级搜索</span>
-          {appliedFilterCount ? <span className="console-advanced-count">{appliedFilterCount}</span> : null}
-        </Button>
-        <Select
-          size="large"
-          value={sortBy}
-          options={SORT_OPTIONS.map((item) => ({ label: item.label, value: item.value }))}
-          onChange={(value) => startTransition(() => setSortBy(value))}
-          className="console-sort-control"
-        />
-      </div>
-
-      {filterSummaries.length ? (
-        <div className="console-active-filter-row">
-          {filterSummaries.map((item) => (
-            <Text key={item} className="console-active-filter-chip">
-              {item}
-            </Text>
-          ))}
-        </div>
-      ) : null}
 
       <Modal
         title="高级搜索"
@@ -227,7 +251,7 @@ function HomeToolbar({
           </section>
         </div>
       </Modal>
-    </div>
+    </>
   );
 }
 
@@ -264,24 +288,12 @@ function PaperListItem({
   );
 }
 
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-  return Boolean(
-    target.isContentEditable ||
-      target.closest("input, textarea, select, [contenteditable='true']") ||
-      target.closest(".ant-select") ||
-      target.closest(".ant-drawer"),
-  );
-}
-
 export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   const screens = Grid.useBreakpoint();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const searchInputRef = useRef<InputRef>(null);
   const paperItemRefs = useRef(new Map<string, HTMLButtonElement>());
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
   const featuredIds = useMemo(() => new Set(payload.featured.map((paper) => paper.id)), [payload.featured]);
 
   const [titleQuery, setTitleQuery] = useState("");
@@ -342,6 +354,9 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
       if (sortBy === "title-asc") {
         return left.bibliography.title.localeCompare(right.bibliography.title);
       }
+      if (sortBy === "title-desc") {
+        return right.bibliography.title.localeCompare(left.bibliography.title);
+      }
       const leftYear = Number(left.bibliography.year ?? 0);
       const rightYear = Number(right.bibliography.year ?? 0);
       return sortBy === "year-asc" ? leftYear - rightYear : rightYear - leftYear;
@@ -356,6 +371,15 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   const isDesktop = Boolean(screens.xl);
   const isTablet = Boolean(screens.md && !screens.xl);
   const isMobile = !screens.md;
+
+  useEffect(() => {
+    if (!isDesktop) {
+      setHeaderSlot(null);
+      return;
+    }
+
+    setHeaderSlot(document.getElementById(HOME_HEADER_SLOT_ID));
+  }, [isDesktop]);
 
   function updateSelectedPaper(paperId: string, replace = false) {
     const nextParams = new URLSearchParams(searchParams);
@@ -401,77 +425,41 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
     return () => window.cancelAnimationFrame(frameId);
   }, [isMobile, selectedPaperId]);
 
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (advancedSearchOpen || !filteredPapers.length || event.metaKey || event.ctrlKey || event.altKey) {
-        return;
-      }
-      if (event.key === "/" && !isEditableTarget(event.target)) {
-        event.preventDefault();
-        searchInputRef.current?.focus({ cursor: "all" });
-        return;
-      }
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-      const currentIndex = filteredPapers.findIndex((paper) => paper.id === selectedPaperId);
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        const nextPaper = filteredPapers[Math.min(currentIndex + 1, filteredPapers.length - 1)] ?? filteredPapers[0];
-        if (nextPaper) {
-          updateSelectedPaper(nextPaper.id);
-        }
-        return;
-      }
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        const nextPaper = filteredPapers[Math.max(currentIndex - 1, 0)] ?? filteredPapers[0];
-        if (nextPaper) {
-          updateSelectedPaper(nextPaper.id);
-        }
-        return;
-      }
-      if (event.key === "Enter" && selectedPaper) {
-        event.preventDefault();
-        navigate(paperRoute(selectedPaper.source.route_path, selectedPaper.id));
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [advancedSearchOpen, filteredPapers, navigate, selectedPaper, selectedPaperId, searchParams]);
-
   const openDetailAction = selectedPaper ? (
     <Button type="primary" icon={<ReadOutlined />} onClick={() => navigate(paperRoute(selectedPaper.source.route_path, selectedPaper.id))}>
       在独立页打开
     </Button>
   ) : null;
+  const toolbar = (
+    <HomeToolbar
+      payload={payload}
+      titleQuery={titleQuery}
+      setTitleQuery={setTitleQuery}
+      selectedThemes={selectedThemes}
+      selectedTasks={selectedTasks}
+      selectedMethods={selectedMethods}
+      draftThemes={draftThemes}
+      setDraftThemes={setDraftThemes}
+      draftTasks={draftTasks}
+      setDraftTasks={setDraftTasks}
+      draftMethods={draftMethods}
+      setDraftMethods={setDraftMethods}
+      advancedSearchOpen={advancedSearchOpen}
+      openAdvancedSearch={openAdvancedSearch}
+      closeAdvancedSearch={closeAdvancedSearch}
+      applyAdvancedSearch={applyAdvancedSearch}
+      clearDraftFilters={clearDraftFilters}
+      sortBy={sortBy}
+      setSortBy={setSortBy}
+      resultsCount={filteredPapers.length}
+      inHeader={isDesktop}
+    />
+  );
 
   return (
     <div className="page-stack console-page">
-      <HomeToolbar
-        payload={payload}
-        titleQuery={titleQuery}
-        setTitleQuery={setTitleQuery}
-        selectedThemes={selectedThemes}
-        selectedTasks={selectedTasks}
-        selectedMethods={selectedMethods}
-        draftThemes={draftThemes}
-        setDraftThemes={setDraftThemes}
-        draftTasks={draftTasks}
-        setDraftTasks={setDraftTasks}
-        draftMethods={draftMethods}
-        setDraftMethods={setDraftMethods}
-        advancedSearchOpen={advancedSearchOpen}
-        openAdvancedSearch={openAdvancedSearch}
-        closeAdvancedSearch={closeAdvancedSearch}
-        applyAdvancedSearch={applyAdvancedSearch}
-        clearDraftFilters={clearDraftFilters}
-        sortBy={sortBy}
-        setSortBy={setSortBy}
-        resultsCount={filteredPapers.length}
-        searchInputRef={searchInputRef}
-      />
+      {isDesktop && headerSlot ? createPortal(toolbar, headerSlot) : null}
+      {!isDesktop || !headerSlot ? toolbar : null}
 
       <div className="console-layout">
         <section className="console-list-panel">
@@ -482,11 +470,6 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
                 {filteredPapers.length ? `${filteredPapers.length} 篇候选论文` : "没有匹配结果"}
               </Title>
             </div>
-            {selectedPaper ? (
-              <Button size="small" icon={<LinkOutlined />} onClick={() => navigate(paperRoute(selectedPaper.source.route_path, selectedPaper.id))}>
-                在独立页打开
-              </Button>
-            ) : null}
           </div>
 
           {filteredPapers.length ? (

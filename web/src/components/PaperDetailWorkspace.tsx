@@ -118,7 +118,6 @@ function QuickLookPanel({ paper }: { paper: PaperCanonicalRecord }) {
     paper.editorial.summary ||
     paper.story.paper_one_liner ||
     "暂无明确读前判断。";
-  const nextStep = paper.editorial.strengths[0] || paper.story.method || "建议先看 Summary，再进入 Method。";
   return (
     <section className="workspace-quicklook-card">
       <div className="workspace-quicklook-head">
@@ -131,7 +130,6 @@ function QuickLookPanel({ paper }: { paper: PaperCanonicalRecord }) {
           { label: "Verdict", value: paper.editorial.verdict || "暂无" },
           { label: "阅读路径", value: recommendedRouteLabel(paper.editorial.reading_route) },
           { label: "研究定位", value: paper.editorial.research_position || "暂无" },
-          { label: "建议起点", value: nextStep },
         ]}
       />
     </section>
@@ -533,6 +531,16 @@ export function PaperDetailWorkspace({
               {formatYear(paper.bibliography.year)}
             </Paragraph>
           </div>
+          <div className="workspace-header-actions">
+            <Flex wrap="wrap" gap={10}>
+              {headerActions}
+              {primaryPdfLink ? (
+                <Button href={primaryPdfLink.href} target="_blank" icon={<LinkOutlined />}>
+                  {primaryPdfLink.label}
+                </Button>
+              ) : null}
+            </Flex>
+          </div>
           {headlineTags.length ? (
             <Flex wrap="wrap" gap={8} className="workspace-headline-tags">
               {headlineTags.map((tag) => (
@@ -540,16 +548,6 @@ export function PaperDetailWorkspace({
               ))}
             </Flex>
           ) : null}
-        </div>
-        <div className="workspace-header-actions">
-          <Flex wrap="wrap" gap={10}>
-            {headerActions}
-            {primaryPdfLink ? (
-              <Button href={primaryPdfLink.href} target="_blank" icon={<LinkOutlined />}>
-                {primaryPdfLink.label}
-              </Button>
-            ) : null}
-          </Flex>
         </div>
       </div>
 

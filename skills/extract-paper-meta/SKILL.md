@@ -46,6 +46,9 @@ It does not write the final canonical paper record.
 - Only emit `relation_candidates`, never final canonical `relations`.
 - Prefer explicit `compares_to` / `extends` / `uses_method` over heuristic candidates.
 - Heuristic candidates are limited to `compares_to` and `same_problem`.
+- Treat `meta.editorial.graph_worthy` as a conservative graph-anchor flag, not a generic quality score.
+- Set `meta.editorial.graph_worthy` to `true` only when at least 2 grounded signals are present: representative route anchor, clear comparison anchor, reusable mechanism reference, or durable evidence anchor.
+- Keep `meta.editorial.graph_worthy` `false` for incremental-only papers, incomplete evidence, overly narrow papers, or papers already fully covered by a stronger local anchor.
 
 ## Validation Checklist
 
@@ -55,6 +58,7 @@ Before writing the JSON, verify:
 - `meta.method.inputs` and `meta.method.outputs` are the only canonical task I/O fields
 - `meta.evaluation.baselines` contains only explicit baselines named in the paper
 - `meta.editorial.reading_route` is one of `method`, `evaluation`, `comparison`, or `overview`
+- `meta.editorial.graph_worthy` follows the graph-worthy rubric and is not inferred directly from `meta.editorial.verdict`
 - `meta.taxonomy` uses English canonical labels only
 - `meta.comparison.next_read` and `meta.editorial.next_read` are short target names, not sentences
 - `meta.assets` contains figure/table items with grounded `role` and `importance`

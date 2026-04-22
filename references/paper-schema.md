@@ -183,6 +183,7 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
 - `evaluation.baselines`: explicit comparison methods named in the paper.
 - `claims`: falsifiable or comparable claims with grounded support references.
 - `editorial`: editor-facing reading judgment for humans.
+- `editorial.graph_worthy`: conservative long-term curation flag for graph anchors; set it only when the paper has durable route or comparison value beyond a one-off strong read.
 - `taxonomy`: canonical English labels only. Translate only in view/render layers.
 - `comparison.aspects`: short comparison hooks for reading and relation building.
 - `assets`: figure/table reading index with stable role and importance labels.
