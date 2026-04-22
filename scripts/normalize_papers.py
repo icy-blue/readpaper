@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import unicodedata
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,16 @@ RELATION_CANDIDATE_CONFIDENCE_HINTS = {"low", "medium", "high"}
 RELATION_CANDIDATE_EVIDENCE_MODES = {"explicit", "heuristic"}
 EXPLICIT_RELATION_TYPES = {"compares_to", "uses_method"}
 HEURISTIC_RELATION_TYPES = {"compares_to"}
+CRITICAL_META_FIELDS = {
+    "meta.research_problem.summary": ("research_problem", "summary"),
+    "meta.research_problem.goal": ("research_problem", "goal"),
+    "meta.core_contributions": ("core_contributions",),
+    "meta.method.summary": ("method", "summary"),
+    "meta.method.pipeline_steps": ("method", "pipeline_steps"),
+    "meta.method.innovations": ("method", "innovations"),
+    "meta.claims": ("claims",),
+    "meta.comparison.aspects": ("comparison", "aspects"),
+}
 
 
 def progress(message: str) -> None:
@@ -517,6 +528,43 @@ def build_validation_error(meta_path: Path, errors: list[str]) -> ValueError:
     return ValueError(f"Invalid meta artifact {meta_path}: {preview}")
 
 
+def nested_meta_value(meta: dict[str, Any], path: tuple[str, ...]) -> Any:
+    current: Any = meta
+    for key in path:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
+
+
+def meta_value_missing(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, list):
+        return len(value) == 0
+    return False
+
+
+def collect_critical_meta_gaps(validated_meta: dict[str, Any]) -> list[str]:
+    missing: list[str] = []
+    for label, path in CRITICAL_META_FIELDS.items():
+        value = nested_meta_value(validated_meta, path)
+        if meta_value_missing(value):
+            missing.append(label)
+    return missing
+
+
+def build_critical_meta_error(meta_path: Path, paper_id: str, missing_fields: list[str]) -> ValueError:
+    fields = ", ".join(missing_fields)
+    message = (
+        f"Critical meta fields missing for {paper_id}: {fields}. "
+        f"Please complete {meta_path} before rerunning normalize_papers.py so the agent can补全 these fields."
+    )
+    return ValueError(message)
+
+
 def validate_meta_payload(meta_path: Path, payload: Any, paper_id: str, extractor_version: str) -> dict[str, Any]:
     errors: list[str] = []
     artifact = validate_record(errors, "artifact", payload)
@@ -550,6 +598,10 @@ def validate_meta_payload(meta_path: Path, payload: Any, paper_id: str, extracto
 
     if errors:
         raise build_validation_error(meta_path, errors)
+
+    critical_gaps = collect_critical_meta_gaps(validated_meta)
+    if critical_gaps:
+        raise build_critical_meta_error(meta_path, paper_id, critical_gaps)
 
     return {
         "paper_id": artifact_paper_id,
@@ -931,13 +983,17 @@ def main() -> int:
             continue
         progress(f"[{index}/{len(raw_files)}] 开始处理 {raw_paper_id}")
         existing_record = read_json(papers_dir / f"{raw_paper_id}.json", {})
-        record = normalize_raw_file(
-            raw_path,
-            meta_path=meta_dir / f"{raw_paper_id}.json",
-            extractor_version=extractor_version,
-            registry_items=registry_items,
-            existing_record=existing_record,
-        )
+        try:
+            record = normalize_raw_file(
+                raw_path,
+                meta_path=meta_dir / f"{raw_paper_id}.json",
+                extractor_version=extractor_version,
+                registry_items=registry_items,
+                existing_record=existing_record,
+            )
+        except ValueError as exc:
+            print(f"[normalize] ERROR: {exc}", file=sys.stderr, flush=True)
+            return 1
         paper_id = normalize_text(str(record.get("id") or raw_paper_id))
         if not paper_id:
             continue

@@ -101,10 +101,20 @@ function metadataTagLabel(value: string): string {
 
 function claimSourceLabel(value: string): string {
   const content = cleanDisplayText(value) ?? value;
-  if (content.toLowerCase().startsWith("section:")) {
-    return `来源：${content.slice("section:".length)}`;
+  const normalized = content.trim();
+  const lowercase = normalized.toLowerCase();
+  if (lowercase.startsWith("section:")) {
+    return `来源：${normalized.slice("section:".length)}`;
   }
-  return `来源：${content}`;
+  const tableMatch = normalized.match(/^table:\s*table\s*(.+)$/i);
+  if (tableMatch) {
+    return `来源：表 ${tableMatch[1].trim()}`;
+  }
+  const figureMatch = normalized.match(/^figure:\s*figure\s*(.+)$/i);
+  if (figureMatch) {
+    return `来源：图 ${figureMatch[1].trim()}`;
+  }
+  return `来源：${normalized}`;
 }
 
 function claimConfidenceLabel(value: string | null | undefined): string | null {
