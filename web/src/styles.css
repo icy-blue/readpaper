@@ -2076,75 +2076,26 @@ a {
 
 .workspace-tabs .ant-tabs-nav {
   margin-bottom: 0;
-  padding: 10px 12px 8px;
-  border: 1px solid rgba(214, 225, 236, 0.92);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(248, 251, 254, 0.98) 0%, rgba(242, 247, 251, 0.94) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .workspace-tabs .ant-tabs-nav::before {
   border-bottom: 0 !important;
 }
 
-.workspace-tabs .ant-tabs-nav-list {
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.workspace-tabs .ant-tabs-tab {
-  margin: 0 !important;
-  padding: 9px 14px !important;
-  border-radius: 12px;
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.62);
-  color: #68819f;
-  font-weight: 700;
-  transition:
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
-}
-
-.workspace-tabs .ant-tabs-tab .ant-tabs-tab-btn {
-  color: inherit;
-}
-
-.workspace-tabs .ant-tabs-tab:hover {
-  color: #345878;
-  border-color: rgba(188, 208, 226, 0.9);
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.workspace-tabs .ant-tabs-tab:focus-visible {
-  outline: none;
-}
-
-.workspace-tabs .ant-tabs-tab-active {
-  color: #26485f !important;
-  border-color: rgba(141, 179, 208, 0.95) !important;
-  background: rgba(255, 255, 255, 0.98) !important;
-  box-shadow:
-    0 8px 18px rgba(178, 198, 219, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.92);
-}
-
-.workspace-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
-  color: #26485f !important;
-}
-
-.workspace-tabs .ant-tabs-ink-bar {
-  height: 3px !important;
-  border-radius: 999px 999px 0 0;
-  background: linear-gradient(90deg, #2b6de6 0%, #1f8f73 100%);
-}
-
 .workspace-tabs .ant-tabs-content-holder {
   min-height: 0;
   overflow: visible;
-  padding-top: 18px;
+  padding-top: 14px;
+}
+
+.workspace-tabs .ant-tabs-tabpane {
+  padding: 18px 20px 20px;
+  border: 1px solid rgba(223, 231, 239, 0.96);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(249, 251, 253, 0.96) 0%, rgba(244, 248, 251, 0.92) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.74);
 }
 
 .workspace-tab-stack {
