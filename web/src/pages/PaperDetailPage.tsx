@@ -9,6 +9,7 @@ import {
   displayClaimType,
   displayComparisonAspect,
   displayFigureRole,
+  displayRelationType,
   displayValueLabel,
   filterFigureTableItems,
   firstExternalLinks,
@@ -265,14 +266,14 @@ function DecisionHero({ paper }: { paper: PaperCanonicalRecord }) {
 
       <aside className="detail-hero-aside">
         <div className="hero-action-panel">
-          <Text className="section-kicker">Resources</Text>
+          <Text className="section-kicker">资源入口</Text>
           <ExternalLinkButtons paper={paper} />
         </div>
 
         <div className="facts-grid hero-facts-grid">
           <StatTile label="数据集" value={paper.evaluation.datasets.length || "暂无"} />
           <StatTile label="对比基线" value={paper.evaluation.baselines.length || "暂无"} />
-          <StatTile label="Claims" value={paper.claims.length || "暂无"} />
+          <StatTile label="核心论断" value={paper.claims.length || "暂无"} />
         </div>
       </aside>
     </section>
@@ -283,7 +284,7 @@ function ResearchSection({ paper }: { paper: PaperCanonicalRecord }) {
   const summary = paper.research_problem.summary || paper.story.problem || "暂无研究问题摘要。";
 
   return (
-    <PaperSection title="研究问题" kicker="story / problem" summary={summary}>
+    <PaperSection title="研究问题" kicker="问题定义" summary={summary}>
       <div className="paper-two-column">
         <HighlightPanel kicker="问题与目标" title="研究动机" copy={summary} className="highlight-panel-warm">
           {paper.research_problem.goal ? (
@@ -308,7 +309,7 @@ function ResearchSection({ paper }: { paper: PaperCanonicalRecord }) {
 
 function MethodSection({ paper }: { paper: PaperCanonicalRecord }) {
   return (
-    <PaperSection title="方法设计" kicker="canonical method" summary={paper.method.summary || paper.story.method || "暂无方法概述。"}>
+    <PaperSection title="方法设计" kicker="方法设计" summary={paper.method.summary || paper.story.method || "暂无方法概述。"}>
       <HighlightPanel kicker="方案摘要" title="核心思路" copy={paper.method.summary || paper.story.method || "暂无方法摘要。"} />
 
       <div className="paper-two-column">
@@ -341,8 +342,8 @@ function MethodSection({ paper }: { paper: PaperCanonicalRecord }) {
 
 function EvaluationSection({ paper }: { paper: PaperCanonicalRecord }) {
   return (
-    <PaperSection title="实验结果" kicker="evaluation" summary={paper.evaluation.headline || paper.story.result || "暂无实验结论。"}>
-      <HighlightPanel kicker="结论先看" title="Headline" copy={paper.evaluation.headline || paper.story.result || "暂无前置结果判断。"} />
+    <PaperSection title="实验结果" kicker="实验结果" summary={paper.evaluation.headline || paper.story.result || "暂无实验结论。"}>
+      <HighlightPanel kicker="结论先看" title="结果摘要" copy={paper.evaluation.headline || paper.story.result || "暂无前置结果判断。"} />
 
       {paper.evaluation.setup_summary ? (
         <ContentGroup title="实验设置摘要">
@@ -374,7 +375,7 @@ function EditorialSection({ paper }: { paper: PaperCanonicalRecord }) {
   const cautions = paper.editorial.cautions.length ? paper.editorial.cautions : paper.conclusion.limitations;
 
   return (
-    <PaperSection title="阅读判断" kicker="editorial" summary={paper.editorial.research_position || paper.editorial.summary || "帮助判断值不值得继续读。"}>
+    <PaperSection title="阅读判断" kicker="阅读判断" summary={paper.editorial.research_position || paper.editorial.summary || "帮助判断值不值得继续读。"}>
       <div className="paper-two-column editorial-top-grid">
         <div className="content-stack">
           <HighlightPanel
@@ -386,7 +387,7 @@ function EditorialSection({ paper }: { paper: PaperCanonicalRecord }) {
         </div>
 
         <div className="content-stack">
-          <ContentGroup title="为什么读 / Strengths">
+          <ContentGroup title="为什么值得读">
             <TextList items={highlights} emptyText="暂无明确亮点。" />
           </ContentGroup>
           <ContentGroup title="需注意" className="content-group-muted">
@@ -409,7 +410,7 @@ function EditorialSection({ paper }: { paper: PaperCanonicalRecord }) {
 
 function ComparisonSection({ paper, neighbors }: { paper: PaperCanonicalRecord; neighbors: PaperDetailViewModel["neighbors"] }) {
   return (
-    <PaperSection title="对比线索" kicker="comparison" summary={paper.comparison.next_read[0] || "拿谁来比，为什么值得比。"}>
+    <PaperSection title="对比线索" kicker="对比线索" summary={paper.comparison.next_read[0] || "拿谁来比，为什么值得比。"}>
       <div className="facts-grid comparison-facts-grid">
         <ContentGroup title="显式基线" className="fact-group">
           <BadgeGroup values={paper.evaluation.baselines} />
@@ -436,7 +437,7 @@ function ComparisonSection({ paper, neighbors }: { paper: PaperCanonicalRecord; 
         )}
       </ContentGroup>
 
-      <div className="content-group tabs-group">
+      <ContentGroup title="相关论文" className="content-group-plain tabs-group">
         <Tabs
           items={[
             { key: "task", label: "任务近邻", children: <NeighborList items={neighbors.task} /> },
@@ -444,14 +445,14 @@ function ComparisonSection({ paper, neighbors }: { paper: PaperCanonicalRecord; 
             { key: "comparison", label: "对比近邻", children: <NeighborList items={neighbors.comparison} /> },
           ]}
         />
-      </div>
+      </ContentGroup>
     </PaperSection>
   );
 }
 
 function ClaimsPanel({ paper }: { paper: PaperCanonicalRecord }) {
   if (!paper.claims.length) {
-    return <EmptyBlock description="暂无结构化 claims。" />;
+    return <EmptyBlock description="暂无结构化论断。" />;
   }
 
   return (
@@ -587,7 +588,7 @@ function MaterialsSection({
   const items = [
     {
       key: "claims",
-      label: "Claims",
+      label: "核心论断",
       children: <ClaimsPanel paper={paper} />,
     },
     {
@@ -618,19 +619,19 @@ function MaterialsSection({
     },
     {
       key: "relations",
-      label: "Relations",
+      label: "关联关系",
       children: paper.relations.length ? (
         <div className="info-stack">
           {paper.relations.map((item) => (
             <div key={`${item.type}-${item.target_paper_id}`} className="info-item relation-item">
-              <Text strong>{item.type}</Text>
+              <Text strong>{displayRelationType(item.type)}</Text>
               <Paragraph className="relation-title">{item.label || item.target_paper_id}</Paragraph>
               {item.description ? <Paragraph type="secondary" className="relation-description">{item.description}</Paragraph> : null}
             </div>
           ))}
         </div>
       ) : (
-        <EmptyBlock description="暂无结构化 relations。" />
+        <EmptyBlock description="暂无结构化关联关系。" />
       ),
     },
   ];
@@ -651,10 +652,10 @@ function MaterialsSection({
   }
 
   return (
-    <PaperSection title="附录资料" kicker="materials" summary="Claims、图表、摘要和 relations 收在后半段，避免正文信息流反复跳转。">
-      <div className="content-group materials-group">
+    <PaperSection title="附录资料" kicker="附录资料" summary="核心论断、图表、摘要和关联关系收在后半段，避免正文信息流反复跳转。">
+      <ContentGroup title="补充材料" className="content-group-plain materials-group">
         <Collapse defaultActiveKey={[]} items={items} />
-      </div>
+      </ContentGroup>
     </PaperSection>
   );
 }
@@ -662,9 +663,9 @@ function MaterialsSection({
 function SidebarSnapshotCard({ paper }: { paper: PaperCanonicalRecord }) {
   return (
     <div className="sidebar-panel">
-      <Text className="section-kicker">Paper Info</Text>
+      <Text className="section-kicker">论文概览</Text>
       <Title level={4} className="sidebar-title">
-        Canonical Snapshot
+        信息快照
       </Title>
       <MetaLine label="来源 / 年份" value={`${paper.bibliography.venue || "未知"} / ${formatYear(paper.bibliography.year)}`} />
       <MetaLine label="引用数" value={paper.bibliography.citation_count ?? "暂无"} />
@@ -677,7 +678,7 @@ function SidebarSnapshotCard({ paper }: { paper: PaperCanonicalRecord }) {
 function SidebarQuickFactsCard({ paper }: { paper: PaperCanonicalRecord }) {
   return (
     <div className="sidebar-panel sidebar-panel-muted">
-      <Text className="section-kicker">Quick Facts</Text>
+      <Text className="section-kicker">关键信息</Text>
       <MetaLine label="任务" value={<BadgeGroup values={paper.taxonomy.tasks} color="gold" />} />
       <MetaLine label="方法" value={<BadgeGroup values={paper.taxonomy.methods} color="green" />} />
       <MetaLine label="创新类型" value={<BadgeGroup values={paper.taxonomy.novelty_types} color="magenta" />} />
@@ -693,7 +694,7 @@ function SidebarActionsPanel({ paper, payload }: { paper: PaperCanonicalRecord; 
 
   return (
     <div className="sidebar-panel sidebar-panel-actions">
-      <Text className="section-kicker">Actions</Text>
+      <Text className="section-kicker">操作</Text>
       <div className="sidebar-actions-block">
         <Text className="meta-label">外部资源</Text>
         <Flex wrap="wrap" gap={8}>

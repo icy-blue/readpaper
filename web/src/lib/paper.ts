@@ -44,6 +44,15 @@ const CLAIM_TYPE_LABELS: Record<string, string> = {
   limitation: "局限",
 };
 
+const RELATION_TYPE_LABELS: Record<string, string> = {
+  compares_to: "对比",
+  extends: "扩展",
+  uses_dataset: "使用数据集",
+  uses_method: "使用方法",
+  inspired_by: "受启发于",
+  same_problem: "同一问题",
+};
+
 const SIGNAL_LABELS: Record<string, string> = {
   tasks: "任务",
   themes: "主题",
@@ -530,6 +539,10 @@ export function displayComparisonAspect(value: string): string {
 
 export function displayClaimType(value: string): string {
   return CLAIM_TYPE_LABELS[value] || value;
+}
+
+export function displayRelationType(value: string): string {
+  return RELATION_TYPE_LABELS[value] || value;
 }
 
 export function filterFigureTableItems(items: FigureTableIndexItem[], query: string): FigureTableIndexItem[] {

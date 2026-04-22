@@ -467,16 +467,10 @@ a {
 
 .focus-note-card {
   margin-top: 16px;
-  border-radius: var(--radius-md);
-  border: 1px solid #eadfc2;
-  background: linear-gradient(180deg, #fff9ef 0%, #f8efdd 100%);
+  padding-top: 14px;
+  border-top: 1px solid rgba(170, 126, 58, 0.24);
+  background: transparent;
   box-shadow: none;
-}
-
-.focus-note-card .ant-card-body {
-  padding: 16px 18px;
-  display: grid;
-  gap: 8px;
 }
 
 .focus-note-label {
@@ -488,6 +482,7 @@ a {
 
 .focus-note-copy {
   margin-bottom: 0 !important;
+  margin-top: 4px !important;
   color: #5c4828;
   line-height: 1.75;
 }
@@ -823,8 +818,8 @@ a {
   gap: 12px;
   padding: 18px;
   border-radius: 18px;
-  background: rgba(248, 250, 252, 0.88);
-  border: 1px solid rgba(219, 229, 237, 0.96);
+  background: rgba(248, 250, 252, 0.82);
+  border: 1px solid rgba(219, 229, 237, 0.84);
 }
 
 .hero-summary-group {
@@ -846,8 +841,8 @@ a {
   min-height: 110px;
   padding: 16px 14px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(219, 229, 237, 0.92);
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(219, 229, 237, 0.8);
 }
 
 .stat-label {
@@ -921,6 +916,13 @@ a {
 
 .content-group-muted {
   background: rgba(244, 247, 251, 0.92);
+}
+
+.content-group-plain {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .content-group-title {
@@ -1045,23 +1047,27 @@ a {
 }
 
 .tabs-group {
-  padding-top: 6px;
+  gap: 12px;
+}
+
+.tabs-group .ant-tabs-nav {
+  margin-bottom: 0;
 }
 
 .info-item,
 .neighbor-card {
   padding: 18px 20px;
-  border-radius: 16px;
-  border: 1px solid rgba(226, 234, 242, 0.96);
-  background: rgba(248, 250, 252, 0.9);
+  border-radius: 14px;
+  border: 1px solid rgba(226, 234, 242, 0.78);
+  background: rgba(255, 255, 255, 0.62);
 }
 
 .claim-item {
-  background: linear-gradient(180deg, rgba(251, 253, 255, 0.98) 0%, rgba(245, 249, 253, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(251, 253, 255, 0.76) 0%, rgba(245, 249, 253, 0.7) 100%);
 }
 
 .neighbor-card {
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.68);
 }
 
 .neighbor-reason-long {
@@ -1078,8 +1084,7 @@ a {
 }
 
 .materials-group {
-  padding: 0;
-  overflow: hidden;
+  gap: 12px;
 }
 
 .materials-group .ant-collapse {
@@ -1092,7 +1097,7 @@ a {
 
 .materials-group .ant-collapse > .ant-collapse-item > .ant-collapse-header {
   padding: 18px 20px !important;
-  background: rgba(248, 250, 252, 0.96);
+  background: rgba(248, 250, 252, 0.88);
 }
 
 .materials-group .ant-collapse-content > .ant-collapse-content-box {
