@@ -11,6 +11,8 @@ import type {
 
 type JsonRecord = Record<string, unknown>;
 
+const paperDetailCache = new Map<string, Promise<PaperDetailViewModel>>();
+
 const DISPLAY_VALUE_LABELS: Record<string, string> = {
   "point cloud": "点云",
   "text prompt": "文本提示",
@@ -409,6 +411,23 @@ export async function loadPaperDetail(paperId: string): Promise<PaperDetailViewM
     throw new Error(`读取 papers/${paperId}.json 失败: ${response.status}`);
   }
   return validatePaperDetailPayload(await response.json());
+}
+
+export function loadPaperDetailCached(paperId: string): Promise<PaperDetailViewModel> {
+  const normalized = paperId.trim();
+  if (!normalized) {
+    return Promise.reject(new Error("缺少论文 ID。"));
+  }
+  const cached = paperDetailCache.get(normalized);
+  if (cached) {
+    return cached;
+  }
+  const pending = loadPaperDetail(normalized).catch((error) => {
+    paperDetailCache.delete(normalized);
+    throw error;
+  });
+  paperDetailCache.set(normalized, pending);
+  return pending;
 }
 
 export function paperRoute(routePath: string | undefined, paperId: string): string {
