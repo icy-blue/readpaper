@@ -152,8 +152,6 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
       "type": "compares_to",
       "target_kind": "local",
       "target_paper_id": "find3d-open-world-3d-part-segmentation-xxxx",
-      "target_semantic_scholar_paper_id": null,
-      "target_url": null,
       "label": "Find3D",
       "description": "最直接的几何-文本匹配对照路线。",
       "confidence": 0.9
@@ -162,8 +160,6 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
       "type": "extends",
       "target_kind": "external",
       "target_paper_id": null,
-      "target_semantic_scholar_paper_id": "abcdef1234567890",
-      "target_url": "https://www.semanticscholar.org/paper/abcdef1234567890",
       "label": "Example External Paper",
       "description": "在已有视觉-几何生成路线基础上做扩展。",
       "confidence": 0.82
@@ -179,7 +175,7 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
 - `source.paper_path` / `source.route_path`: stable local routing info used by site generators.
 - `bibliography.identifiers`: only persistent scholarly IDs such as DOI / arXiv.
 - `bibliography.links`: only reader-facing URLs such as PDF / project / code / data.
-- `abstracts.raw`: original-language abstract, usually from Semantic Scholar when available.
+- `abstracts.raw`: original-language abstract when locally available from prior enrichment; keep it `null` rather than querying external services during assembly.
 - `abstracts.zh`: translated abstract from the translate conversation.
 - `story`: short reading-facing summary of the paper itself.
 - `research_problem`: grounded formulation of the problem, gaps, and goal.
@@ -193,7 +189,7 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
 - `relations`: normalized typed graph edges only; do not store generic neighbors, unresolved names, or retrieval artifacts here.
 - `relations.target_kind`: `local` or `external`.
 - `relations.target_paper_id`: required when `target_kind` is `local`.
-- `relations.target_semantic_scholar_paper_id` / `relations.target_url`: required when `target_kind` is `external`.
+- `relations.label`: required when `target_kind` is `external`; the Semantic Scholar search URL is derived in the render layer and must not be stored in canonical records.
 
 ## Do Not Store In Canonical Records
 

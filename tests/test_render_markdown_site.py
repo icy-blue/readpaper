@@ -88,6 +88,19 @@ class RenderMarkdownSiteTests(unittest.TestCase):
         self.assertIn("## 阅读判断", rendered)
         self.assertIn("## 对比线索", rendered)
 
+    def test_render_paper_page_normalizes_display_text(self) -> None:
+        record = canonical_record()
+        record["story"]["problem"] = "常用方法在跨模态场景中面临困难,原因在于关键点检测不兼容。"  # type: ignore[index]
+        record["editorial"]["summary"] = "适合作为3D Reconstruction中Point Cloud Normal Estimation路线的代表样本。"  # type: ignore[index]
+        record["claims"][0]["text"] = "我们通过(PnP)求解器提升2D3D-MATR在KITTI数据集上的效果!"  # type: ignore[index]
+        detail_payload = {"canonical": record, "neighbors": {"task": [], "method": [], "comparison": []}}
+
+        rendered = render_paper_page(detail_payload)
+
+        self.assertIn("常用方法在跨模态场景中面临困难，原因在于关键点检测不兼容。", rendered)
+        self.assertIn("适合作为 3D Reconstruction 中 Point Cloud Normal Estimation 路线的代表样本。", rendered)
+        self.assertIn("我们通过（PnP）求解器提升 2D3D-MATR 在 KITTI 数据集上的效果！", rendered)
+
     def test_render_markdown_site_writes_site_index_and_detail_json(self) -> None:
         record = canonical_record()
 

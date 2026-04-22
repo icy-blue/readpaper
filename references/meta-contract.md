@@ -25,7 +25,7 @@ Prefer missing over guessed. Do not infer unsupported claims from absent section
 ```json
 {
   "paper_id": "demo-paper",
-  "extractor_version": "meta-v3",
+  "extractor_version": "meta-v5",
   "source_conversation_id": "conv-1",
   "source_semantic_updated_at": "2026-04-21T00:00:00+08:00",
   "extracted_at": "2026-04-21T00:00:00+08:00",
@@ -99,7 +99,11 @@ Prefer missing over guessed. Do not infer unsupported claims from absent section
 ## Output Rules
 
 - Use Chinese for human-facing summaries and judgments.
+- For Chinese reader-facing text, prefer full-width punctuation such as `，。：；（）！？` in sentence flow.
+- Keep natural spacing between Chinese and embedded English words, abbreviations, or number phrases such as `3D`, `Open-World`, and `Point Cloud`.
 - Keep paper titles, method names, dataset names, venues, and URLs in original form.
+- Do not collapse Chinese punctuation into half-width ASCII punctuation in reader-facing fields.
+- Do not remove natural spaces between Chinese and embedded English or number phrases.
 - Use English canonical labels for `taxonomy.*`.
 - Missing scalar fields must be `null`.
 - Missing arrays must be `[]`.
@@ -164,6 +168,7 @@ Prefer missing over guessed. Do not infer unsupported claims from absent section
 - `relation_candidates` are analysis-layer inputs only; do not emit final canonical relation ids here.
 - `relation_candidates` should prefer explicit typed evidence such as `compares_to`, `extends`, or `uses_method`.
 - Heuristic `relation_candidates` are limited to `compares_to` and `same_problem`.
+- If a `relation_candidate` does not resolve to a local paper id, canonical assembly may keep it as an `external` relation and let the render layer generate a Semantic Scholar search link from `target_name`.
 
 ## Evidence Rules
 

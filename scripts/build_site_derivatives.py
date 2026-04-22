@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from display_text import normalize_display_text
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -30,7 +32,19 @@ def write_json(path: Path, payload: Any) -> None:
         handle.write("\n")
 
 
-def ensure_strings(value: Any) -> list[str]:
+def ensure_display_strings(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    result: list[str] = []
+    for item in value:
+        if isinstance(item, str) and item.strip():
+            cleaned = normalize_display_text(item)
+            if cleaned and cleaned not in result:
+                result.append(cleaned)
+    return result
+
+
+def ensure_machine_strings(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     result: list[str] = []
@@ -40,6 +54,10 @@ def ensure_strings(value: Any) -> list[str]:
             if cleaned and cleaned not in result:
                 result.append(cleaned)
     return result
+
+
+def ensure_strings(value: Any) -> list[str]:
+    return ensure_display_strings(value)
 
 
 def normalize_label(value: str) -> str:
@@ -84,7 +102,7 @@ def tag_group(record: dict[str, Any], group: str) -> list[str]:
     taxonomy = record.get("taxonomy")
     if not isinstance(taxonomy, dict):
         return []
-    return ensure_strings(taxonomy.get(group))
+    return ensure_machine_strings(taxonomy.get(group))
 
 
 def source_block(record: dict[str, Any]) -> dict[str, Any]:
@@ -92,7 +110,7 @@ def source_block(record: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(source, dict):
         return {"conversation_ids": [], "paper_path": "", "route_path": ""}
     return {
-        "conversation_ids": ensure_strings(source.get("conversation_ids")),
+        "conversation_ids": ensure_machine_strings(source.get("conversation_ids")),
         "paper_path": str(source.get("paper_path") or ""),
         "route_path": str(source.get("route_path") or ""),
     }
@@ -114,7 +132,7 @@ def bibliography_block(record: dict[str, Any]) -> dict[str, Any]:
     links = bibliography.get("links") if isinstance(bibliography.get("links"), dict) else {}
     return {
         "title": str(bibliography.get("title") or record.get("id") or ""),
-        "authors": ensure_strings(bibliography.get("authors")),
+        "authors": ensure_machine_strings(bibliography.get("authors")),
         "year": bibliography.get("year"),
         "venue": str(bibliography.get("venue") or ""),
         "citation_count": bibliography.get("citation_count"),
@@ -139,21 +157,21 @@ def card_view(record: dict[str, Any]) -> dict[str, Any]:
         "source": source_block(record),
         "bibliography": bibliography_block(record),
         "story": {
-            "paper_one_liner": str(story.get("paper_one_liner") or "") or None,
-            "problem": str(story.get("problem") or "") or None,
-            "method": str(story.get("method") or "") or None,
-            "result": str(story.get("result") or "") or None,
+            "paper_one_liner": normalize_display_text(str(story.get("paper_one_liner") or "")) or None,
+            "problem": normalize_display_text(str(story.get("problem") or "")) or None,
+            "method": normalize_display_text(str(story.get("method") or "")) or None,
+            "result": normalize_display_text(str(story.get("result") or "")) or None,
         },
         "editorial": {
             "verdict": str(editorial.get("verdict") or "") or None,
-            "summary": str(editorial.get("summary") or "") or None,
-            "why_read": ensure_strings(editorial.get("why_read")),
-            "strengths": ensure_strings(editorial.get("strengths")),
-            "cautions": ensure_strings(editorial.get("cautions")),
+            "summary": normalize_display_text(str(editorial.get("summary") or "")) or None,
+            "why_read": ensure_display_strings(editorial.get("why_read")),
+            "strengths": ensure_display_strings(editorial.get("strengths")),
+            "cautions": ensure_display_strings(editorial.get("cautions")),
             "reading_route": str(editorial.get("reading_route") or "overview"),
-            "research_position": str(editorial.get("research_position") or "") or None,
+            "research_position": normalize_display_text(str(editorial.get("research_position") or "")) or None,
             "graph_worthy": bool(editorial.get("graph_worthy")),
-            "next_read": ensure_strings(editorial.get("next_read")),
+            "next_read": ensure_display_strings(editorial.get("next_read")),
         },
         "taxonomy": {
             "themes": tag_group(record, "themes"),
@@ -230,7 +248,11 @@ def compute_neighbors_for(record: dict[str, Any], records: list[dict[str, Any]])
     comparison = record.get("comparison") if isinstance(record.get("comparison"), dict) else {}
     editorial = record.get("editorial") if isinstance(record.get("editorial"), dict) else {}
 
-    named_targets = ensure_strings(comparison.get("next_read")) + ensure_strings(editorial.get("next_read")) + ensure_strings(evaluation.get("baselines"))
+    named_targets = (
+        ensure_machine_strings(comparison.get("next_read"))
+        + ensure_machine_strings(editorial.get("next_read"))
+        + ensure_machine_strings(evaluation.get("baselines"))
+    )
 
     task_neighbors: list[dict[str, Any]] = []
     method_neighbors: list[dict[str, Any]] = []

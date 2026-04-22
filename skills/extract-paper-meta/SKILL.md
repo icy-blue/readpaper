@@ -35,11 +35,14 @@ It does not write the final canonical paper record.
 - Ground everything in translated visible content, figure captions, and table captions from the raw payload.
 - Prefer missing over guessed.
 - Keep human-facing summaries in Chinese.
+- Keep Chinese reader-facing text typographically natural: use full-width punctuation such as `，。：；（）！？` and preserve natural spacing between Chinese and embedded English or number phrases.
+- Keep paper titles, method names, dataset names, URLs, and formula-like tokens in their original form.
 - Keep taxonomy labels canonical and English.
 - Do not emit old schema blocks such as `summary`, `reading_digest`, `storyline`, `method_core`, `benchmarks_or_eval`, `editorial_review`, or `retrieval_profile`.
 - Do not copy long paragraphs verbatim into short fields.
 - Do not emit `...` or hard-truncated half-sentences.
 - Do not let baseline descriptions overwrite the paper's own method summary.
+- Do not collapse Chinese punctuation into half-width ASCII punctuation in reader-facing fields.
 - Only emit `relation_candidates`, never final canonical `relations`.
 - Prefer explicit `compares_to` / `extends` / `uses_method` over heuristic candidates.
 - Heuristic candidates are limited to `compares_to` and `same_problem`.

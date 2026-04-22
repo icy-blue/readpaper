@@ -167,6 +167,24 @@ class BuildSiteDerivativesTests(unittest.TestCase):
         self.assertEqual(comparison[0]["paper_id"], "baseline")
         self.assertEqual(comparison[0]["match_source"], "explicit_target")
 
+    def test_build_site_payload_preserves_display_typography_for_editorial_lists(self) -> None:
+        primary = make_record(
+            "primary",
+            title="Primary Paper",
+            theme="3D Generation",
+            tasks=["Image-to-3D"],
+            methods=["Diffusion Model"],
+            modalities=["Image", "3D"],
+        )
+        primary["editorial"]["why_read"] = ["问题定义清楚,方法机制也比较完整。"]  # type: ignore[index]
+        primary["editorial"]["strengths"] = ["适合作为3D Reconstruction中Point Cloud Normal Estimation路线的代表样本。"]  # type: ignore[index]
+
+        site_payload, _ = build_site_payload([primary])
+        card = site_payload["papers"][0]
+
+        self.assertEqual(card["editorial"]["why_read"][0], "问题定义清楚，方法机制也比较完整。")
+        self.assertEqual(card["editorial"]["strengths"][0], "适合作为 3D Reconstruction 中 Point Cloud Normal Estimation 路线的代表样本。")
+
 
 if __name__ == "__main__":
     unittest.main()

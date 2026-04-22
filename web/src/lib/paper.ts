@@ -257,11 +257,24 @@ function validateRelations(issues: string[], path: string, value: unknown): void
     expectString(issues, `${path}[${index}].type`, item.type);
     expectString(issues, `${path}[${index}].target_kind`, item.target_kind);
     expectOptionalString(issues, `${path}[${index}].target_paper_id`, item.target_paper_id);
-    expectOptionalString(issues, `${path}[${index}].target_semantic_scholar_paper_id`, item.target_semantic_scholar_paper_id);
-    expectOptionalString(issues, `${path}[${index}].target_url`, item.target_url);
     expectOptionalString(issues, `${path}[${index}].label`, item.label);
     expectOptionalString(issues, `${path}[${index}].description`, item.description);
     expectOptionalNumber(issues, `${path}[${index}].confidence`, item.confidence);
+    if ("target_semantic_scholar_paper_id" in item) {
+      issues.push(`${path}[${index}].target_semantic_scholar_paper_id 已废弃，需重建数据`);
+    }
+    if ("target_url" in item) {
+      issues.push(`${path}[${index}].target_url 已废弃，需重建数据`);
+    }
+    if (item.target_kind !== "local" && item.target_kind !== "external") {
+      issues.push(`${path}[${index}].target_kind 只允许 local 或 external`);
+    }
+    if (item.target_kind === "local" && typeof item.target_paper_id !== "string") {
+      issues.push(`${path}[${index}] local relation 必须包含 target_paper_id`);
+    }
+    if (item.target_kind === "external" && typeof item.label !== "string") {
+      issues.push(`${path}[${index}] external relation 必须包含 label`);
+    }
   });
 }
 
@@ -563,7 +576,15 @@ export function displayRelationType(value: string): string {
 }
 
 export function relationTargetLabel(item: RelationItem): string {
-  return item.label || item.target_paper_id || item.target_semantic_scholar_paper_id || "未命名关系目标";
+  return item.label || item.target_paper_id || "未命名关系目标";
+}
+
+export function semanticScholarSearchUrl(title: string | null | undefined): string | null {
+  const normalized = cleanDisplayText(title);
+  if (!normalized) {
+    return null;
+  }
+  return `https://www.semanticscholar.org/search?q=${encodeURIComponent(normalized)}&sort=relevance`;
 }
 
 export function relationConfidenceLabel(value: number | null | undefined): string | null {

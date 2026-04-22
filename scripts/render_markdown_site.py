@@ -4,15 +4,28 @@
 from __future__ import annotations
 
 import argparse
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
 from build_site_derivatives import build_site_payload, ensure_strings, load_papers, write_json
+from display_text import normalize_display_text
 
 
 def write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def semantic_scholar_search_url(title: str) -> str | None:
+    cleaned = str(title).strip()
+    if not cleaned:
+        return None
+    return f"https://www.semanticscholar.org/search?q={urllib.parse.quote(cleaned)}&sort=relevance"
+
+
+def display_value(value: Any) -> str:
+    return normalize_display_text(str(value or ""))
 
 
 def render_link_lines(bibliography: dict[str, Any]) -> list[str]:
@@ -116,21 +129,21 @@ def render_paper_page(detail_payload: dict[str, Any]) -> str:
         ("结果", story.get("result")),
     ):
         if isinstance(value, str) and value.strip():
-            lines.append(f"- {label}: {value}")
+            lines.append(f"- {label}: {display_value(value)}")
     lines.append("")
 
     lines.extend(["## 研究问题", ""])
     if research_problem.get("summary"):
-        lines.append(f"- 摘要: {research_problem.get('summary')}")
+        lines.append(f"- 摘要: {display_value(research_problem.get('summary'))}")
     for item in ensure_strings(research_problem.get("gaps")):
         lines.append(f"- 缺口: {item}")
     if research_problem.get("goal"):
-        lines.append(f"- 目标: {research_problem.get('goal')}")
+        lines.append(f"- 目标: {display_value(research_problem.get('goal'))}")
     lines.append("")
 
     lines.extend(["## 方法", ""])
     if method.get("summary"):
-        lines.append(f"- 摘要: {method.get('summary')}")
+        lines.append(f"- 摘要: {display_value(method.get('summary'))}")
     for item in ensure_strings(method.get("pipeline_steps")):
         lines.append(f"- 流程: {item}")
     for item in ensure_strings(method.get("innovations")):
@@ -143,7 +156,7 @@ def render_paper_page(detail_payload: dict[str, Any]) -> str:
 
     lines.extend(["## 实验", ""])
     if evaluation.get("headline"):
-        lines.append(f"- 结论先看: {evaluation.get('headline')}")
+        lines.append(f"- 结论先看: {display_value(evaluation.get('headline'))}")
     for label, key in (("数据集", "datasets"), ("指标", "metrics"), ("基线", "baselines")):
         values = ensure_strings(evaluation.get(key))
         if values:
@@ -151,7 +164,7 @@ def render_paper_page(detail_payload: dict[str, Any]) -> str:
     for item in ensure_strings(evaluation.get("key_findings")):
         lines.append(f"- 发现: {item}")
     if evaluation.get("setup_summary"):
-        lines.append(f"- 设置摘要: {evaluation.get('setup_summary')}")
+        lines.append(f"- 设置摘要: {display_value(evaluation.get('setup_summary'))}")
     lines.append("")
 
     lines.extend(["## 阅读判断", ""])
@@ -162,7 +175,7 @@ def render_paper_page(detail_payload: dict[str, Any]) -> str:
         ("研究定位", editorial.get("research_position")),
     ):
         if isinstance(value, str) and value.strip():
-            lines.append(f"- {label}: {value}")
+            lines.append(f"- {label}: {display_value(value)}")
     for item in ensure_strings(editorial.get("why_read")):
         lines.append(f"- 为什么读: {item}")
     for item in ensure_strings(editorial.get("strengths")):
@@ -179,7 +192,7 @@ def render_paper_page(detail_payload: dict[str, Any]) -> str:
     aspects = comparison.get("aspects") if isinstance(comparison.get("aspects"), list) else []
     for item in aspects:
         if isinstance(item, dict) and item.get("aspect") and item.get("difference"):
-            lines.append(f"- {item.get('aspect')}: {item.get('difference')}")
+            lines.append(f"- {display_value(item.get('aspect'))}: {display_value(item.get('difference'))}")
     next_read = ensure_strings(comparison.get("next_read"))
     if next_read:
         lines.append(f"- 下一篇: {' / '.join(next_read)}")
@@ -194,7 +207,7 @@ def render_paper_page(detail_payload: dict[str, Any]) -> str:
     if link_lines:
         lines.extend(link_lines)
     if abstracts.get("zh"):
-        lines.extend(["", "### 中文摘要", "", str(abstracts.get("zh")), ""])
+        lines.extend(["", "### 中文摘要", "", display_value(abstracts.get("zh")), ""])
     if abstracts.get("raw"):
         lines.extend(["### 原始摘要", "", str(abstracts.get("raw")), ""])
     if claims:
@@ -202,7 +215,7 @@ def render_paper_page(detail_payload: dict[str, Any]) -> str:
         for claim in claims:
             if not isinstance(claim, dict):
                 continue
-            lines.append(f"- {claim.get('text') or ''}")
+            lines.append(f"- {display_value(claim.get('text'))}")
             support = ensure_strings(claim.get("support"))
             if support:
                 lines.append(f"  support: {', '.join(support)}")
@@ -232,14 +245,15 @@ def render_paper_page(detail_payload: dict[str, Any]) -> str:
             if not isinstance(item, dict):
                 continue
             target_kind = str(item.get("target_kind") or "")
-            label = str(item.get("label") or item.get("target_paper_id") or item.get("target_semantic_scholar_paper_id") or "")
+            label = str(item.get("label") or item.get("target_paper_id") or "")
             description = str(item.get("description") or "").strip()
             confidence = item.get("confidence")
             confidence_text = f" | confidence {confidence:.2f}" if isinstance(confidence, (int, float)) else ""
             if target_kind == "local" and item.get("target_paper_id"):
                 target = f"[{label}](../index.html#/paper/{item.get('target_paper_id')})"
-            elif target_kind == "external" and item.get("target_url"):
-                target = f"[{label}]({item.get('target_url')})"
+            elif target_kind == "external":
+                target_url = semantic_scholar_search_url(label)
+                target = f"[{label}]({target_url})" if target_url else label
             else:
                 target = label
             lines.append(

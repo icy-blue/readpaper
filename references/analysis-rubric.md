@@ -58,5 +58,5 @@ Neighbors, retrieval indexes, ranking signals, and filter buckets are derived ar
 ## Source Priority
 
 - Prefer translated conversation units for Chinese summaries.
-- Prefer Semantic Scholar for `authors`, `abstract_raw`, `citation_count`, and scholarly identifiers.
+- Prefer source-grounded local payloads first; if bibliography enrichment is missing, keep the canonical record partial rather than querying external services at assembly time.
 - Never override `conversation.pdf_url` with an external PDF when the conversation already has one.

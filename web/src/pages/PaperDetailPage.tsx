@@ -20,6 +20,7 @@ import {
   paperRoute,
   relationConfidenceLabel,
   relationTargetLabel,
+  semanticScholarSearchUrl,
   recommendedRouteLabel,
   scoreLevelLabel,
   scoreLevelTagClass,
@@ -627,30 +628,35 @@ function MaterialsSection({
       children: paper.relations.length ? (
         <div className="info-stack">
           {paper.relations.map((item) => (
-            <div
-              key={`${item.type}-${item.target_paper_id || item.target_semantic_scholar_paper_id || item.target_url || item.label || "relation"}`}
-              className="info-item relation-item"
-            >
-              <Flex justify="space-between" align="start" gap={12} wrap="wrap">
-                <Text strong>{displayRelationType(item.type)}</Text>
-                <Flex wrap="wrap" gap={8}>
-                  <Tag className="chip-tag chip-tag-tone-blue">{item.target_kind === "external" ? "Semantic Scholar" : "本地论文"}</Tag>
-                  {relationConfidenceLabel(item.confidence) ? <Tag className="chip-tag chip-tag-tone-green">{relationConfidenceLabel(item.confidence)}</Tag> : null}
-                </Flex>
-              </Flex>
-              {item.target_kind === "external" && item.target_url ? (
-                <a href={item.target_url} target="_blank" rel="noreferrer" className="paper-link small relation-link">
-                  {relationTargetLabel(item)}
-                </a>
-              ) : item.target_paper_id ? (
-                <Link to={paperRoute(`#/paper/${item.target_paper_id}`, item.target_paper_id)} className="paper-link small relation-link">
-                  {relationTargetLabel(item)}
-                </Link>
-              ) : (
-                <Paragraph className="relation-title">{relationTargetLabel(item)}</Paragraph>
-              )}
-              {item.description ? <Paragraph type="secondary" className="relation-description">{item.description}</Paragraph> : null}
-            </div>
+            (() => {
+              const externalHref = item.target_kind === "external" ? semanticScholarSearchUrl(item.label) : null;
+              return (
+                <div
+                  key={`${item.type}-${item.target_paper_id || item.label || "relation"}`}
+                  className="info-item relation-item"
+                >
+                  <Flex justify="space-between" align="start" gap={12} wrap="wrap">
+                    <Text strong>{displayRelationType(item.type)}</Text>
+                    <Flex wrap="wrap" gap={8}>
+                      <Tag className="chip-tag chip-tag-tone-blue">{item.target_kind === "external" ? "Semantic Scholar" : "本地论文"}</Tag>
+                      {relationConfidenceLabel(item.confidence) ? <Tag className="chip-tag chip-tag-tone-green">{relationConfidenceLabel(item.confidence)}</Tag> : null}
+                    </Flex>
+                  </Flex>
+                  {externalHref ? (
+                    <a href={externalHref} target="_blank" rel="noreferrer" className="paper-link small relation-link">
+                      {relationTargetLabel(item)}
+                    </a>
+                  ) : item.target_paper_id ? (
+                    <Link to={paperRoute(`#/paper/${item.target_paper_id}`, item.target_paper_id)} className="paper-link small relation-link">
+                      {relationTargetLabel(item)}
+                    </Link>
+                  ) : (
+                    <Paragraph className="relation-title">{relationTargetLabel(item)}</Paragraph>
+                  )}
+                  {item.description ? <Paragraph type="secondary" className="relation-description">{item.description}</Paragraph> : null}
+                </div>
+              );
+            })()
           ))}
         </div>
       ) : (
