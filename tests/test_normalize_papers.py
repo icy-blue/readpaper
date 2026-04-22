@@ -59,7 +59,7 @@ def raw_payload(*, pdf_url: str | None = "https://translate.local/paper.pdf") ->
     }
 
 
-def meta_artifact(*, version: str = "meta-v3") -> dict[str, object]:
+def meta_artifact(*, version: str = "meta-v4") -> dict[str, object]:
     return {
         "paper_id": "demo-paper",
         "extractor_version": version,
@@ -138,16 +138,92 @@ def meta_artifact(*, version: str = "meta-v3") -> dict[str, object]:
                 "figures": [{"label": "Figure 1", "caption": "Method overview.", "role": "method_overview", "importance": "high"}],
                 "tables": [{"label": "Table 1", "caption": "Benchmark comparison.", "role": "quantitative_result", "importance": "high"}],
             },
-            "relations": [
+            "relation_candidates": [
                 {
                     "type": "compares_to",
-                    "target_paper_id": "baseline-net-paper",
-                    "label": "BaselineNet",
+                    "target_name": "BaselineNet",
                     "description": "主对照方法。",
-                    "confidence": 0.9,
+                    "confidence_hint": "high",
+                    "evidence_mode": "explicit",
                 }
             ],
         },
+    }
+
+
+def registry_payload() -> dict[str, object]:
+    return {
+        "source": "https://translate.icydev.cn",
+        "updated_at": "2026-04-22T00:59:39+00:00",
+        "items": [
+            {
+                "paper_id": "baseline-net-paper",
+                "title": "BaselineNet: A Strong Baseline for Image-to-3D",
+                "year": "2024",
+                "venue": "CVPR",
+                "dedupe_key": "baselinenet a strong baseline for image to 3d::2024::cvpr",
+                "fallback_key": "baselinenet a strong baseline for image to 3d::2024",
+                "record_path": "baseline-net-paper.json",
+            }
+        ],
+    }
+
+
+def local_target_record() -> dict[str, object]:
+    return {
+        "id": "baseline-net-paper",
+        "source": {
+            "conversation_ids": ["conv-2"],
+            "paper_path": "papers/baseline-net-paper.md",
+            "route_path": "#/paper/baseline-net-paper",
+        },
+        "bibliography": {
+            "title": "BaselineNet: A Strong Baseline for Image-to-3D",
+            "authors": ["Author B"],
+            "year": 2024,
+            "venue": "CVPR",
+            "citation_count": 5,
+            "identifiers": {"doi": None, "arxiv": None},
+            "links": {"pdf": None, "project": None, "code": None, "data": None},
+        },
+        "abstracts": {"raw": None, "zh": None},
+        "story": {"paper_one_liner": None, "problem": None, "method": None, "result": None},
+        "research_problem": {"summary": None, "gaps": [], "goal": None},
+        "core_contributions": [],
+        "method": {
+            "summary": None,
+            "pipeline_steps": [],
+            "innovations": [],
+            "ingredients": [],
+            "inputs": ["Image"],
+            "outputs": ["3D Asset"],
+            "representations": ["Mesh"],
+        },
+        "evaluation": {"headline": None, "datasets": [], "metrics": [], "baselines": [], "key_findings": [], "setup_summary": None},
+        "claims": [],
+        "conclusion": {"author": None, "limitations": []},
+        "editorial": {
+            "verdict": None,
+            "summary": None,
+            "why_read": [],
+            "strengths": [],
+            "cautions": [],
+            "reading_route": "overview",
+            "research_position": None,
+            "graph_worthy": False,
+            "next_read": [],
+        },
+        "taxonomy": {
+            "themes": ["3D Generation"],
+            "tasks": ["Image-to-3D"],
+            "methods": ["Reconstruction"],
+            "modalities": ["Image", "3D"],
+            "representations": ["Mesh"],
+            "novelty_types": [],
+        },
+        "comparison": {"aspects": [], "next_read": []},
+        "assets": {"figures": [], "tables": []},
+        "relations": [],
     }
 
 
@@ -178,37 +254,50 @@ class NormalizePapersTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             config_path = Path(tempdir) / "extractor-config.json"
             meta_path = Path(tempdir) / "demo-paper.json"
-            config_path.write_text(json.dumps({"extractor_version": "meta-v3"}), encoding="utf-8")
+            config_path.write_text(json.dumps({"extractor_version": "meta-v4"}), encoding="utf-8")
             meta_path.write_text(json.dumps(meta_artifact(), ensure_ascii=False), encoding="utf-8")
 
             version = read_extractor_version(config_path)
-            self.assertEqual(version, "meta-v3")
+            self.assertEqual(version, "meta-v4")
             self.assertTrue(meta_artifact_is_current(meta_path, version))
-            self.assertFalse(meta_artifact_is_current(meta_path, "meta-v4"))
+            self.assertFalse(meta_artifact_is_current(meta_path, "meta-v5"))
 
-    def test_validate_meta_payload_accepts_v3_artifact(self) -> None:
+    def test_validate_meta_payload_accepts_v4_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             meta_path = Path(tempdir) / "demo-paper.json"
             payload = meta_artifact()
             meta_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
-            validated = validate_meta_payload(meta_path, payload, "demo-paper", "meta-v3")
+            validated = validate_meta_payload(meta_path, payload, "demo-paper", "meta-v4")
             self.assertEqual(validated["meta"]["story"]["paper_one_liner"], "一篇把单图 3D 生成做得更稳的论文。")
             self.assertEqual(validated["meta"]["editorial"]["reading_route"], "method")
             self.assertIn("Diffusion Model", validated["meta"]["taxonomy"]["methods"])
+            self.assertEqual(validated["meta"]["relation_candidates"][0]["target_name"], "BaselineNet")
+
+    def test_validate_meta_payload_rejects_incomplete_relation_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            meta_path = Path(tempdir) / "demo-paper.json"
+            payload = meta_artifact()
+            payload["meta"]["relation_candidates"][0].pop("target_name")  # type: ignore[index]
+            meta_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+            with self.assertRaises(ValueError):
+                validate_meta_payload(meta_path, payload, "demo-paper", "meta-v4")
 
     def test_normalize_raw_file_builds_canonical_record(self) -> None:
         def fake_fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
-            return {
-                "title": "Demo Paper",
-                "authors": [{"name": "Author A"}],
-                "year": 2024,
-                "venue": "CVPR",
-                "citationCount": 9,
-                "abstract": "Original abstract",
-                "externalIds": {"DOI": "10.1000/demo", "ArXiv": "2401.00001"},
-                "openAccessPdf": {"url": "https://s2.local/demo.pdf"},
-            }
+            if "query=Demo+Paper" in url:
+                return {
+                    "title": "Demo Paper",
+                    "authors": [{"name": "Author A"}],
+                    "year": 2024,
+                    "venue": "CVPR",
+                    "citationCount": 9,
+                    "abstract": "Original abstract",
+                    "externalIds": {"DOI": "10.1000/demo", "ArXiv": "2401.00001"},
+                    "openAccessPdf": {"url": "https://s2.local/demo.pdf"},
+                }
+            raise AssertionError(f"Unexpected fetch url: {url}")
 
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
@@ -217,7 +306,7 @@ class NormalizePapersTests(unittest.TestCase):
             raw_path.write_text(json.dumps(raw_payload(), ensure_ascii=False), encoding="utf-8")
             meta_path.write_text(json.dumps(meta_artifact(), ensure_ascii=False), encoding="utf-8")
 
-            record = normalize_raw_file(raw_path, meta_path=meta_path, extractor_version="meta-v3", fetcher=fake_fetch)
+            record = normalize_raw_file(raw_path, meta_path=meta_path, extractor_version="meta-v4", fetcher=fake_fetch)
 
             self.assertEqual(record["id"], "demo-paper")
             self.assertEqual(record["source"]["conversation_ids"], ["conv-1"])
@@ -227,6 +316,122 @@ class NormalizePapersTests(unittest.TestCase):
             self.assertIn("Image-to-3D", record["taxonomy"]["tasks"])
             self.assertNotIn("reading_digest", record)
             self.assertNotIn("paper_neighbors", record)
+
+    def test_normalize_raw_file_resolves_local_relation(self) -> None:
+        def fake_fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
+            if "query=Demo+Paper" in url:
+                return {
+                    "title": "Demo Paper",
+                    "authors": [{"name": "Author A"}],
+                    "year": 2024,
+                    "venue": "CVPR",
+                    "citationCount": 9,
+                    "abstract": "Original abstract",
+                    "externalIds": {"DOI": "10.1000/demo"},
+                    "openAccessPdf": {"url": "https://s2.local/demo.pdf"},
+                }
+            raise AssertionError(f"Unexpected fetch url: {url}")
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            raw_path = root / "raw.json"
+            meta_path = root / "meta.json"
+            registry_path = root / "baseline-net-paper.json"
+            raw_path.write_text(json.dumps(raw_payload(), ensure_ascii=False), encoding="utf-8")
+            meta_path.write_text(json.dumps(meta_artifact(), ensure_ascii=False), encoding="utf-8")
+            registry_path.write_text(json.dumps(local_target_record(), ensure_ascii=False), encoding="utf-8")
+            registry_items = registry_payload()["items"]  # type: ignore[index]
+            registry_items[0]["record_path"] = str(registry_path)
+            record = normalize_raw_file(
+                raw_path,
+                meta_path=meta_path,
+                extractor_version="meta-v4",
+                registry_items=registry_items,
+                fetcher=fake_fetch,
+            )
+
+            self.assertEqual(record["relations"][0]["target_kind"], "local")
+            self.assertEqual(record["relations"][0]["target_paper_id"], "baseline-net-paper")
+            self.assertEqual(record["relations"][0]["confidence"], 0.9)
+
+    def test_normalize_raw_file_resolves_external_relation(self) -> None:
+        def fake_fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
+            if "query=Demo+Paper" in url:
+                return {
+                    "title": "Demo Paper",
+                    "authors": [{"name": "Author A"}],
+                    "year": 2024,
+                    "venue": "CVPR",
+                    "citationCount": 9,
+                    "abstract": "Original abstract",
+                    "externalIds": {"DOI": "10.1000/demo"},
+                    "openAccessPdf": {"url": "https://s2.local/demo.pdf"},
+                }
+            if "query=BaselineNet" in url:
+                return {
+                    "paperId": "external-baseline-paper-id",
+                    "title": "BaselineNet",
+                    "authors": [{"name": "Author Z"}],
+                    "year": 2023,
+                    "venue": "NeurIPS",
+                    "citationCount": 20,
+                    "abstract": "External baseline abstract",
+                    "externalIds": {"DOI": "10.1000/baseline"},
+                    "openAccessPdf": {"url": "https://s2.local/baseline.pdf"},
+                }
+            raise AssertionError(f"Unexpected fetch url: {url}")
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            raw_path = root / "raw.json"
+            meta_path = root / "meta.json"
+            raw_path.write_text(json.dumps(raw_payload(), ensure_ascii=False), encoding="utf-8")
+            meta_path.write_text(json.dumps(meta_artifact(), ensure_ascii=False), encoding="utf-8")
+
+            record = normalize_raw_file(
+                raw_path,
+                meta_path=meta_path,
+                extractor_version="meta-v4",
+                registry_items=[],
+                fetcher=fake_fetch,
+            )
+
+            self.assertEqual(record["relations"][0]["target_kind"], "external")
+            self.assertEqual(record["relations"][0]["target_semantic_scholar_paper_id"], "external-baseline-paper-id")
+            self.assertEqual(record["relations"][0]["target_url"], "https://www.semanticscholar.org/paper/external-baseline-paper-id")
+            self.assertEqual(record["relations"][0]["confidence"], 0.82)
+
+    def test_normalize_raw_file_drops_unresolved_relation(self) -> None:
+        def fake_fetch(url: str, headers: dict[str, str]) -> dict[str, object]:
+            if "query=Demo+Paper" in url:
+                return {
+                    "title": "Demo Paper",
+                    "authors": [{"name": "Author A"}],
+                    "year": 2024,
+                    "venue": "CVPR",
+                    "citationCount": 9,
+                    "abstract": "Original abstract",
+                    "externalIds": {"DOI": "10.1000/demo"},
+                    "openAccessPdf": {"url": "https://s2.local/demo.pdf"},
+                }
+            return {"data": []}
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            raw_path = root / "raw.json"
+            meta_path = root / "meta.json"
+            raw_path.write_text(json.dumps(raw_payload(), ensure_ascii=False), encoding="utf-8")
+            meta_path.write_text(json.dumps(meta_artifact(), ensure_ascii=False), encoding="utf-8")
+
+            record = normalize_raw_file(
+                raw_path,
+                meta_path=meta_path,
+                extractor_version="meta-v4",
+                registry_items=[],
+                fetcher=fake_fetch,
+            )
+
+            self.assertEqual(record["relations"], [])
 
     def test_extract_sections_falls_back_to_section_category_and_heading(self) -> None:
         conversation = {

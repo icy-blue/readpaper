@@ -18,6 +18,8 @@ import {
   loadPaperDetail,
   markdownHref,
   paperRoute,
+  relationConfidenceLabel,
+  relationTargetLabel,
   recommendedRouteLabel,
   scoreLevelLabel,
   scoreLevelTagClass,
@@ -459,10 +461,12 @@ function ClaimsPanel({ paper }: { paper: PaperCanonicalRecord }) {
     <div className="info-stack">
       {paper.claims.map((claim, index) => (
         <div key={`${paper.id}-claim-${index}`} className="info-item claim-item">
-          <Flex justify="space-between" align="start" gap={12} wrap="wrap">
-            <Paragraph className="claim-text">{claim.text}</Paragraph>
-            <Tag className="chip-tag chip-tag-route-overview">{displayClaimType(claim.type)}</Tag>
-          </Flex>
+          <div className="claim-header">
+            <div className="claim-body">
+              <Paragraph className="claim-text">{claim.text}</Paragraph>
+            </div>
+            <Tag className="chip-tag chip-tag-route-overview claim-type-tag">{displayClaimType(claim.type)}</Tag>
+          </div>
           <Flex wrap="wrap" gap={8}>
             {claim.support.map((item) => (
               <Tag key={`${paper.id}-${index}-${item}`} className="chip-tag chip-tag-tone-blue">
@@ -623,9 +627,28 @@ function MaterialsSection({
       children: paper.relations.length ? (
         <div className="info-stack">
           {paper.relations.map((item) => (
-            <div key={`${item.type}-${item.target_paper_id}`} className="info-item relation-item">
-              <Text strong>{displayRelationType(item.type)}</Text>
-              <Paragraph className="relation-title">{item.label || item.target_paper_id}</Paragraph>
+            <div
+              key={`${item.type}-${item.target_paper_id || item.target_semantic_scholar_paper_id || item.target_url || item.label || "relation"}`}
+              className="info-item relation-item"
+            >
+              <Flex justify="space-between" align="start" gap={12} wrap="wrap">
+                <Text strong>{displayRelationType(item.type)}</Text>
+                <Flex wrap="wrap" gap={8}>
+                  <Tag className="chip-tag chip-tag-tone-blue">{item.target_kind === "external" ? "Semantic Scholar" : "本地论文"}</Tag>
+                  {relationConfidenceLabel(item.confidence) ? <Tag className="chip-tag chip-tag-tone-green">{relationConfidenceLabel(item.confidence)}</Tag> : null}
+                </Flex>
+              </Flex>
+              {item.target_kind === "external" && item.target_url ? (
+                <a href={item.target_url} target="_blank" rel="noreferrer" className="paper-link small relation-link">
+                  {relationTargetLabel(item)}
+                </a>
+              ) : item.target_paper_id ? (
+                <Link to={paperRoute(`#/paper/${item.target_paper_id}`, item.target_paper_id)} className="paper-link small relation-link">
+                  {relationTargetLabel(item)}
+                </Link>
+              ) : (
+                <Paragraph className="relation-title">{relationTargetLabel(item)}</Paragraph>
+              )}
               {item.description ? <Paragraph type="secondary" className="relation-description">{item.description}</Paragraph> : null}
             </div>
           ))}

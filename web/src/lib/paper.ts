@@ -5,6 +5,7 @@ import type {
   NeighborItem,
   PaperCardView,
   PaperDetailViewModel,
+  RelationItem,
   SiteIndexPayload,
 } from "../types";
 
@@ -40,6 +41,7 @@ const COMPARISON_ASPECT_LABELS: Record<string, string> = {
 const CLAIM_TYPE_LABELS: Record<string, string> = {
   method: "方法",
   experiment: "实验",
+  result: "结果",
   capability: "能力",
   limitation: "局限",
 };
@@ -249,6 +251,20 @@ function validateAssets(issues: string[], path: string, value: unknown): void {
   });
 }
 
+function validateRelations(issues: string[], path: string, value: unknown): void {
+  const items = expectObjectArray(issues, path, value);
+  items?.forEach((item, index) => {
+    expectString(issues, `${path}[${index}].type`, item.type);
+    expectString(issues, `${path}[${index}].target_kind`, item.target_kind);
+    expectOptionalString(issues, `${path}[${index}].target_paper_id`, item.target_paper_id);
+    expectOptionalString(issues, `${path}[${index}].target_semantic_scholar_paper_id`, item.target_semantic_scholar_paper_id);
+    expectOptionalString(issues, `${path}[${index}].target_url`, item.target_url);
+    expectOptionalString(issues, `${path}[${index}].label`, item.label);
+    expectOptionalString(issues, `${path}[${index}].description`, item.description);
+    expectOptionalNumber(issues, `${path}[${index}].confidence`, item.confidence);
+  });
+}
+
 function validatePaperCard(issues: string[], path: string, value: unknown): void {
   const record = expectRecord(issues, path, value);
   if (!record) {
@@ -311,7 +327,7 @@ function validateCanonical(issues: string[], path: string, value: unknown): void
     expectStringArray(issues, `${path}.comparison.next_read`, comparison.next_read);
   }
   validateAssets(issues, `${path}.assets`, record.assets);
-  expectObjectArray(issues, `${path}.relations`, record.relations);
+  validateRelations(issues, `${path}.relations`, record.relations);
 }
 
 export function validatePayload(payload: unknown): SiteIndexPayload {
@@ -538,11 +554,23 @@ export function displayComparisonAspect(value: string): string {
 }
 
 export function displayClaimType(value: string): string {
-  return CLAIM_TYPE_LABELS[value] || value;
+  const normalized = value.trim().toLowerCase();
+  return CLAIM_TYPE_LABELS[normalized] || value;
 }
 
 export function displayRelationType(value: string): string {
   return RELATION_TYPE_LABELS[value] || value;
+}
+
+export function relationTargetLabel(item: RelationItem): string {
+  return item.label || item.target_paper_id || item.target_semantic_scholar_paper_id || "未命名关系目标";
+}
+
+export function relationConfidenceLabel(value: number | null | undefined): string | null {
+  if (typeof value !== "number") {
+    return null;
+  }
+  return `可信度 ${value.toFixed(2)}`;
 }
 
 export function filterFigureTableItems(items: FigureTableIndexItem[], query: string): FigureTableIndexItem[] {

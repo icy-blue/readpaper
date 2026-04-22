@@ -140,7 +140,10 @@ export interface AssetsBlock {
 
 export interface RelationItem {
   type: string;
-  target_paper_id: string;
+  target_kind: "local" | "external" | string;
+  target_paper_id: string | null;
+  target_semantic_scholar_paper_id: string | null;
+  target_url: string | null;
   label: string | null;
   description: string | null;
   confidence?: number | null;

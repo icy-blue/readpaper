@@ -91,7 +91,7 @@ Prefer missing over guessed. Do not infer unsupported claims from absent section
       "figures": [],
       "tables": []
     },
-    "relations": []
+    "relation_candidates": []
   }
 }
 ```
@@ -143,6 +143,11 @@ Prefer missing over guessed. Do not infer unsupported claims from absent section
 - `assets.*[].caption`: 220
 - `assets.*[].role`: 32
 - `assets.*[].importance`: `high`, `medium`, or `low`
+- `relation_candidates[].type`: 24
+- `relation_candidates[].target_name`: 120
+- `relation_candidates[].description`: 120
+- `relation_candidates[].confidence_hint`: `low`, `medium`, or `high`
+- `relation_candidates[].evidence_mode`: `explicit` or `heuristic`
 
 ## Grounding Rules
 
@@ -156,7 +161,9 @@ Prefer missing over guessed. Do not infer unsupported claims from absent section
 - `evaluation.datasets`, `metrics`, and `baselines` must be explicit names from experiment text or captions.
 - `taxonomy` should be conservative and canonical. Do not mix Chinese and English labels.
 - `comparison.next_read` and `editorial.next_read` should contain short target names, not sentences.
-- `relations` should only be emitted when there is clear typed evidence such as `compares_to`, `extends`, or `uses_dataset`.
+- `relation_candidates` are analysis-layer inputs only; do not emit final canonical relation ids here.
+- `relation_candidates` should prefer explicit typed evidence such as `compares_to`, `extends`, or `uses_method`.
+- Heuristic `relation_candidates` are limited to `compares_to` and `same_problem`.
 
 ## Evidence Rules
 

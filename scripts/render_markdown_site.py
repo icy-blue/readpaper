@@ -231,9 +231,21 @@ def render_paper_page(detail_payload: dict[str, Any]) -> str:
         for item in relations:
             if not isinstance(item, dict):
                 continue
-            label = str(item.get("label") or item.get("target_paper_id") or "")
+            target_kind = str(item.get("target_kind") or "")
+            label = str(item.get("label") or item.get("target_paper_id") or item.get("target_semantic_scholar_paper_id") or "")
             description = str(item.get("description") or "").strip()
-            lines.append(f"- {item.get('type') or ''}: {label}" + (f" | {description}" if description else ""))
+            confidence = item.get("confidence")
+            confidence_text = f" | confidence {confidence:.2f}" if isinstance(confidence, (int, float)) else ""
+            if target_kind == "local" and item.get("target_paper_id"):
+                target = f"[{label}](../index.html#/paper/{item.get('target_paper_id')})"
+            elif target_kind == "external" and item.get("target_url"):
+                target = f"[{label}]({item.get('target_url')})"
+            else:
+                target = label
+            lines.append(
+                f"- {item.get('type') or ''} [{target_kind or 'unknown'}]: {target}{confidence_text}"
+                + (f" | {description}" if description else "")
+            )
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

@@ -18,9 +18,11 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EXTRACTOR_CONFIG = REPO_ROOT / "extractor-config.json"
+DEFAULT_REGISTRY_PATH = REPO_ROOT / "state" / "paper_registry.json"
 
 SEMANTIC_SCHOLAR_BASE_URL = "https://api.semanticscholar.org/graph/v1"
 SEMANTIC_SCHOLAR_FIELDS = [
+    "paperId",
     "title",
     "authors",
     "year",
@@ -48,10 +50,16 @@ RELATION_TYPES = {
     "inspired_by",
     "same_problem",
 }
+RELATION_TARGET_KINDS = {"local", "external"}
+RELATION_CANDIDATE_CONFIDENCE_HINTS = {"low", "medium", "high"}
+RELATION_CANDIDATE_EVIDENCE_MODES = {"explicit", "heuristic"}
+EXPLICIT_RELATION_TYPES = {"compares_to", "extends", "uses_method"}
+HEURISTIC_RELATION_TYPES = {"compares_to", "same_problem"}
 
 
 @dataclass
 class SemanticScholarPaper:
+    paper_id: str | None
     title: str
     authors: list[str]
     year: int | None
@@ -187,6 +195,7 @@ def parse_semantic_scholar_candidate(payload: dict[str, Any]) -> SemanticScholar
     abstract_raw = payload.get("abstract")
     doi, arxiv = parse_external_ids(payload)
     return SemanticScholarPaper(
+        paper_id=normalize_text(str(payload.get("paperId") or "")) if isinstance(payload.get("paperId"), str) and str(payload.get("paperId")).strip() else None,
         title=normalize_title(str(payload.get("title") or "")),
         authors=author_names,
         year=year if isinstance(year, int) else None,
@@ -197,6 +206,12 @@ def parse_semantic_scholar_candidate(payload: dict[str, Any]) -> SemanticScholar
         arxiv=arxiv,
         open_access_pdf=pdf_url,
     )
+
+
+def semantic_scholar_paper_url(paper_id: str | None) -> str | None:
+    if not isinstance(paper_id, str) or not paper_id.strip():
+        return None
+    return f"https://www.semanticscholar.org/paper/{urllib.parse.quote(paper_id.strip())}"
 
 
 def semantic_scholar_title_match(title: str, year: int | None, *, fetcher: Any = fetch_json) -> SemanticScholarPaper | None:
@@ -243,6 +258,62 @@ def semantic_scholar_title_match(title: str, year: int | None, *, fetcher: Any =
                 continue
             return parsed
     return None
+
+
+def semantic_scholar_named_target_match(target_name: str, *, fetcher: Any = fetch_json) -> SemanticScholarPaper | None:
+    headers = semantic_scholar_headers()
+    normalized_target = normalize_key(target_name)
+    if not normalized_target:
+        return None
+    allow_fuzzy = len(normalized_target) >= 12 and " " in normalized_target
+
+    best_match: tuple[int, SemanticScholarPaper] | None = None
+    routes = [
+        ("/paper/search/match", {"query": target_name}),
+        ("/paper/search", {"query": target_name, "limit": 5}),
+    ]
+    for route, base_params in routes:
+        payload: Any | None = None
+        for include_external_ids in (True, False):
+            params = dict(base_params)
+            params["fields"] = semantic_scholar_fields(include_external_ids)
+            url = build_semantic_scholar_url(route, params)
+            try:
+                payload = fetcher(url, headers)
+                break
+            except urllib.error.HTTPError as error:
+                if error.code == 400 and include_external_ids:
+                    continue
+                payload = None
+                break
+            except Exception:
+                payload = None
+                break
+        if payload is None:
+            continue
+
+        candidates: list[dict[str, Any]] = []
+        if isinstance(payload, dict) and isinstance(payload.get("data"), list):
+            candidates = [item for item in payload["data"] if isinstance(item, dict)]
+        elif isinstance(payload, dict):
+            candidates = [payload]
+
+        for candidate in candidates:
+            parsed = parse_semantic_scholar_candidate(candidate)
+            title_key = normalize_key(parsed.title)
+            paper_id_key = normalize_key(parsed.paper_id or "")
+            score = 0
+            if paper_id_key and paper_id_key == normalized_target:
+                score = 4
+            elif title_key == normalized_target:
+                score = 3
+            elif allow_fuzzy and (normalized_target in title_key or title_key in normalized_target):
+                score = 2
+            if score == 0:
+                continue
+            if best_match is None or score > best_match[0]:
+                best_match = (score, parsed)
+    return best_match[1] if best_match else None
 
 
 def message_unit_id(message: dict[str, Any]) -> str:
@@ -609,33 +680,53 @@ def validate_assets(errors: list[str], value: Any) -> dict[str, Any]:
     }
 
 
-def validate_relations(errors: list[str], value: Any) -> list[dict[str, Any]]:
+def validate_relation_candidates(errors: list[str], value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, list):
-        errors.append("meta.relations must be a list")
+        errors.append("meta.relation_candidates must be a list")
         return []
     result: list[dict[str, Any]] = []
     for index, item in enumerate(value):
-        record = validate_record(errors, f"meta.relations[{index}]", item)
-        relation_type = validate_string_field(errors, f"meta.relations[{index}].type", record.get("type"), required=True, max_chars=32) or ""
-        if relation_type not in RELATION_TYPES:
-            errors.append(f"meta.relations[{index}].type must be one of {sorted(RELATION_TYPES)}")
-        confidence = record.get("confidence")
-        if confidence is not None and not isinstance(confidence, (int, float)):
-            errors.append(f"meta.relations[{index}].confidence must be a number or null")
+        record = validate_record(errors, f"meta.relation_candidates[{index}]", item)
+        relation_type = validate_string_field(
+            errors, f"meta.relation_candidates[{index}].type", record.get("type"), required=True, max_chars=24
+        ) or ""
+        evidence_mode = (
+            validate_choice(
+                errors,
+                f"meta.relation_candidates[{index}].evidence_mode",
+                record.get("evidence_mode"),
+                RELATION_CANDIDATE_EVIDENCE_MODES,
+                required=True,
+            )
+            or "explicit"
+        )
+        if evidence_mode == "explicit" and relation_type not in EXPLICIT_RELATION_TYPES:
+            errors.append(f"meta.relation_candidates[{index}].type must be one of {sorted(EXPLICIT_RELATION_TYPES)} for explicit evidence")
+        if evidence_mode == "heuristic" and relation_type not in HEURISTIC_RELATION_TYPES:
+            errors.append(f"meta.relation_candidates[{index}].type must be one of {sorted(HEURISTIC_RELATION_TYPES)} for heuristic evidence")
         result.append(
             {
                 "type": relation_type,
-                "target_paper_id": validate_string_field(
+                "target_name": validate_string_field(
                     errors,
-                    f"meta.relations[{index}].target_paper_id",
-                    record.get("target_paper_id"),
+                    f"meta.relation_candidates[{index}].target_name",
+                    record.get("target_name"),
                     required=True,
                     max_chars=120,
                 )
                 or "",
-                "label": validate_string_field(errors, f"meta.relations[{index}].label", record.get("label"), max_chars=60),
-                "description": validate_string_field(errors, f"meta.relations[{index}].description", record.get("description"), max_chars=120),
-                "confidence": float(confidence) if isinstance(confidence, (int, float)) else None,
+                "description": validate_string_field(errors, f"meta.relation_candidates[{index}].description", record.get("description"), max_chars=120),
+                "confidence_hint": (
+                    validate_choice(
+                        errors,
+                        f"meta.relation_candidates[{index}].confidence_hint",
+                        record.get("confidence_hint"),
+                        RELATION_CANDIDATE_CONFIDENCE_HINTS,
+                        required=True,
+                    )
+                    or "medium"
+                ),
+                "evidence_mode": evidence_mode,
             }
         )
     return result
@@ -676,7 +767,7 @@ def validate_meta_payload(meta_path: Path, payload: Any, paper_id: str, extracto
         "taxonomy": validate_taxonomy(errors, meta.get("taxonomy")),
         "comparison": validate_comparison(errors, meta.get("comparison")),
         "assets": validate_assets(errors, meta.get("assets")),
-        "relations": validate_relations(errors, meta.get("relations")),
+        "relation_candidates": validate_relation_candidates(errors, meta.get("relation_candidates")),
     }
 
     if errors:
@@ -692,6 +783,257 @@ def validate_meta_payload(meta_path: Path, payload: Any, paper_id: str, extracto
     }
 
 
+def load_registry_items(registry_path: Path) -> list[dict[str, Any]]:
+    payload = read_json(registry_path, {})
+    if not isinstance(payload, dict):
+        return []
+    items = payload.get("items")
+    if not isinstance(items, list):
+        return []
+    return [item for item in items if isinstance(item, dict)]
+
+
+def match_registry_entry(registry_items: list[dict[str, Any]], target_name: str) -> dict[str, Any] | None:
+    normalized_target = normalize_key(target_name)
+    if not normalized_target:
+        return None
+    allow_fuzzy = len(normalized_target) >= 12 and " " in normalized_target
+
+    exact_matches: list[dict[str, Any]] = []
+    fuzzy_matches: list[dict[str, Any]] = []
+    for item in registry_items:
+        exact_keys = {
+            normalize_key(str(item.get("paper_id") or "")),
+            normalize_key(str(item.get("title") or "")),
+            normalize_key(str(item.get("dedupe_key") or "")),
+            normalize_key(str(item.get("fallback_key") or "")),
+        }
+        exact_keys.discard("")
+        if normalized_target in exact_keys:
+            exact_matches.append(item)
+            continue
+        title_key = normalize_key(str(item.get("title") or ""))
+        if allow_fuzzy and title_key and (normalized_target in title_key or title_key in normalized_target):
+            fuzzy_matches.append(item)
+
+    if len(exact_matches) == 1:
+        return exact_matches[0]
+    if not exact_matches and len(fuzzy_matches) == 1:
+        return fuzzy_matches[0]
+    return None
+
+
+def relation_cache_key(item: dict[str, Any]) -> str:
+    target_key = str(item.get("target_paper_id") or item.get("target_semantic_scholar_paper_id") or item.get("target_url") or item.get("label") or "")
+    return f"{item.get('type') or ''}::{item.get('target_kind') or ''}::{target_key}"
+
+
+def relation_confidence(target_kind: str, evidence_mode: str) -> float:
+    if evidence_mode == "explicit":
+        return 0.9 if target_kind == "local" else 0.82
+    return 0.68 if target_kind == "local" else 0.6
+
+
+def record_tags(record: dict[str, Any], key: str) -> set[str]:
+    taxonomy = record.get("taxonomy")
+    if not isinstance(taxonomy, dict):
+        return set()
+    return set(ensure_strings(taxonomy.get(key)))
+
+
+def has_comparison_reading_intent(record: dict[str, Any]) -> bool:
+    comparison = record.get("comparison")
+    if not isinstance(comparison, dict):
+        return False
+    for item in comparison.get("aspects") if isinstance(comparison.get("aspects"), list) else []:
+        if not isinstance(item, dict):
+            continue
+        difference = normalize_text(str(item.get("difference") or ""))
+        if any(token in difference for token in ("对比", "相比", "相对", "不同", "区别")):
+            return True
+    return False
+
+
+def read_registry_record(entry: dict[str, Any], record_cache: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    record_path_value = str(entry.get("record_path") or "").strip()
+    if not record_path_value:
+        return None
+    record_path = Path(record_path_value)
+    if not record_path.is_absolute():
+        record_path = REPO_ROOT / record_path
+    cache_key = str(record_path)
+    if cache_key not in record_cache:
+        payload = read_json(record_path, {})
+        record_cache[cache_key] = payload if isinstance(payload, dict) else {}
+    cached = record_cache.get(cache_key)
+    return cached if isinstance(cached, dict) and cached else None
+
+
+def build_local_relation(entry: dict[str, Any], candidate: dict[str, Any]) -> dict[str, Any]:
+    paper_id = normalize_text(str(entry.get("paper_id") or "")) or None
+    title = normalize_text(str(entry.get("title") or "")) or paper_id
+    return {
+        "type": candidate["type"],
+        "target_kind": "local",
+        "target_paper_id": paper_id,
+        "target_semantic_scholar_paper_id": None,
+        "target_url": None,
+        "label": title,
+        "description": candidate.get("description"),
+        "confidence": relation_confidence("local", str(candidate.get("evidence_mode") or "explicit")),
+    }
+
+
+def build_external_relation(match: SemanticScholarPaper, candidate: dict[str, Any]) -> dict[str, Any] | None:
+    if not match.paper_id:
+        return None
+    return {
+        "type": candidate["type"],
+        "target_kind": "external",
+        "target_paper_id": None,
+        "target_semantic_scholar_paper_id": match.paper_id,
+        "target_url": semantic_scholar_paper_url(match.paper_id),
+        "label": match.title or candidate.get("target_name"),
+        "description": candidate.get("description"),
+        "confidence": relation_confidence("external", str(candidate.get("evidence_mode") or "explicit")),
+    }
+
+
+def derived_relation_candidates(record: dict[str, Any]) -> list[dict[str, Any]]:
+    evaluation = record.get("evaluation") if isinstance(record.get("evaluation"), dict) else {}
+    comparison = record.get("comparison") if isinstance(record.get("comparison"), dict) else {}
+    editorial = record.get("editorial") if isinstance(record.get("editorial"), dict) else {}
+
+    candidates: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    target_sources = [
+        ("baseline", ensure_strings(evaluation.get("baselines"))),
+        ("comparison.next_read", ensure_strings(comparison.get("next_read"))),
+        ("editorial.next_read", ensure_strings(editorial.get("next_read"))),
+    ]
+    for source_name, values in target_sources:
+        for target_name in values:
+            key = ("compares_to", target_name, "heuristic")
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(
+                {
+                    "type": "compares_to",
+                    "target_name": target_name,
+                    "description": f"命中 {source_name} 线索。",
+                    "confidence_hint": "medium",
+                    "evidence_mode": "heuristic",
+                }
+            )
+    return candidates
+
+
+def merge_relation_candidates(meta_candidates: list[dict[str, Any]], derived_candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for candidate in derived_candidates + meta_candidates:
+        key = (
+            str(candidate.get("type") or ""),
+            normalize_key(str(candidate.get("target_name") or "")),
+            str(candidate.get("evidence_mode") or "explicit"),
+        )
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = candidate
+            continue
+        if not existing.get("description") and candidate.get("description"):
+            existing["description"] = candidate["description"]
+        if existing.get("evidence_mode") == "heuristic" and candidate.get("evidence_mode") == "explicit":
+            merged[key] = candidate
+    return list(merged.values())
+
+
+def resolve_relation_candidate(
+    current_record: dict[str, Any],
+    candidate: dict[str, Any],
+    *,
+    registry_items: list[dict[str, Any]],
+    fetcher: Any,
+    record_cache: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    relation_type = str(candidate.get("type") or "")
+    evidence_mode = str(candidate.get("evidence_mode") or "explicit")
+    target_name = str(candidate.get("target_name") or "")
+    current_paper_id = normalize_text(str(current_record.get("id") or ""))
+    current_title = normalize_key(str(((current_record.get("bibliography") or {}) if isinstance(current_record.get("bibliography"), dict) else {}).get("title") or ""))
+    local_entry = match_registry_entry(registry_items, target_name)
+    if local_entry is not None:
+        local_paper_id = normalize_text(str(local_entry.get("paper_id") or ""))
+        local_title = normalize_key(str(local_entry.get("title") or ""))
+        if local_paper_id == current_paper_id or (local_title and local_title == current_title):
+            local_entry = None
+
+    if evidence_mode == "heuristic":
+        named_targets = {
+            *ensure_strings((current_record.get("evaluation") or {}).get("baselines") if isinstance(current_record.get("evaluation"), dict) else []),
+            *ensure_strings((current_record.get("comparison") or {}).get("next_read") if isinstance(current_record.get("comparison"), dict) else []),
+            *ensure_strings((current_record.get("editorial") or {}).get("next_read") if isinstance(current_record.get("editorial"), dict) else []),
+        }
+        if relation_type == "compares_to" and target_name not in named_targets:
+            return None
+        if relation_type == "same_problem":
+            if local_entry is None:
+                return None
+            target_record = read_registry_record(local_entry, record_cache)
+            if not target_record:
+                return None
+            shared_tasks = record_tags(current_record, "tasks") & record_tags(target_record, "tasks")
+            if not shared_tasks:
+                return None
+            current_methods = record_tags(current_record, "methods")
+            target_methods = record_tags(target_record, "methods")
+            methods_differ = bool(current_methods and target_methods and current_methods != target_methods)
+            if not methods_differ and not has_comparison_reading_intent(current_record):
+                return None
+            return build_local_relation(local_entry, candidate)
+
+    if local_entry is not None:
+        return build_local_relation(local_entry, candidate)
+
+    external_match = semantic_scholar_named_target_match(target_name, fetcher=fetcher)
+    if external_match is None:
+        return None
+    external_title = normalize_key(external_match.title)
+    if (external_match.paper_id and normalize_text(external_match.paper_id) == current_paper_id) or (external_title and external_title == current_title):
+        return None
+    return build_external_relation(external_match, candidate)
+
+
+def resolve_relations(
+    current_record: dict[str, Any],
+    meta: dict[str, Any],
+    *,
+    registry_items: list[dict[str, Any]],
+    fetcher: Any,
+    record_cache: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    meta_candidates = meta.get("relation_candidates") if isinstance(meta.get("relation_candidates"), list) else []
+    candidates = merge_relation_candidates(meta_candidates, derived_relation_candidates(current_record))
+    relations: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        relation = resolve_relation_candidate(
+            current_record,
+            candidate,
+            registry_items=registry_items,
+            fetcher=fetcher,
+            record_cache=record_cache,
+        )
+        if relation is None:
+            continue
+        key = relation_cache_key(relation)
+        existing = relations.get(key)
+        if existing is None or float(relation.get("confidence") or 0) > float(existing.get("confidence") or 0):
+            relations[key] = relation
+        elif existing is not None and not existing.get("description") and relation.get("description"):
+            existing["description"] = relation["description"]
+    return sorted(relations.values(), key=lambda item: (-float(item.get("confidence") or 0), str(item.get("label") or "")))
+
+
 def paper_paths(paper_id: str) -> dict[str, str]:
     return {
         "paper_path": f"papers/{paper_id}.md",
@@ -699,7 +1041,15 @@ def paper_paths(paper_id: str) -> dict[str, str]:
     }
 
 
-def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticScholarPaper | None, meta_artifact: dict[str, Any]) -> dict[str, Any]:
+def normalize_record(
+    raw_payload: dict[str, Any],
+    semantic_paper: SemanticScholarPaper | None,
+    meta_artifact: dict[str, Any],
+    *,
+    registry_items: list[dict[str, Any]],
+    fetcher: Any,
+    record_cache: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
     conversation = raw_payload.get("conversation")
     if not isinstance(conversation, dict):
         raise ValueError("Raw payload must include a conversation object.")
@@ -741,7 +1091,7 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
         "arxiv": semantic_paper.arxiv if semantic_paper else None,
     }
 
-    return {
+    record = {
         "id": paper_id,
         "source": {
             "conversation_ids": source_conversation_ids,
@@ -771,8 +1121,16 @@ def normalize_record(raw_payload: dict[str, Any], semantic_paper: SemanticSchola
         "taxonomy": meta["taxonomy"],
         "comparison": meta["comparison"],
         "assets": meta["assets"],
-        "relations": meta["relations"],
+        "relations": [],
     }
+    record["relations"] = resolve_relations(
+        record,
+        meta,
+        registry_items=registry_items,
+        fetcher=fetcher,
+        record_cache=record_cache,
+    )
+    return record
 
 
 def merge_existing_enrichment(record: dict[str, Any], existing_record: dict[str, Any] | None) -> dict[str, Any]:
@@ -829,7 +1187,9 @@ def normalize_raw_file(
     *,
     meta_path: Path,
     extractor_version: str,
+    registry_items: list[dict[str, Any]] | None = None,
     fetcher: Any = fetch_json,
+    record_cache: dict[str, dict[str, Any]] | None = None,
     existing_record: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     raw_payload = read_json(raw_path, {})
@@ -855,7 +1215,14 @@ def normalize_raw_file(
     except Exception:
         semantic_paper = None
 
-    record = normalize_record(raw_payload, semantic_paper, meta_artifact)
+    record = normalize_record(
+        raw_payload,
+        semantic_paper,
+        meta_artifact,
+        registry_items=registry_items or [],
+        fetcher=fetcher,
+        record_cache=record_cache or {},
+    )
     return merge_existing_enrichment(record, existing_record)
 
 
@@ -875,6 +1242,11 @@ def parse_args() -> argparse.Namespace:
         default=str(DEFAULT_EXTRACTOR_CONFIG),
         help="Path to extractor-config.json.",
     )
+    parser.add_argument(
+        "--registry",
+        default=str(DEFAULT_REGISTRY_PATH),
+        help="Path to paper_registry.json used for local relation resolution.",
+    )
     return parser.parse_args()
 
 
@@ -884,6 +1256,8 @@ def main() -> int:
     meta_dir = Path(args.meta_dir)
     papers_dir = Path(args.papers_dir)
     extractor_version = read_extractor_version(Path(args.extractor_config))
+    registry_items = load_registry_items(Path(args.registry))
+    record_cache: dict[str, dict[str, Any]] = {}
 
     papers_dir.mkdir(parents=True, exist_ok=True)
     written = 0
@@ -897,6 +1271,8 @@ def main() -> int:
             raw_path,
             meta_path=meta_dir / f"{raw_paper_id}.json",
             extractor_version=extractor_version,
+            registry_items=registry_items,
+            record_cache=record_cache,
             existing_record=existing_record,
         )
         paper_id = normalize_text(str(record.get("id") or raw_paper_id))

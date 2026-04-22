@@ -150,10 +150,23 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
   "relations": [
     {
       "type": "compares_to",
+      "target_kind": "local",
       "target_paper_id": "find3d-open-world-3d-part-segmentation-xxxx",
+      "target_semantic_scholar_paper_id": null,
+      "target_url": null,
       "label": "Find3D",
       "description": "最直接的几何-文本匹配对照路线。",
       "confidence": 0.9
+    },
+    {
+      "type": "extends",
+      "target_kind": "external",
+      "target_paper_id": null,
+      "target_semantic_scholar_paper_id": "abcdef1234567890",
+      "target_url": "https://www.semanticscholar.org/paper/abcdef1234567890",
+      "label": "Example External Paper",
+      "description": "在已有视觉-几何生成路线基础上做扩展。",
+      "confidence": 0.82
     }
   ]
 }
@@ -177,7 +190,10 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
 - `taxonomy`: canonical English labels only. Translate only in view/render layers.
 - `comparison.aspects`: short comparison hooks for reading and relation building.
 - `assets`: figure/table reading index with stable role and importance labels.
-- `relations`: typed graph edges only; do not store generic neighbors or retrieval artifacts here.
+- `relations`: normalized typed graph edges only; do not store generic neighbors, unresolved names, or retrieval artifacts here.
+- `relations.target_kind`: `local` or `external`.
+- `relations.target_paper_id`: required when `target_kind` is `local`.
+- `relations.target_semantic_scholar_paper_id` / `relations.target_url`: required when `target_kind` is `external`.
 
 ## Do Not Store In Canonical Records
 

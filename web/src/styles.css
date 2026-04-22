@@ -510,10 +510,27 @@ a {
   background: linear-gradient(180deg, #fbfdff 0%, #f7fbff 100%);
 }
 
+.claim-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.claim-body {
+  min-width: 0;
+}
+
 .claim-text {
-  margin-bottom: 14px !important;
+  margin: 0 !important;
   font-size: 16px;
   line-height: 1.8;
+}
+
+.claim-type-tag {
+  align-self: start;
+  justify-self: end;
+  white-space: nowrap;
 }
 
 .support-chip {
@@ -1079,6 +1096,11 @@ a {
   margin-top: 8px !important;
 }
 
+.relation-link {
+  display: inline-block;
+  margin-top: 8px;
+}
+
 .relation-description {
   margin-top: 4px !important;
 }
@@ -1264,5 +1286,14 @@ a {
 
   .hero-action-row {
     width: 100%;
+  }
+
+  .claim-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .claim-type-tag {
+    justify-self: start;
+    white-space: normal;
   }
 }

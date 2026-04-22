@@ -26,8 +26,9 @@ It does not write the final canonical paper record.
    - `method`
    - `evaluation`
    - `conclusion`
-4. Write one v2 meta artifact matching `references/meta-contract.md`.
-5. Save it to `outputs/meta/<paper-id>.json`.
+4. Extract `relation_candidates` from explicit evidence first, then add conservative heuristic candidates only when the contract allows them.
+5. Write one v2 meta artifact matching `references/meta-contract.md`.
+6. Save it to `outputs/meta/<paper-id>.json`.
 
 ## Output Rules
 
@@ -39,6 +40,9 @@ It does not write the final canonical paper record.
 - Do not copy long paragraphs verbatim into short fields.
 - Do not emit `...` or hard-truncated half-sentences.
 - Do not let baseline descriptions overwrite the paper's own method summary.
+- Only emit `relation_candidates`, never final canonical `relations`.
+- Prefer explicit `compares_to` / `extends` / `uses_method` over heuristic candidates.
+- Heuristic candidates are limited to `compares_to` and `same_problem`.
 
 ## Validation Checklist
 
@@ -51,3 +55,5 @@ Before writing the JSON, verify:
 - `meta.taxonomy` uses English canonical labels only
 - `meta.comparison.next_read` and `meta.editorial.next_read` are short target names, not sentences
 - `meta.assets` contains figure/table items with grounded `role` and `importance`
+- `meta.relation_candidates` only contains `type`, `target_name`, `description`, `confidence_hint`, and `evidence_mode`
+- `meta.relation_candidates[].evidence_mode` is `explicit` or `heuristic`
