@@ -25,7 +25,7 @@ It does not write the final canonical paper record.
    - `problem`
    - `method`
    - `evaluation`
-   - `conclusion / risk`
+   - `risk / limitation`
 4. Extract `relation_candidates` from explicit evidence first, then add conservative heuristic candidates only when the contract allows them.
 5. Write one v2 meta artifact matching `references/meta-contract.md`.
 6. Save it to `outputs/meta/<paper-id>.json`.
@@ -45,8 +45,13 @@ It does not write the final canonical paper record.
 - Do not let baseline descriptions overwrite the paper's own method summary.
 - Do not collapse Chinese punctuation into half-width ASCII punctuation in reader-facing fields.
 - Only emit `relation_candidates`, never final canonical `relations`.
-- Prefer explicit `compares_to` / `extends` / `uses_method` over heuristic candidates.
-- Heuristic candidates are limited to `compares_to` and `same_problem`.
+- Prefer explicit `compares_to` / `uses_method` over heuristic candidates.
+- Heuristic candidates are limited to `compares_to`.
+- Treat `confidence_hint` as an extraction-layer hint only; do not assume it directly controls the final numeric `relations[].confidence`.
+- Current downstream assembly maps many explicit external relations to the same numeric score, so your job is to make the hint semantically honest, not to spread scores artificially.
+- Use `confidence_hint=high` only when the target paper or method is explicitly named and the relation is directly supported by text, figure captions, or table captions.
+- Use `confidence_hint=medium` when the target is explicitly named but the exact relation still needs a small amount of interpretation.
+- Use `confidence_hint=low` sparingly; if the evidence is genuinely weak, prefer omitting the candidate.
 - Keep `meta.discovery_axes` as short canonical labels grouped into `problem / method / evaluation / risk`, not sentences and not final graph edges.
 - Treat `meta.editorial.graph_worthy` as a conservative graph-anchor flag, not a generic quality score.
 - Set `meta.editorial.graph_worthy` to `true` only when at least 2 grounded signals are present: representative route anchor, clear comparison anchor, reusable mechanism reference, or durable evidence anchor.
@@ -59,7 +64,7 @@ Before writing the JSON, verify:
 - `meta.story` 只保留 `paper_one_liner`
 - `meta.method.inputs` and `meta.method.outputs` are the only canonical task I/O fields
 - `meta.evaluation.baselines` contains only explicit baselines named in the paper
-- `meta.research_risks` captures concrete reproduction / comparison risks, not泛泛而谈
+- `meta.research_risks` captures concrete reproduction / comparison risks, not generic filler
 - `meta.editorial` 只保留 `research_position` 和 `graph_worthy`
 - `meta.editorial.graph_worthy` follows the graph-worthy rubric and is not inferred from a generic read-worthiness judgment
 - `meta.taxonomy` uses English canonical labels only
@@ -67,3 +72,4 @@ Before writing the JSON, verify:
 - `meta.discovery_axes.*` are short canonical labels with clear grouping
 - `meta.relation_candidates` only contains `type`, `target_name`, `description`, `confidence_hint`, and `evidence_mode`
 - `meta.relation_candidates[].evidence_mode` is `explicit` or `heuristic`
+- `meta.relation_candidates[].confidence_hint` is justified by evidence strength, not by a desire to diversify downstream numeric scores

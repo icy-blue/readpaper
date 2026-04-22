@@ -131,11 +131,11 @@ It does **not** store UI-only fallback text, search indexes, neighbor lists, or 
       "confidence": 0.9
     },
     {
-      "type": "extends",
+      "type": "uses_method",
       "target_kind": "external",
       "target_paper_id": null,
       "label": "Example External Paper",
-      "description": "在已有视觉-几何生成路线基础上做扩展。",
+      "description": "采用了外部方法中的关键机制或骨干。",
       "confidence": 0.82
     }
   ]

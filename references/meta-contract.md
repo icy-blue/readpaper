@@ -149,8 +149,18 @@ Prefer missing over guessed. Do not infer unsupported claims from absent section
 - Set `editorial.graph_worthy` to `true` only when at least 2 of these are grounded: the paper is a representative route anchor, a clear comparison anchor, a reusable mechanism reference, or a durable evidence anchor.
 - Keep `editorial.graph_worthy` `false` when the evidence is incomplete, the contribution is mostly incremental, the paper is too narrow for future comparison, or the same anchor role is already covered more clearly by another local paper.
 - `relation_candidates` are analysis-layer inputs only; do not emit final canonical relation ids here.
-- `relation_candidates` should prefer explicit typed evidence such as `compares_to`, `extends`, or `uses_method`.
-- Heuristic `relation_candidates` are limited to `compares_to` and `same_problem`.
+- `relation_candidates` should prefer explicit typed evidence such as `compares_to` or `uses_method`.
+- Heuristic `relation_candidates` are limited to `compares_to`.
+- `relation_candidates[].confidence_hint` is an extraction-layer hint, not the final numeric `relations[].confidence`.
+- Current canonical assembly derives final `relations[].confidence` from `target_kind` and `evidence_mode`:
+  - `local + explicit` -> `0.90`
+  - `external + explicit` -> `0.82`
+  - `local + heuristic` -> `0.68`
+  - `external + heuristic` -> `0.60`
+- Therefore, many explicit external links may share the same final score even when the extraction-layer confidence differs.
+- Use `confidence_hint=high` only when the target and relation are directly grounded in the translated text, figure caption, or table caption.
+- Use `confidence_hint=medium` when the target is named explicitly but the exact relation wording still requires small interpretation.
+- Use `confidence_hint=low` only for weak but still admissible candidates; if the evidence is too weak, prefer omitting the candidate instead of emitting a low-confidence placeholder.
 - If a `relation_candidate` does not resolve to a local paper id, canonical assembly may keep it as an `external` relation and let the render layer generate a Semantic Scholar search link from `target_name`.
 
 ## Evidence Rules

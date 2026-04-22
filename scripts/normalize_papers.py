@@ -23,17 +23,15 @@ GITHUB_PATTERN = re.compile(r"https?://(?:www\.)?github\.com/[^\s)>\]\"']+", re.
 
 RELATION_TYPES = {
     "compares_to",
-    "extends",
     "uses_dataset",
     "uses_method",
     "inspired_by",
-    "same_problem",
 }
 RELATION_TARGET_KINDS = {"local", "external"}
 RELATION_CANDIDATE_CONFIDENCE_HINTS = {"low", "medium", "high"}
 RELATION_CANDIDATE_EVIDENCE_MODES = {"explicit", "heuristic"}
-EXPLICIT_RELATION_TYPES = {"compares_to", "extends", "uses_method"}
-HEURISTIC_RELATION_TYPES = {"compares_to", "same_problem"}
+EXPLICIT_RELATION_TYPES = {"compares_to", "uses_method"}
+HEURISTIC_RELATION_TYPES = {"compares_to"}
 
 
 def progress(message: str) -> None:

@@ -8,10 +8,10 @@
 
 结论先说：
 
-- `meta.*` 下的字段，全部属于 skill 负责产出的分析层字段。
-- 其中一部分是明显的“推断/总结/判断”字段，必须依赖 skill 的阅读理解。
-- 另一部分虽然常常能在原文里直接找到名字，但仍然需要 skill 做证据选择、去重、规范化和裁剪后再写入。
-- `paper_id`、`extractor_version`、`source_conversation_id`、`source_semantic_updated_at`、`extracted_at` 不属于 `meta` 本体的分析字段，不应和“需要 skill 推断的 meta 字段”混在一起。
+- 按当前 `meta-v7` contract，`meta.*` 下的字段都属于 `extract-paper-meta` skill 负责产出的分析层字段。
+- 其中一部分是强依赖阅读理解的“归纳 / 判断 / 结构化解释”字段。
+- 另一部分虽然更接近抽取，但仍然需要 skill 做 grounding、去重、规范化和裁剪。
+- `paper_id`、`extractor_version`、`source_conversation_id`、`source_semantic_updated_at`、`extracted_at` 不属于 `meta` 本体分析字段，不应和 skill-owned 的 `meta.*` 混在一起。
 
 ## 1. 强依赖 skill 推断的字段
 
@@ -20,9 +20,6 @@
 ### Story
 
 - `meta.story.paper_one_liner`
-- `meta.story.problem`
-- `meta.story.method`
-- `meta.story.result`
 
 ### Research Problem
 
@@ -53,22 +50,14 @@
 - `meta.claims[].support`
 - `meta.claims[].confidence`
 
-### Conclusion
+### Research Risks
 
-- `meta.conclusion.author`
-- `meta.conclusion.limitations[]`
+- `meta.research_risks[]`
 
 ### Editorial Judgment
 
-- `meta.editorial.verdict`
-- `meta.editorial.summary`
-- `meta.editorial.why_read[]`
-- `meta.editorial.strengths[]`
-- `meta.editorial.cautions[]`
-- `meta.editorial.reading_route`
 - `meta.editorial.research_position`
 - `meta.editorial.graph_worthy`
-- `meta.editorial.next_read[]`
 
 ### Canonical Taxonomy
 
@@ -76,7 +65,6 @@
 - `meta.taxonomy.tasks[]`
 - `meta.taxonomy.methods[]`
 - `meta.taxonomy.modalities[]`
-- `meta.taxonomy.representations[]`
 - `meta.taxonomy.novelty_types[]`
 
 ### Comparison Hooks
@@ -84,6 +72,13 @@
 - `meta.comparison.aspects[].aspect`
 - `meta.comparison.aspects[].difference`
 - `meta.comparison.next_read[]`
+
+### Discovery Axes
+
+- `meta.discovery_axes.problem[]`
+- `meta.discovery_axes.method[]`
+- `meta.discovery_axes.evaluation[]`
+- `meta.discovery_axes.risk[]`
 
 ### Relation Candidates
 
@@ -109,19 +104,6 @@
 - `meta.evaluation.datasets[]`
 - `meta.evaluation.metrics[]`
 - `meta.evaluation.baselines[]`
-
-### Assets
-
-- `meta.assets.figures[].label`
-- `meta.assets.figures[].caption`
-- `meta.assets.figures[].role`
-- `meta.assets.figures[].importance`
-- `meta.assets.tables[].label`
-- `meta.assets.tables[].caption`
-- `meta.assets.tables[].role`
-- `meta.assets.tables[].importance`
-
-其中 `assets.*` 尤其要注意：contract 明确要求它们必须由 skill 产出，下游脚本不能再靠关键词启发式补推。
 
 ## 3. 不应算进“需要 skill 推断的 meta 字段”的 artifact 包裹字段
 
@@ -167,5 +149,5 @@
 可以直接按下面这条记：
 
 - 除了 artifact 顶层的来源/版本/时间字段以外，`meta.*` 全部都应该视为 skill-owned。
-- 其中 `story`、`research_problem`、`core_contributions`、`method.summary/pipeline_steps/innovations`、`evaluation.headline/key_findings/setup_summary`、`claims`、`editorial`、`taxonomy`、`comparison`、`relation_candidates` 是最典型的“必须靠 skill 推断”的部分。
-- `datasets / metrics / baselines / method ingredients / assets` 虽然更接近抽取，但也仍应由 skill 负责 grounding 和规范化，不应交给下游脚本猜。
+- 其中 `story`、`research_problem`、`core_contributions`、`method.summary/pipeline_steps/innovations`、`evaluation.headline/key_findings/setup_summary`、`claims`、`research_risks`、`editorial`、`taxonomy`、`comparison`、`discovery_axes`、`relation_candidates` 是最典型的“必须靠 skill 推断”的部分。
+- `datasets / metrics / baselines / method ingredients / method representations` 虽然更接近抽取，但也仍应由 skill 负责 grounding 和规范化，不应交给下游脚本猜。

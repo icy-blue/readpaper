@@ -40,11 +40,9 @@ const CLAIM_TYPE_LABELS: Record<string, string> = {
 
 const RELATION_TYPE_LABELS: Record<string, string> = {
   compares_to: "对比",
-  extends: "扩展",
   uses_dataset: "使用数据集",
   uses_method: "使用方法",
   inspired_by: "受启发于",
-  same_problem: "同一问题",
 };
 
 const SIGNAL_LABELS: Record<string, string> = {
