@@ -428,6 +428,14 @@ export function markdownHref(path: string | undefined): string | undefined {
   return path.replace(/^\/+/, "");
 }
 
+export function translateConversationHref(conversationIds: string[] | undefined): string | undefined {
+  const firstId = conversationIds?.find((value) => typeof value === "string" && value.trim());
+  if (!firstId) {
+    return undefined;
+  }
+  return `https://translate.icydev.cn/chat/${encodeURIComponent(firstId)}`;
+}
+
 export function searchableText(paper: PaperCardView): string {
   return [
     paper.bibliography.title,

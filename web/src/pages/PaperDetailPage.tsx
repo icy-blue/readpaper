@@ -25,6 +25,7 @@ import {
   scoreLevelLabel,
   scoreLevelTagClass,
   sharedSignalPreview,
+  translateConversationHref,
   verdictTagClass,
 } from "../lib/paper";
 import type { FigureTableIndexItem, NeighborItem, PaperCanonicalRecord, PaperDetailViewModel, SiteIndexPayload } from "../types";
@@ -178,12 +179,18 @@ function ExternalLinkButtons({ paper }: { paper: PaperCanonicalRecord }) {
   const navigate = useNavigate();
   const links = firstExternalLinks(paper.bibliography);
   const markdownLink = markdownHref(paper.source.paper_path);
+  const translateLink = translateConversationHref(paper.source.conversation_ids);
 
   return (
     <Flex wrap="wrap" gap={10} className="hero-action-row">
       <Button icon={<ArrowLeftOutlined />} onClick={() => navigate("/")}>
         返回首页
       </Button>
+      {translateLink ? (
+        <Button href={translateLink} target="_blank" icon={<LinkOutlined />}>
+          原始 Translate
+        </Button>
+      ) : null}
       {markdownLink ? (
         <Button href={markdownLink} target="_blank" icon={<BookOutlined />}>
           Markdown
