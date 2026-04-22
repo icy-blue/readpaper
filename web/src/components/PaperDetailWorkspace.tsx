@@ -25,10 +25,13 @@ import {
   translateConversationHref,
   verdictTagClass,
 } from "../lib/paper";
-import { TooltipTag, TooltipText } from "./OverflowTooltip";
+import { OverflowCount, TooltipTag, TooltipText } from "./OverflowTooltip";
 import type { NeighborItem, PaperCanonicalRecord, PaperDetailViewModel, RelationItem, SiteIndexPayload } from "../types";
 
 const { Title, Paragraph, Text } = Typography;
+type WorkspaceLayoutMode = "default" | "home-compact";
+type SurfaceVariant = "card" | "plain";
+
 const RESOURCE_LABELS: Record<string, string> = {
   pdf: "查看 PDF",
   arxiv: "查看 arXiv",
@@ -50,15 +53,19 @@ function SectionCard({
   kicker,
   children,
   muted = false,
+  variant = "card",
 }: {
   title: string;
   kicker?: string;
   children: ReactNode;
   muted?: boolean;
+  variant?: SurfaceVariant;
 }) {
+  const displayKicker = variant === "card" ? kicker : undefined;
+
   return (
-    <section className={`workspace-section-card${muted ? " is-muted" : ""}`}>
-      {kicker ? <Text className="section-kicker">{kicker}</Text> : null}
+    <section className={`workspace-section-card${muted ? " is-muted" : ""}${variant === "plain" ? " is-plain" : ""}`}>
+      {displayKicker ? <Text className="section-kicker">{displayKicker}</Text> : null}
       <Text className="workspace-section-title">{title}</Text>
       <div className="workspace-section-body">{children}</div>
     </section>
@@ -106,7 +113,7 @@ function BadgeGroup({ values, tone }: { values: string[]; tone?: string | null }
 }
 
 function orderedResourceLinks(paper: PaperCanonicalRecord): Array<{ key: string; label: string; href: string }> {
-  const orderMap = new Map(RESOURCE_ORDER.map((key, index) => [key, index]));
+  const orderMap = new Map<string, number>(RESOURCE_ORDER.map((key, index) => [key, index]));
   return [...firstExternalLinks(paper.bibliography)]
     .sort((left, right) => (orderMap.get(left.key) ?? 99) - (orderMap.get(right.key) ?? 99))
     .map((item) => ({ ...item, label: RESOURCE_LABELS[item.key] || `查看 ${item.label}` }));
@@ -136,14 +143,46 @@ function QuickLookPanel({ paper }: { paper: PaperCanonicalRecord }) {
   );
 }
 
-function ClaimList({ paper }: { paper: PaperCanonicalRecord }) {
+function ResearchPositionPanel({ paper }: { paper: PaperCanonicalRecord }) {
+  return (
+    <section className="workspace-research-position">
+      <Text className="workspace-section-title">研究定位</Text>
+      <Paragraph className="workspace-lead">{paper.editorial.research_position || "暂无研究定位。"}</Paragraph>
+    </section>
+  );
+}
+
+function CompactMetaLine({ paper }: { paper: PaperCanonicalRecord }) {
+  const authors = paper.bibliography.authors.filter((author) => author.trim());
+  const visibleAuthors = authors.slice(0, 5);
+  const hiddenAuthors = authors.slice(5);
+  const authorLabel = visibleAuthors.length ? visibleAuthors.join(" / ") : "作者信息暂缺";
+  const venueLabel = paper.bibliography.venue || "未知 venue";
+
+  return (
+    <div className="workspace-meta-line workspace-meta-line-compact">
+      <span className="workspace-meta-group workspace-meta-authors" title={authorLabel}>
+        <Text className="workspace-meta-primary-text">{authorLabel}</Text>
+        <OverflowCount items={hiddenAuthors} className="workspace-meta-overflow-count" />
+      </span>
+      <span className="workspace-meta-separator">·</span>
+      <span className="workspace-meta-group workspace-meta-venue" title={venueLabel}>
+        <Text className="workspace-meta-venue-text">{venueLabel}</Text>
+      </span>
+      <span className="workspace-meta-separator">·</span>
+      <span className="workspace-meta-year">{formatYear(paper.bibliography.year)}</span>
+    </div>
+  );
+}
+
+function ClaimList({ paper, variant = "card" }: { paper: PaperCanonicalRecord; variant?: SurfaceVariant }) {
   if (!paper.claims.length) {
     return <EmptyState description="暂无结构化论断。" />;
   }
   return (
     <div className="workspace-stack">
       {paper.claims.map((claim, index) => (
-        <div key={`${paper.id}-claim-${index}`} className="workspace-note-card">
+        <div key={`${paper.id}-claim-${index}`} className={`workspace-note-card${variant === "plain" ? " is-plain" : ""}`}>
           <Flex justify="space-between" align="start" gap={12} wrap="wrap">
             <Paragraph className="workspace-body-copy claim-copy">{claim.text}</Paragraph>
             <Tag className="chip-tag chip-tag-route-overview">{displayClaimType(claim.type)}</Tag>
@@ -162,7 +201,7 @@ function ClaimList({ paper }: { paper: PaperCanonicalRecord }) {
   );
 }
 
-function RelationsList({ items }: { items: RelationItem[] }) {
+function RelationsList({ items, variant = "card" }: { items: RelationItem[]; variant?: SurfaceVariant }) {
   if (!items.length) {
     return <EmptyState description="暂无结构化关联关系。" />;
   }
@@ -172,7 +211,10 @@ function RelationsList({ items }: { items: RelationItem[] }) {
         const externalHref = item.target_kind === "external" ? semanticScholarSearchUrl(item.label) : null;
         const targetLabel = relationTargetLabel(item);
         return (
-          <div key={`${item.type}-${item.target_paper_id || item.label || "relation"}`} className="workspace-note-card">
+          <div
+            key={`${item.type}-${item.target_paper_id || item.label || "relation"}`}
+            className={`workspace-note-card${variant === "plain" ? " is-plain" : ""}`}
+          >
             <Flex justify="space-between" align="start" gap={12} wrap="wrap">
               <Text strong>{displayRelationType(item.type)}</Text>
               <Flex wrap="wrap" gap={8}>
@@ -201,14 +243,14 @@ function RelationsList({ items }: { items: RelationItem[] }) {
   );
 }
 
-function NeighborList({ items }: { items: NeighborItem[] }) {
+function NeighborList({ items, variant = "card" }: { items: NeighborItem[]; variant?: SurfaceVariant }) {
   if (!items.length) {
     return <EmptyState description="当前没有足够可靠的近邻。" />;
   }
   return (
     <div className="workspace-stack">
       {items.map((item) => (
-        <div key={`${item.paper_id}-${item.match_source}`} className="workspace-note-card">
+        <div key={`${item.paper_id}-${item.match_source}`} className={`workspace-note-card${variant === "plain" ? " is-plain" : ""}`}>
           <Flex justify="space-between" align="start" gap={12} wrap="wrap">
             <div className="workspace-note-main">
               <Link to={paperRoute(item.route_path, item.paper_id)} className="paper-link small">
@@ -230,51 +272,59 @@ function NeighborList({ items }: { items: NeighborItem[] }) {
   );
 }
 
-function SummaryTab({ paper }: { paper: PaperCanonicalRecord }) {
+function SummaryTab({ paper, variant = "card" }: { paper: PaperCanonicalRecord; variant?: SurfaceVariant }) {
   const summaryItems = [paper.story.paper_one_liner, paper.editorial.summary, paper.evaluation.headline].filter(Boolean) as string[];
   const highlights = [...paper.editorial.why_read, ...paper.editorial.strengths];
   const cautions = paper.editorial.cautions.length ? paper.editorial.cautions : paper.conclusion.limitations;
 
   return (
-    <div className="workspace-tab-stack">
-      <SectionCard title="读前摘要" kicker="Summary">
-        {summaryItems.length ? summaryItems.map((item) => <Paragraph key={item} className="workspace-body-copy">{item}</Paragraph>) : <Paragraph className="workspace-empty-copy">暂无结构化摘要。</Paragraph>}
+    <div className={`workspace-tab-stack${variant === "plain" ? " is-plain" : ""}`}>
+      <SectionCard title="读前摘要" kicker="Summary" variant={variant}>
+        {summaryItems.length ? (
+          summaryItems.map((item) => (
+            <Paragraph key={item} className="workspace-body-copy">
+              {item}
+            </Paragraph>
+          ))
+        ) : (
+          <Paragraph className="workspace-empty-copy">暂无结构化摘要。</Paragraph>
+        )}
       </SectionCard>
-      <SectionCard title="研究问题" muted>
+      <SectionCard title="研究问题" muted variant={variant}>
         <Paragraph className="workspace-body-copy">{paper.research_problem.summary || paper.story.problem || "暂无研究问题摘要。"}</Paragraph>
         {paper.research_problem.goal ? <Paragraph className="workspace-support-copy">目标：{paper.research_problem.goal}</Paragraph> : null}
         <TextList items={paper.research_problem.gaps} emptyText="暂无结构化研究缺口。" />
       </SectionCard>
-      <SectionCard title="核心贡献">
+      <SectionCard title="核心贡献" variant={variant}>
         <TextList items={paper.core_contributions} emptyText="暂无核心贡献整理。" ordered />
       </SectionCard>
-      <SectionCard title="为什么值得读">
+      <SectionCard title="为什么值得读" variant={variant}>
         <TextList items={highlights} emptyText="暂无明确亮点。" />
       </SectionCard>
-      <SectionCard title="风险与限制" muted>
+      <SectionCard title="风险与限制" muted variant={variant}>
         <TextList items={cautions} emptyText="暂无明确风险提示。" />
       </SectionCard>
     </div>
   );
 }
 
-function MethodTab({ paper }: { paper: PaperCanonicalRecord }) {
+function MethodTab({ paper, variant = "card" }: { paper: PaperCanonicalRecord; variant?: SurfaceVariant }) {
   return (
-    <div className="workspace-tab-stack">
-      <SectionCard title="方法摘要" kicker="Method">
+    <div className={`workspace-tab-stack${variant === "plain" ? " is-plain" : ""}`}>
+      <SectionCard title="方法摘要" kicker="Method" variant={variant}>
         <Paragraph className="workspace-body-copy">{paper.method.summary || paper.story.method || "暂无方法概述。"}</Paragraph>
       </SectionCard>
-      <SectionCard title="实验结论" muted>
+      <SectionCard title="实验结论" muted variant={variant}>
         <Paragraph className="workspace-body-copy">{paper.evaluation.headline || paper.story.result || "暂无实验结论。"}</Paragraph>
         {paper.evaluation.setup_summary ? <Paragraph className="workspace-support-copy">{paper.evaluation.setup_summary}</Paragraph> : null}
       </SectionCard>
-      <SectionCard title="方法流程">
+      <SectionCard title="方法流程" variant={variant}>
         <TextList items={paper.method.pipeline_steps} emptyText="暂无明确流程拆解。" ordered />
       </SectionCard>
-      <SectionCard title="关键创新" muted>
+      <SectionCard title="关键创新" muted variant={variant}>
         <TextList items={paper.method.innovations} emptyText="暂无结构化创新点。" />
       </SectionCard>
-      <SectionCard title="组件与表示">
+      <SectionCard title="组件与表示" variant={variant}>
         <KeyValueGrid
           items={[
             { label: "组件", value: <BadgeGroup values={paper.method.ingredients} tone="gold" /> },
@@ -284,14 +334,14 @@ function MethodTab({ paper }: { paper: PaperCanonicalRecord }) {
           ]}
         />
       </SectionCard>
-      <SectionCard title="主要发现" muted>
+      <SectionCard title="主要发现" muted variant={variant}>
         <TextList items={paper.evaluation.key_findings} emptyText="暂无结构化主要发现。" />
       </SectionCard>
     </div>
   );
 }
 
-function MetadataTab({ paper }: { paper: PaperCanonicalRecord }) {
+function MetadataTab({ paper, variant = "card" }: { paper: PaperCanonicalRecord; variant?: SurfaceVariant }) {
   const links = orderedResourceLinks(paper);
   const markdownLinkHref = markdownHref(paper.source.paper_path);
   const translateLinkHref = translateConversationHref(paper.source.conversation_ids);
@@ -305,8 +355,8 @@ function MetadataTab({ paper }: { paper: PaperCanonicalRecord }) {
   ];
 
   return (
-    <div className="workspace-tab-stack">
-      <SectionCard title="基础元信息" kicker="Metadata">
+    <div className={`workspace-tab-stack${variant === "plain" ? " is-plain" : ""}`}>
+      <SectionCard title="基础元信息" kicker="Metadata" variant={variant}>
         <KeyValueGrid
           items={[
             { label: "标题", value: paper.bibliography.title },
@@ -319,7 +369,7 @@ function MetadataTab({ paper }: { paper: PaperCanonicalRecord }) {
           ]}
         />
       </SectionCard>
-      <SectionCard title="资源链接" muted>
+      <SectionCard title="资源链接" muted variant={variant}>
         {hasAnyResource ? (
           <Flex wrap="wrap" gap={10}>
             {links.map((item) => (
@@ -342,10 +392,10 @@ function MetadataTab({ paper }: { paper: PaperCanonicalRecord }) {
           <Paragraph className="workspace-empty-copy">暂无外部资源链接。</Paragraph>
         )}
       </SectionCard>
-      <SectionCard title="Taxonomy">
+      <SectionCard title="Taxonomy" variant={variant}>
         <KeyValueGrid items={taxonomyRows} />
       </SectionCard>
-      <SectionCard title="素材索引" muted>
+      <SectionCard title="素材索引" muted variant={variant}>
         <KeyValueGrid
           items={[
             { label: "Figures", value: paper.assets.figures.length || "暂无" },
@@ -355,24 +405,32 @@ function MetadataTab({ paper }: { paper: PaperCanonicalRecord }) {
           ]}
         />
       </SectionCard>
-      <SectionCard title="结构化论断">
-        <ClaimList paper={paper} />
+      <SectionCard title="结构化论断" variant={variant}>
+        <ClaimList paper={paper} variant={variant} />
       </SectionCard>
     </div>
   );
 }
 
-function RelatedTab({ detail, payload }: { detail: PaperDetailViewModel; payload: SiteIndexPayload }) {
+function RelatedTab({
+  detail,
+  payload,
+  variant = "card",
+}: {
+  detail: PaperDetailViewModel;
+  payload: SiteIndexPayload;
+  variant?: SurfaceVariant;
+}) {
   const paper = detail.canonical;
 
   return (
-    <div className="workspace-tab-stack">
-      <SectionCard title="下一篇线索" kicker="Related">
+    <div className={`workspace-tab-stack${variant === "plain" ? " is-plain" : ""}`}>
+      <SectionCard title="下一篇线索" kicker="Related" variant={variant}>
         <BadgeGroup values={paper.comparison.next_read} tone="processing" />
         {paper.comparison.aspects.length ? (
           <div className="workspace-stack">
             {paper.comparison.aspects.map((item) => (
-              <div key={`${item.aspect}-${item.difference}`} className="workspace-note-card">
+              <div key={`${item.aspect}-${item.difference}`} className={`workspace-note-card${variant === "plain" ? " is-plain" : ""}`}>
                 <Text strong>{displayComparisonAspect(item.aspect)}</Text>
                 <Paragraph className="workspace-support-copy">{cleanDisplayText(item.difference, 160)}</Paragraph>
               </div>
@@ -380,17 +438,17 @@ function RelatedTab({ detail, payload }: { detail: PaperDetailViewModel; payload
           </div>
         ) : null}
       </SectionCard>
-      <SectionCard title="相关论文近邻" muted>
+      <SectionCard title="相关论文近邻" muted variant={variant}>
         <Tabs
           items={payload.navigation.neighbor_tabs.map((tab) => ({
             key: tab.key,
             label: tab.label,
-            children: <NeighborList items={detail.neighbors[tab.key]} />,
+            children: <NeighborList items={detail.neighbors[tab.key]} variant={variant} />,
           }))}
         />
       </SectionCard>
-      <SectionCard title="关联关系">
-        <RelationsList items={paper.relations} />
+      <SectionCard title="关联关系" variant={variant}>
+        <RelationsList items={paper.relations} variant={variant} />
       </SectionCard>
     </div>
   );
@@ -401,12 +459,14 @@ export function PaperDetailWorkspace({
   payload,
   headerActions,
   debugMode = false,
+  layoutMode = "default",
   className = "",
 }: {
   paperId: string;
   payload: SiteIndexPayload;
   headerActions?: ReactNode;
   debugMode?: boolean;
+  layoutMode?: WorkspaceLayoutMode;
   className?: string;
 }) {
   const [detail, setDetail] = useState<PaperDetailViewModel | null>(null);
@@ -451,11 +511,12 @@ export function PaperDetailWorkspace({
     if (!detail) {
       return [];
     }
+    const variant: SurfaceVariant = layoutMode === "home-compact" ? "plain" : "card";
     const items = [
-      { key: "summary", label: "Summary", children: <SummaryTab paper={detail.canonical} /> },
-      { key: "method", label: "Method", children: <MethodTab paper={detail.canonical} /> },
-      { key: "metadata", label: "Metadata", children: <MetadataTab paper={detail.canonical} /> },
-      { key: "related", label: "Related", children: <RelatedTab detail={detail} payload={payload} /> },
+      { key: "summary", label: layoutMode === "home-compact" ? "摘要" : "Summary", children: <SummaryTab paper={detail.canonical} variant={variant} /> },
+      { key: "method", label: layoutMode === "home-compact" ? "方法" : "Method", children: <MethodTab paper={detail.canonical} variant={variant} /> },
+      { key: "metadata", label: layoutMode === "home-compact" ? "元信息" : "Metadata", children: <MetadataTab paper={detail.canonical} variant={variant} /> },
+      { key: "related", label: layoutMode === "home-compact" ? "相关" : "Related", children: <RelatedTab detail={detail} payload={payload} variant={variant} /> },
     ];
     if (debugMode) {
       items.push({
@@ -465,7 +526,7 @@ export function PaperDetailWorkspace({
       });
     }
     return items;
-  }, [debugMode, detail, payload]);
+  }, [debugMode, detail, layoutMode, payload]);
 
   if (!paperId) {
     return (
@@ -502,6 +563,7 @@ export function PaperDetailWorkspace({
 
   const paper = detail.canonical;
   const primaryPdfLink = orderedResourceLinks(paper).find((item) => item.key === "pdf") ?? null;
+  const translateLinkHref = translateConversationHref(paper.source.conversation_ids);
   const topTags = [
     paper.bibliography.venue || "未知来源",
     formatYear(paper.bibliography.year),
@@ -510,7 +572,7 @@ export function PaperDetailWorkspace({
   const headlineTags = [...new Set([...paper.taxonomy.tasks, ...paper.taxonomy.methods, ...paper.taxonomy.themes])].slice(0, 4);
 
   return (
-    <div className={`workspace-shell ${className}`.trim()}>
+    <div className={`workspace-shell${layoutMode === "home-compact" ? " is-home-compact" : ""} ${className}`.trim()}>
       <div className="workspace-header">
         <div className="workspace-header-main">
           <Flex wrap="wrap" gap={8}>
@@ -526,14 +588,21 @@ export function PaperDetailWorkspace({
             <Title level={2} className="workspace-title">
               {paper.bibliography.title}
             </Title>
-            <Paragraph className="workspace-meta-line">
-              {paper.bibliography.authors.length ? paper.bibliography.authors.join(" / ") : "作者信息暂缺"} · {paper.bibliography.venue || "未知 venue"} ·{" "}
-              {formatYear(paper.bibliography.year)}
-            </Paragraph>
+            {layoutMode === "home-compact" ? <CompactMetaLine paper={paper} /> : (
+              <Paragraph className="workspace-meta-line">
+                {paper.bibliography.authors.length ? paper.bibliography.authors.join(" / ") : "作者信息暂缺"} · {paper.bibliography.venue || "未知 venue"} ·{" "}
+                {formatYear(paper.bibliography.year)}
+              </Paragraph>
+            )}
           </div>
           <div className="workspace-header-actions">
             <Flex wrap="wrap" gap={10}>
               {headerActions}
+              {layoutMode === "home-compact" && translateLinkHref ? (
+                <Button href={translateLinkHref} target="_blank" icon={<BookOutlined />}>
+                  查看翻译
+                </Button>
+              ) : null}
               {primaryPdfLink ? (
                 <Button href={primaryPdfLink.href} target="_blank" icon={<LinkOutlined />}>
                   {primaryPdfLink.label}
@@ -551,7 +620,7 @@ export function PaperDetailWorkspace({
         </div>
       </div>
 
-      <QuickLookPanel paper={paper} />
+      {layoutMode === "home-compact" ? <ResearchPositionPanel paper={paper} /> : <QuickLookPanel paper={paper} />}
 
       {error ? <Alert type="warning" showIcon message="已显示缓存内容，刷新详情时出现问题" description={error} /> : null}
 

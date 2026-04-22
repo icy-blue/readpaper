@@ -106,3 +106,47 @@ export function TooltipTag({
     </Tooltip>
   );
 }
+
+export function OverflowCount({
+  items,
+  className,
+  mode = "text",
+  label,
+}: {
+  items: Array<string | null | undefined>;
+  className?: string;
+  mode?: "tag" | "text";
+  label?: string;
+}) {
+  const contentItems = items.map((item) => (item ?? "").trim()).filter(Boolean);
+  if (!contentItems.length) {
+    return null;
+  }
+
+  const displayLabel = label ?? `+${contentItems.length}`;
+  const node =
+    mode === "tag" ? (
+      <Tag className={className}>{displayLabel}</Tag>
+    ) : (
+      <Text className={className}>{displayLabel}</Text>
+    );
+
+  return (
+    <Tooltip
+      title={
+        <div className="overflow-tooltip-list">
+          {contentItems.map((item, index) => (
+            <div key={`${item}-${index}`} className="overflow-tooltip-item">
+              {item}
+            </div>
+          ))}
+        </div>
+      }
+      trigger={["hover", "focus"]}
+    >
+      <span className="tooltip-trigger" tabIndex={0}>
+        {node}
+      </span>
+    </Tooltip>
+  );
+}

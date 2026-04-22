@@ -24,7 +24,7 @@ import {
   selectedFilterSummary,
   verdictTagClass,
 } from "../lib/paper";
-import { TooltipTag } from "../components/OverflowTooltip";
+import { OverflowCount, TooltipTag } from "../components/OverflowTooltip";
 import type { PaperCardView, SiteIndexPayload } from "../types";
 
 const { Title, Paragraph, Text } = Typography;
@@ -51,7 +51,7 @@ function buildSortValue(field: "year" | "title", direction: "asc" | "desc"): str
 }
 
 function discoveryTags(paper: PaperCardView): string[] {
-  return [...paper.taxonomy.tasks, ...paper.taxonomy.methods, ...paper.taxonomy.themes].slice(0, 3);
+  return [...new Set([...paper.taxonomy.tasks, ...paper.taxonomy.methods, ...paper.taxonomy.themes])];
 }
 
 function authorSummary(paper: PaperCardView): string {
@@ -258,32 +258,34 @@ function HomeToolbar({
 function PaperListItem({
   paper,
   selected,
-  featured,
   onSelect,
   itemRef,
 }: {
   paper: PaperCardView;
   selected: boolean;
-  featured: boolean;
   onSelect: () => void;
   itemRef?: (node: HTMLButtonElement | null) => void;
 }) {
+  const tagLabels = discoveryTags(paper).map((tag) => displayValueLabel(tag));
+  const visibleTagLabels = tagLabels.slice(0, 2);
+  const hiddenTagLabels = tagLabels.slice(2);
+
   return (
     <button type="button" ref={itemRef} className={`paper-list-item${selected ? " is-selected" : ""}`} onClick={onSelect}>
       <Flex wrap="wrap" gap={8} className="paper-list-item-decision">
         {paper.editorial.verdict ? <Tag className={verdictTagClass(paper.editorial.verdict)}>{paper.editorial.verdict}</Tag> : null}
         <Tag className={routeTagClass(paper.editorial.reading_route)}>{recommendedRouteLabel(paper.editorial.reading_route)}</Tag>
-        {featured || paper.editorial.graph_worthy ? <Tag className="chip-tag chip-tag-worth">精选</Tag> : null}
       </Flex>
       <Text className="paper-list-item-title">{paper.bibliography.title}</Text>
       <Paragraph className="paper-list-item-meta">
         {authorSummary(paper)} · {paper.bibliography.venue || "未知 venue"} · {paper.bibliography.year || "未知年份"}
       </Paragraph>
-      <Flex wrap="wrap" gap={8} className="paper-list-item-tags">
-        {discoveryTags(paper).map((tag) => (
-          <TooltipTag key={`${paper.id}-${tag}`} label={displayValueLabel(tag)} maxChars={18} className="chip-tag chip-tag-tone-blue" />
+      <div className="paper-list-item-tags">
+        {visibleTagLabels.map((tagLabel) => (
+          <TooltipTag key={`${paper.id}-${tagLabel}`} label={tagLabel} maxChars={18} className="chip-tag chip-tag-tone-blue" />
         ))}
-      </Flex>
+        <OverflowCount items={hiddenTagLabels} mode="tag" className="chip-tag chip-tag-tone-blue" />
+      </div>
     </button>
   );
 }
@@ -294,7 +296,6 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const paperItemRefs = useRef(new Map<string, HTMLButtonElement>());
   const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
-  const featuredIds = useMemo(() => new Set(payload.featured.map((paper) => paper.id)), [payload.featured]);
 
   const [titleQuery, setTitleQuery] = useState("");
   const [selectedThemes, setSelectedThemes] = useState<string[]>([]);
@@ -465,9 +466,9 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
         <section className="console-list-panel">
           <div className="console-panel-header">
             <div>
-              <Text className="section-kicker">Results</Text>
+              <Text className="section-kicker">论文列表</Text>
               <Title level={4} className="console-panel-title">
-                {filteredPapers.length ? `${filteredPapers.length} 篇候选论文` : "没有匹配结果"}
+                {filteredPapers.length ? `共 ${filteredPapers.length} 篇论文` : "暂无匹配论文"}
               </Title>
             </div>
           </div>
@@ -479,7 +480,6 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
                   key={paper.id}
                   paper={paper}
                   selected={paper.id === selectedPaperId}
-                  featured={featuredIds.has(paper.id)}
                   onSelect={() => handleSelectPaper(paper)}
                   itemRef={(node) => {
                     if (node) {
@@ -504,6 +504,7 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
               paperId={selectedPaperId}
               payload={payload}
               headerActions={openDetailAction}
+              layoutMode="home-compact"
               className="console-workspace"
             />
           </section>
@@ -522,6 +523,7 @@ export function HomePage({ payload }: { payload: SiteIndexPayload }) {
           paperId={selectedPaperId}
           payload={payload}
           headerActions={openDetailAction}
+          layoutMode="home-compact"
           className="console-workspace is-drawer"
         />
       </Drawer>

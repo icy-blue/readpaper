@@ -669,6 +669,15 @@ a {
   outline: none;
 }
 
+.overflow-tooltip-list {
+  display: grid;
+  gap: 4px;
+}
+
+.overflow-tooltip-item {
+  line-height: 1.5;
+}
+
 .tag-tooltip-trigger .ant-tag {
   margin-inline-end: 0;
 }
@@ -1612,9 +1621,10 @@ a {
 
 .console-detail-panel {
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   padding: 14px;
   border-left: 1px solid rgba(215, 225, 236, 0.96);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 252, 255, 0.98) 100%);
@@ -1720,7 +1730,27 @@ a {
 }
 
 .paper-list-item-tags {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: center;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.paper-list-item-tags .tooltip-trigger,
+.paper-list-item-tags .tag-tooltip-trigger {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.paper-list-item-tags .chip-tag {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  word-break: normal;
 }
 
 .console-empty-panel {
@@ -1755,6 +1785,14 @@ a {
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 10px 28px rgba(31, 52, 77, 0.05);
+  overflow: hidden;
+}
+
+.console-detail-panel > .workspace-shell.console-workspace {
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .workspace-header {
@@ -1822,6 +1860,62 @@ a {
   font-size: 14px;
 }
 
+.workspace-meta-line-compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, max-content) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.workspace-meta-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.workspace-meta-authors {
+  min-width: 0;
+}
+
+.workspace-meta-venue {
+  min-width: 0;
+  max-width: 180px;
+}
+
+.workspace-meta-line-compact .tooltip-trigger {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.workspace-meta-primary-text,
+.workspace-meta-venue-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-meta-overflow-count,
+.workspace-meta-separator,
+.workspace-meta-year {
+  flex: 0 0 auto;
+}
+
+.workspace-meta-overflow-count {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.workspace-meta-year {
+  color: var(--text-secondary);
+}
+
 .workspace-lead {
   font-size: 15px;
   line-height: 1.7;
@@ -1840,8 +1934,12 @@ a {
 
 .workspace-tabs .ant-tabs-nav {
   margin-bottom: 0;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(220, 228, 237, 0.92);
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.workspace-tabs .ant-tabs-nav::before {
+  border-bottom: 0 !important;
 }
 
 .workspace-tabs .ant-tabs-content-holder {
@@ -1857,6 +1955,11 @@ a {
   padding-right: 2px;
 }
 
+.workspace-tab-stack.is-plain {
+  gap: 22px;
+  padding-right: 0;
+}
+
 .workspace-section-card {
   display: grid;
   gap: 12px;
@@ -1868,6 +1971,15 @@ a {
 
 .workspace-section-card.is-muted {
   background: linear-gradient(180deg, rgba(247, 250, 252, 0.98) 0%, rgba(243, 247, 251, 0.96) 100%);
+}
+
+.workspace-section-card.is-plain,
+.workspace-section-card.is-plain.is-muted {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .workspace-section-title {
@@ -1925,6 +2037,34 @@ a {
   border: 1px solid rgba(223, 231, 239, 0.92);
   border-radius: 14px;
   background: rgba(250, 252, 254, 0.94);
+}
+
+.workspace-note-card.is-plain {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.workspace-research-position {
+  display: grid;
+  gap: 8px;
+}
+
+.workspace-shell.is-home-compact .workspace-header {
+  gap: 10px;
+}
+
+.workspace-shell.is-home-compact .workspace-title-block {
+  gap: 6px;
+}
+
+.workspace-shell.is-home-compact .workspace-header-actions {
+  gap: 10px;
+}
+
+.workspace-shell.is-home-compact .workspace-headline-tags {
+  overflow: hidden;
 }
 
 .workspace-note-main {
@@ -1986,6 +2126,10 @@ a {
   .detail-page-workspace {
     height: auto;
     min-height: 0;
+  }
+
+  .console-detail-panel > .workspace-shell.console-workspace {
+    height: auto;
   }
 
   .paper-list-scroll {
